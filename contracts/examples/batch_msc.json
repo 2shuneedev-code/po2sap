@@ -1,0 +1,113 @@
+{
+  "batch_id": "b_20260910_0001",
+  "customer": "MSC",
+  "status": "NEEDS_REVIEW",
+  "files": [
+    { "file_id": "f1", "name": "P7988114.HTM", "status": "DONE", "row_count": 5 },
+    { "file_id": "f2", "name": "P8033553.HTM", "status": "FAILED", "row_count": 0,
+      "error": "품목표를 찾지 못했습니다. 원문을 확인해 주세요." }
+  ],
+  "columns": [
+    "AUART","VKORG","VTWEG","VBELN","KUNNR1","KUNNR2","KUNNR3","BSTKD","VDATU","ZTERM",
+    "INCO1","INCO2","ZBRAND","ZSHCO","ZPKRE1","MATNR","MAKTX","KWMENG","LGORT","ETDAT",
+    "BATCH","VALTY","ZPKRE2","EMPST","VSART","PRICE","WAERK","BSTDK_E","POSEX","DELCO",
+    "BSTKD_E","AUGRU","VKAUS","IHREZ_E","VGBEL","VGPOS"
+  ],
+  "grid": {
+    "pinned": ["BSTKD", "KUNNR2", "MATNR", "KWMENG"],
+    "hidden": ["VTWEG","VBELN","VDATU","ZTERM","INCO1","INCO2","ZPKRE1","MAKTX","LGORT",
+               "ETDAT","BATCH","VALTY","EMPST","PRICE","WAERK","BSTDK_E","POSEX","DELCO",
+               "BSTKD_E","AUGRU","VKAUS","IHREZ_E","VGBEL","VGPOS"],
+    "width": { "MATNR": 140, "ZPKRE2": 180, "BSTKD": 180 }
+  },
+  "rows": [
+    {
+      "row_id": "r_0001", "_file_id": "f1", "_file": "P7988114.HTM",
+      "_group": "ELKHART", "_line_no": 1,
+      "fields": {
+        "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
+        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
+        "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
+        "MATNR": "T1634585", "MAKTX": "", "KWMENG": "30", "LGORT": "", "ETDAT": "",
+        "BATCH": "", "VALTY": "", "ZPKRE2": "C", "EMPST": "", "VSART": "04",
+        "PRICE": "", "WAERK": "", "BSTDK_E": "", "POSEX": "", "DELCO": "",
+        "BSTKD_E": "", "AUGRU": "", "VKAUS": "", "IHREZ_E": "", "VGBEL": "", "VGPOS": ""
+      },
+      "issues": [], "edited": []
+    },
+    {
+      "row_id": "r_0002", "_file_id": "f1", "_file": "P7988114.HTM",
+      "_group": "ELKHART", "_line_no": 2,
+      "fields": {
+        "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
+        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
+        "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
+        "MATNR": "", "MAKTX": "", "KWMENG": "30", "LGORT": "", "ETDAT": "",
+        "BATCH": "", "VALTY": "", "ZPKRE2": "C,Blue RING", "EMPST": "", "VSART": "04",
+        "PRICE": "", "WAERK": "", "BSTDK_E": "", "POSEX": "", "DELCO": "",
+        "BSTKD_E": "", "AUGRU": "", "VKAUS": "", "IHREZ_E": "", "VGBEL": "", "VGPOS": ""
+      },
+      "issues": [
+        { "field": "MATNR", "severity": "error", "code": "REQUIRED_MISSING",
+          "message": "자재번호를 찾지 못했습니다" }
+      ],
+      "edited": []
+    },
+    {
+      "row_id": "r_0003", "_file_id": "f1", "_file": "P7988114.HTM",
+      "_group": "ELKHART", "_line_no": 3,
+      "fields": {
+        "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
+        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
+        "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
+        "MATNR": "T1620202B", "MAKTX": "", "KWMENG": "20", "LGORT": "", "ETDAT": "",
+        "BATCH": "", "VALTY": "", "ZPKRE2": "C", "EMPST": "", "VSART": "04",
+        "PRICE": "", "WAERK": "", "BSTDK_E": "", "POSEX": "", "DELCO": "",
+        "BSTKD_E": "", "AUGRU": "", "VKAUS": "", "IHREZ_E": "", "VGBEL": "", "VGPOS": ""
+      },
+      "issues": [
+        { "field": "ZPKRE2", "severity": "warn", "code": "REF_NOT_FOUND",
+          "message": "참조표에 없는 품번입니다 (38012910)" }
+      ],
+      "edited": []
+    },
+    {
+      "row_id": "r_0004", "_file_id": "f1", "_file": "P7988114.HTM",
+      "_group": "RENO", "_line_no": 1,
+      "fields": {
+        "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
+        "KUNNR1": "100249", "KUNNR2": "319678", "KUNNR3": "100249",
+        "BSTKD": "7988114(RENO)", "VDATU": "", "ZTERM": "",
+        "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
+        "MATNR": "T1697506", "MAKTX": "", "KWMENG": "35", "LGORT": "", "ETDAT": "",
+        "BATCH": "", "VALTY": "", "ZPKRE2": "O", "EMPST": "", "VSART": "04",
+        "PRICE": "", "WAERK": "", "BSTDK_E": "", "POSEX": "", "DELCO": "",
+        "BSTKD_E": "", "AUGRU": "", "VKAUS": "", "IHREZ_E": "", "VGBEL": "", "VGPOS": ""
+      },
+      "issues": [], "edited": []
+    },
+    {
+      "row_id": "r_0005", "_file_id": "f1", "_file": "P7988114.HTM",
+      "_group": "RENO", "_line_no": 2,
+      "fields": {
+        "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
+        "KUNNR1": "100249", "KUNNR2": "319678", "KUNNR3": "100249",
+        "BSTKD": "7988114(RENO)", "VDATU": "", "ZTERM": "",
+        "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
+        "MATNR": "T2660506", "MAKTX": "", "KWMENG": "10", "LGORT": "", "ETDAT": "",
+        "BATCH": "", "VALTY": "", "ZPKRE2": "O,Green RING", "EMPST": "", "VSART": "04",
+        "PRICE": "", "WAERK": "", "BSTDK_E": "", "POSEX": "", "DELCO": "",
+        "BSTKD_E": "", "AUGRU": "", "VKAUS": "", "IHREZ_E": "", "VGBEL": "", "VGPOS": ""
+      },
+      "issues": [
+        { "field": "KWMENG", "severity": "warn", "code": "LOW_CONFIDENCE",
+          "message": "수량 인식 신뢰도가 낮습니다. 원문을 확인해 주세요." }
+      ],
+      "edited": []
+    }
+  ],
+  "summary": { "row_count": 5, "total_qty": "125", "error_count": 1, "warn_count": 2 }
+}

@@ -1,0 +1,52 @@
+{
+  "code": "MSC",
+  "name": "MSC Industrial Supply",
+  "customer_no": "100249",
+  "fixed": [
+    { "field": "AUART",  "label": "오더유형",   "value": "ZEXP" },
+    { "field": "VKORG",  "label": "판매조직",   "value": "1000" },
+    { "field": "KUNNR1", "label": "판매처",     "value": "100249" },
+    { "field": "KUNNR3", "label": "최종고객",   "value": "100249" },
+    { "field": "ZSHCO",  "label": "출하조건",   "value": "A" },
+    { "field": "VSART",  "label": "운송수단",   "value": "04" }
+  ],
+  "rules": [
+    {
+      "id": "brand_code",
+      "kind": "keyword_map",
+      "label": "브랜드 판별",
+      "note": "위에서부터 순서대로 확인합니다 (ORDERED FROM 기준)",
+      "columns": ["발주서에 포함", "→ ZBRAND"],
+      "rows": [
+        ["HERTEL", "38"],
+        ["INTERSTATE", "127"],
+        ["ACCUPRO", "205"],
+        ["CLASS C", "428"]
+      ]
+    },
+    {
+      "id": "ship_to_routing",
+      "kind": "table",
+      "label": "출하처(Ship To) 분기",
+      "note": "출하처 블록의 창고명에서 도시를 찾습니다",
+      "columns": ["출하처에 포함", "→ KUNNR2", "→ ZPKRE2 기본값"],
+      "rows": [
+        ["ELKHART", "100249", "C"],
+        ["HARRISBURG", "319677", "N"],
+        ["RENO", "319678", "O"],
+        ["ATLANTA", "319679", "A"]
+      ]
+    },
+    {
+      "id": "ref_codes",
+      "kind": "lookup",
+      "label": "참조표 조회",
+      "note": "거래처 품번으로 참조표를 조회해 ZPKRE2 에 추가합니다 (예: \"C,Blue RING\")",
+      "columns": [],
+      "rows": []
+    }
+  ],
+  "split": { "by": "shipment", "label": "출하처(Shipment)별로 오더를 나눕니다" },
+  "todos": [],
+  "footer": "나머지 항목은 발주서에서 읽어옵니다."
+}

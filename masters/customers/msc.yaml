@@ -1,0 +1,182 @@
+# ═══════════════════════════════════════════════════════════════
+#  MSC Industrial Supply  (고객코드 100249)
+#  스키마: masters/SCHEMA.md
+# ═══════════════════════════════════════════════════════════════
+version: 2
+
+meta:
+  code: MSC
+  name: "MSC Industrial Supply"
+  customer_no: "100249"
+  owner: "※ 지정 필요"
+  status: active
+  file_types: [htm, html]
+
+extends: [_base/sap_defaults]
+
+extraction:
+  input: text
+  page_limit: 40
+  hints: |
+    MSC Industrial 표준 발주서(HTM)다. 표는 class="potbl" 테이블로 되어 있다.
+
+    [PO 번호]
+      <title> 의 "PO#7588650" 또는 "Purchase Order #7588650" 의 숫자.
+
+    [브랜드 원문]
+      "ORDERED FROM" 블록의 첫 줄을 원문 그대로 담을 것. 코드로 바꾸지 말 것.
+      예: "HERTEL (GP END MILLS) (APO)" / "ACCUPRO-CARBIDE DRILL MILL (AP"
+      ※ 품명(Description)이 아니라 ORDERED FROM 에 있다.
+
+    [출하처 — 두 가지 형태가 있다. 반드시 구분할 것] ★
+      (A) 단일 출하처
+          헤더 "SHIP TO" 블록에 창고명+주소가 그대로 있다.
+          → shipments 1건. 상단 품목표가 그 shipment 의 품목이다.
+
+      (B) 복수 출하처
+          헤더 SHIP TO 가 "Check complete attachment for shipping instructions" 이고
+          Receiving Location 이 "See Shipment" 이면 이 경우다.
+          문서 하단에 아래 블록이 출하처 수만큼 반복된다.
+              SHIP TO
+              Shipment No.......:    001
+              Receiving Loc.....:    ELK
+              SID TOOL - ELKHART WAREHOUSE
+              ...주소...
+              (이어서 그 출하처 전용 품목표)
+          → shipment 블록마다 별도 shipments 항목을 만들고,
+            품목은 반드시 그 블록의 품목표에서 가져올 것.
+          ※ 상단 요약 품목표는 전 출하처 합계다. 이것을 쓰지 말 것.
+
+      창고명에 도시명(ATLANTA / ELKHART / HARRISBURG / RENO)이 들어 있고
+      대소문자가 섞인다("SID TOOL Harrisburg Warehouse").
+      주소의 도시는 다를 수 있으므로(ATLANTA 창고 → Mableton, GA)
+      창고명 줄을 포함한 블록 전체를 ship_to_text 에 담을 것.
+
+    [품목표] — 컬럼명이 MSC 기준이라 우리와 반대다. 혼동 금지 ★
+      "Quantity Ordered"  → quantity
+      "Our Item Number"   → our_item    (MSC 품번. 8자리 숫자)
+      "Your Item Number"  → item_code   (우리 YG 품번)
+      "Description"       → description
+      "Price"             → unit_price  ("Line Cost" 합계금액과 혼동 금지)
+      ※ shipment 블록 품목표에는 Price 컬럼이 없다. 없으면 비워 둘 것.
+
+    [기타]
+      "Date of Order" / "Ship on Or Before" 는 M/D/YY(2/17/26). 원문 그대로.
+      "P.O Priced In" 은 "United States Dollars" 같은 문장. 원문 그대로.
+      페이지마다 표 머리글이 반복된다. 머리글을 품목으로 넣지 말 것.
+
+split:
+  by: shipment
+  label: "출하처(Shipment)별로 오더를 나눈다"
+  description: |
+    MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.
+    화면에는 한 그리드로 통합해 보여주고 BSTKD·KUNNR2 만 달라진다.
+
+tables:
+  ship_to_routing:
+    label: "출하처(Ship To) 분기"
+    scope: shipment
+    when:
+      - source: shipment.ship_to_text
+        fallback_source: header.ship_to_text
+        op: contains_ci
+        label: "출하처 블록에 포함"
+    then: [KUNNR2, _city, _pack_base]
+    rows:
+      - { when: ["ELKHART"],    then: ["100249", "ELKHART",    "C"] }
+      - { when: ["HARRISBURG"], then: ["319677", "HARRISBURG", "N"] }
+      - { when: ["RENO"],       then: ["319678", "RENO",       "O"] }
+      - { when: ["ATLANTA"],    then: ["319679", "ATLANTA",    "A"] }
+    on_no_match:
+      action: error
+      message: "출하처 도시를 인식하지 못했습니다 (ATLANTA / ELKHART / HARRISBURG / RENO)"
+
+rules:
+  brand_code:
+    kind: keyword_map
+    label: "브랜드 판별"
+    description: "ORDERED FROM 텍스트에 아래 키워드가 포함되면 해당 코드 (위에서부터)"
+    source: header.brand_text
+    case_insensitive: true
+    entries:
+      - { contains: "HERTEL",     value: "38"  }
+      - { contains: "INTERSTATE", value: "127" }
+      - { contains: "ACCUPRO",    value: "205" }
+      - { contains: "CLASS C",    value: "428" }
+    on_no_match:
+      action: error
+      message: "MSC 브랜드 키워드를 찾을 수 없습니다 (HERTEL / INTERSTATE / ACCUPRO / CLASS C)"
+
+  ref_codes:
+    kind: lookup
+    label: "MSC 참조표 조회"
+    description: |
+      MSC 품번으로 참조표를 조회해 포장 추가비고를 가져온다 (예: "Blue RING").
+      → ZPKRE2 에 출하처 기본값 뒤로 콤마 연결.
+      참조표 파일이 없거나 비어 있으면 기본값만 적용되고 정상 동작한다.
+    table_file: refs/msc_ref.csv
+    optional: true
+    key: line.our_item
+    key_column: our_item
+    return: [b_code, c_code]
+    on_no_match:
+      action: warn
+      message: "참조표에 없는 품번입니다: {our_item}"
+
+fields:
+  AUART:   { from: base }
+  VKORG:   { from: base }
+  VTWEG:   { from: base }
+  VBELN:   { from: const, value: "" }
+  KUNNR1:  { from: const, value: "100249" }
+  KUNNR2:  { from: table, table: ship_to_routing }
+  KUNNR3:  { from: const, value: "100249" }
+  BSTKD:
+    from: expr
+    expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)'
+    explain: '발주번호 뒤에 출하처 도시명을 괄호로 붙입니다 (예: 7588650(ATLANTA))'
+    required: true
+  VDATU:   { from: const, value: "" }
+  ZTERM:   { from: const, value: "" }
+  INCO1:   { from: const, value: "" }
+  INCO2:   { from: const, value: "" }
+  ZBRAND:  { from: rule,  rule: brand_code, required: true }
+  ZSHCO:   { from: const, value: "A" }
+  ZPKRE1:  { from: const, value: "" }
+  MATNR:   { from: doc,   path: line.item_code, required: true }
+  MAKTX:   { from: const, value: "" }
+  KWMENG:  { from: doc,   path: line.quantity, format: integer, required: true }
+  LGORT:   { from: const, value: "" }
+  ETDAT:   { from: const, value: "" }
+  BATCH:   { from: const, value: "" }
+  VALTY:   { from: const, value: "" }
+  ZPKRE2:
+    from: expr
+    expr: 'join(",", compact([_pack_base, ref_codes.b_code, ref_codes.c_code]))'
+    explain: '출하처 기본값(C/N/O/A) 뒤에 참조표 값을 쉼표로 연결 (예: "C,Blue RING")'
+  EMPST:   { from: const, value: "" }
+  VSART:   { from: const, value: "04" }
+  PRICE:   { from: const, value: "" }
+  WAERK:   { from: const, value: "" }
+  BSTDK_E: { from: const, value: "" }
+  POSEX:   { from: const, value: "" }
+  DELCO:   { from: const, value: "" }
+  BSTKD_E: { from: const, value: "" }
+  AUGRU:   { from: const, value: "" }
+  VKAUS:   { from: const, value: "" }
+  IHREZ_E: { from: const, value: "" }
+  VGBEL:   { from: const, value: "" }
+  VGPOS:   { from: const, value: "" }
+
+grid:
+  pinned: [BSTKD, KUNNR2, MATNR, KWMENG]
+  hidden: [VTWEG, VBELN, VDATU, ZTERM, INCO1, INCO2, ZPKRE1, MAKTX, LGORT,
+           ETDAT, BATCH, VALTY, EMPST, PRICE, WAERK, BSTDK_E, POSEX, DELCO,
+           BSTKD_E, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
+  width:  { MATNR: 140, ZPKRE2: 180, BSTKD: 180 }
+
+checks:
+  - id: shipment_total_match
+    label: "출하처별 수량 합계 = 상단 요약표 합계"
+    severity: error
+    description: "복수 출하처일 때 shipment 블록을 하나라도 놓치면 여기서 걸린다"

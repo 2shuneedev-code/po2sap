@@ -1,0 +1,5 @@
+[
+  { "code": "MSC",  "name": "MSC Industrial Supply", "customer_no": "100249", "file_types": ["htm", "html"] },
+  { "code": "KL",   "name": "Kennametal",            "customer_no": "107525", "file_types": ["pdf"] },
+  { "code": "YGJP", "name": "YG-1 Japan",            "customer_no": "3200",   "file_types": ["pdf"] }
+]

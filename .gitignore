@@ -1,0 +1,36 @@
+# ── 비밀 ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── 실행 산출물 ───────────────────────────────────────────────
+storage/
+*.log
+
+# ── Python ────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Node ──────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# ── OS / 에디터 ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+
+# ── 실물 발주서 (대외비) ──────────────────────────────────────
+# samples/ 는 samples/.gitignore 에서 원본 전부를 제외한다.
+# 테스트에 필요한 것은 **마스킹 후** backend/tests/fixtures/ 로 옮겨 커밋한다.

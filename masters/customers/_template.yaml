@@ -1,0 +1,88 @@
+# ═══════════════════════════════════════════════════════════════
+#  신규 거래처 템플릿 — 이 파일을 복사해서 <거래처코드>.yaml 로 만든다.
+#  스키마 정의: masters/SCHEMA.md
+#  값이 미정이면 비워 두고 todo: 를 달아라. 개발은 그대로 진행된다.
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+meta:
+  code: XXX
+  name: ""
+  customer_no: ""
+  owner: "※ 지정 필요"
+  status: draft            # draft 는 화면 거래처 목록에 안 뜬다
+  file_types: [pdf]
+
+extends: [_base/sap_defaults]
+
+extraction:
+  input: text
+  page_limit: 20
+  hints: |
+    (샘플 발주서를 보면서 문서 구조를 자연어로 설명한다.
+     - 어떤 라벨 아래 어떤 값이 있는지
+     - 혼동하기 쉬운 컬럼이 무엇인지
+     - 품목표의 시작/끝을 어떻게 아는지
+     값 변환 지시는 쓰지 않는다. 원문 그대로 읽게 한다.)
+
+split:
+  by: none                 # none | shipment
+
+# tables:                  # 분기(결정표)가 있으면 작성. 없으면 통째로 생략.
+#   my_table:
+#     scope: header
+#     when: [{ source: header.ship_to_text, op: contains_ci }]
+#     then: [KUNNR2, _pack_base]
+#     rows:
+#       - { when: ["CITY"], then: ["123456", "X"] }
+#     on_no_match: { action: error, message: "" }
+
+# rules:                   # 매핑 규칙이 있으면 작성.
+#   brand_code:
+#     kind: keyword_map
+#     source: header.brand_text
+#     entries: [{ contains: "", value: "" }]
+#     on_no_match: { action: error, message: "" }
+
+# ── 전송 필드는 전부 선언해야 한다 (누락 시 검증 실패) ─────────
+fields:
+  AUART:   { from: base }
+  VKORG:   { from: base }
+  VTWEG:   { from: base }
+  VBELN:   { from: const, value: "" }
+  KUNNR1:  { from: const, value: "", todo: "고객코드" }
+  KUNNR2:  { from: const, value: "", todo: "출하처 코드" }
+  KUNNR3:  { from: const, value: "", todo: "최종고객 코드" }
+  BSTKD:   { from: doc,   path: header.po_number, required: true }
+  VDATU:   { from: const, value: "" }
+  ZTERM:   { from: const, value: "" }
+  INCO1:   { from: const, value: "" }
+  INCO2:   { from: const, value: "" }
+  ZBRAND:  { from: const, value: "", todo: "브랜드 규칙" }
+  ZSHCO:   { from: const, value: "" }
+  ZPKRE1:  { from: const, value: "" }
+  MATNR:   { from: doc,   path: line.item_code, required: true }
+  MAKTX:   { from: const, value: "" }
+  KWMENG:  { from: doc,   path: line.quantity, format: integer, required: true }
+  LGORT:   { from: const, value: "" }
+  ETDAT:   { from: const, value: "" }
+  BATCH:   { from: const, value: "" }
+  VALTY:   { from: const, value: "" }
+  ZPKRE2:  { from: const, value: "" }
+  EMPST:   { from: const, value: "" }
+  VSART:   { from: const, value: "04" }
+  PRICE:   { from: const, value: "" }
+  WAERK:   { from: const, value: "" }
+  BSTDK_E: { from: const, value: "" }
+  POSEX:   { from: const, value: "" }
+  DELCO:   { from: const, value: "" }
+  BSTKD_E: { from: const, value: "" }
+  AUGRU:   { from: const, value: "" }
+  VKAUS:   { from: const, value: "" }
+  IHREZ_E: { from: const, value: "" }
+  VGBEL:   { from: const, value: "" }
+  VGPOS:   { from: const, value: "" }
+
+grid:
+  pinned: [BSTKD, MATNR, KWMENG]
+  hidden: []

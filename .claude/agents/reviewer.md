@@ -26,7 +26,7 @@ model: inherit
 |---|---|---|
 | 1 | **거래처 이름이 코드에 있는가** `grep -rn "MSC\|KL\|YGJP\|Kennametal" backend/app/ frontend/src/` | 있으면 **critical** (테스트·픽스처 제외) |
 | 2 | **필드 개수·목록 하드코딩** `grep -rn "\b33\b\|\b36\b" backend/app/ frontend/src/` | 있으면 **critical** |
-| 3 | **LLM 이 SAP 코드를 정하는가** — 프롬프트에 "코드로 바꿔라", "YYYYMMDD로" 같은 변환 지시 | 있으면 **critical** |
+| 3 | **LLM 이 SAP 코드를 정하는가** — 프롬프트에 "브랜드를 코드로 바꿔라", "출하처를 KUNNR2 로" 같은 **값 결정** 지시 | 있으면 **critical** (단, 날짜를 `YYYYMMDD` 8자리로 추출하라는 지시는 `masters/SCHEMA.md` §4.2.1 의 명시적 예외 — 위반 아님) |
 | 4 | **전송 페이로드** — `null` 사용, 숫자 타입 유출, 앞자리 0 손실, `_` 접두 필드 포함 여부 | 있으면 **critical** |
 | 5 | **보안** — `.env` 외 하드코딩된 키/URL, 로그에 원문·단가 기록, `samples/` 경로 커밋 | 있으면 **critical** |
 | 6 | **에러 처리** — 파일 1개 실패가 배치 전체를 죽이는가, EAI 재시도, 사용자에게 보일 한국어 메시지 | warning |

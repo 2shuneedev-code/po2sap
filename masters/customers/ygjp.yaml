@@ -22,13 +22,21 @@ extraction:
     일본어가 깨질 수 있으나 필요한 값은 대부분 영숫자다.
 
     [헤더]
-      "Created On:  2026-05-18"       → po_date (원문 그대로)
       "Purchase Order ID:  10972"     → po_number (원문 그대로)
                                         ※ 문서 라벨은 "ID" 지만 표준 키는 po_number 다
       "Incoterms: CIP"                → incoterms_text
       "Payment Terms: ..." 뒤 문장     → payment_terms_text
       "Ship-to Address:" 뒤 주소 블록  → ship_to_text
       통화는 표 하단 "Total Value: 82,575 JPY" 의 통화표기
+
+    [날짜 — YYYYMMDD 8자리로 담을 것] ★  (SCHEMA.md §4.2.1)
+      "Created On:  2026-05-18"  → po_date → "20260518"
+      품목표의 Delivery date     → line.delivery_date → 같은 방식으로 8자리
+      원문은 YYYY-MM-DD 표기지만 **반드시 구분자 없는 8자리 숫자 문자열**로 담는다.
+      · po_date 는 BSTKD(고객발주번호) 조립에 그대로 쓰인다.
+        8자리가 아니면 발주번호가 틀어지므로 특히 정확할 것.
+      · 발주일 ≤ 납기일이 되는지 확인할 것.
+      ※ 이 지시는 **날짜에만** 적용된다. 그 외 값은 원문 그대로 담는다.
 
     [품목표] — 머리글이 이렇게 붙어서 나온다.
       NoProduct IDYour CodeProduct DimensionsDelivery dateQtyNet PriceNet Value
@@ -38,11 +46,12 @@ extraction:
         Product ID    → item_code        (E24201502SE)  ※ 우리 YG 품번 → MATNR
         Your Code     → our_item         (1515X16X30X95 앞부분… 구분 주의)
         Product Dimensions → description
-        Delivery date → delivery_date    (2026-06-05)
+        Delivery date → delivery_date    (원문 2026-06-05 → "20260605")
         Qty           → quantity         (15)
         Net Price     → unit_price       (1,189)
         Net Value     → net_value        (17,835)
-      값이 붙어 있어 경계가 애매하면 **날짜(YYYY-MM-DD) 패턴을 기준점**으로 삼을 것.
+      값이 붙어 있어 경계가 애매하면 **원문의 날짜(YYYY-MM-DD) 패턴을 기준점**으로
+      삼아 컬럼을 자를 것. (자를 때는 원문 형태로 찾고, 담을 때는 8자리로 바꾼다)
       "Total Quantities:" 줄 이후는 품목이 아니다.
 
     [문서 하단 — 브랜드/포장/비고 블록] ★
@@ -109,8 +118,10 @@ fields:
   KUNNR3:  { from: const, value: "3200" }
   BSTKD:
     from: expr
-    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
+    expr: 'join("-", ["01", header.po_date, header.po_number])'
     explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
+    # po_date 는 추출 단계에서 이미 YYYYMMDD 8자리다 (SCHEMA.md §4.2.1).
+    # 엔진 날짜 변환 함수는 없다. 형식 이상은 ⑦ VALIDATE 가 경고로 잡는다.
     required: true
   VDATU:   { from: const, value: "" }
   ZTERM:   { from: const, value: "" }

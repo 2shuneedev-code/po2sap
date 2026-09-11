@@ -60,8 +60,18 @@ extraction:
       "Price"             → unit_price  ("Line Cost" 합계금액과 혼동 금지)
       ※ shipment 블록 품목표에는 Price 컬럼이 없다. 없으면 비워 둘 것.
 
+    [날짜 — YYYYMMDD 8자리로 담을 것] ★  (SCHEMA.md §4.2.1)
+      "Date of Order"     → po_date
+      "Ship on Or Before" → 해당 shipment/line 의 납기
+      원문은 M/D/YY 표기다(예: 2/17/26).
+      → 반드시 YYYYMMDD 8자리 문자열로 변환해 담을 것. "2/17/26" → "20260217"
+        · MSC 는 미국 거래처이므로 슬래시 표기는 **월/일** 순서다.
+        · 두 자리 연도는 2000년대로 읽는다.
+        · 변환 결과가 문서 내 다른 날짜와 앞뒤가 맞는지 확인할 것
+          (발주일 ≤ 출하기한). 어긋나면 해석을 다시 볼 것.
+      ※ 이 지시는 **날짜에만** 적용된다. 그 외 값은 아래처럼 원문 그대로 담는다.
+
     [기타]
-      "Date of Order" / "Ship on Or Before" 는 M/D/YY(2/17/26). 원문 그대로.
       "P.O Priced In" 은 "United States Dollars" 같은 문장. 원문 그대로.
       페이지마다 표 머리글이 반복된다. 머리글을 품목으로 넣지 말 것.
 

@@ -3,7 +3,7 @@
 > **이 문서가 규칙 관리의 단일 원천이다.**
 > 거래처 규칙은 코드가 아니라 이 스키마를 따르는 **선언(YAML)** 으로만 존재한다.
 > 엔진은 스키마를 해석할 뿐, 거래처 이름을 알지 못한다.
-> 버전 v1 · 2026-09-10
+> 버전 v1.1 · 2026-09-11 (§4.0 최상위 키 · §4.10 `_base` 구조 추가)
 
 ---
 
@@ -93,6 +93,28 @@ line:      line_no, posex, item_code, our_item, description,
 
 ## 4. 섹션별 스키마
 
+### 4.0 최상위 키 (거래처 파일) ★
+
+거래처 YAML 의 최상위에 올 수 있는 키는 **아래가 전부다.** 그 외 키는 로딩 실패(오류).
+
+| 키 | 필수 | 타입 | 의미 |
+|---|---|---|---|
+| `version` | ✅ | int | 이 YAML 이 따르는 스키마 세대. 현재 `1` 또는 `2` |
+| `meta` | ✅ | map | §4.1 |
+| `extends` | — | list[str] | 병합할 베이스. 예: `[_base/sap_defaults]`. 생략 시 병합 없음 |
+| `extraction` | ✅ | map | §4.2 |
+| `split` | — | map | §4.3. 생략 시 `{ by: none }` |
+| `tables` | — | map | §4.4. 결정표가 없으면 생략 |
+| `rules` | — | map | §4.5. 규칙이 없으면 생략 |
+| `fields` | ✅ | map | §4.6 |
+| `grid` | — | map | §4.8 |
+| `checks` | — | list | §4.9 |
+
+- `version` 은 **엔진 동작을 바꾸지 않는다.** 호환성 추적·마이그레이션 판단용 기록이다.
+  값이 다르다고 로딩을 막지 않는다 (미래 세대가 생기면 그때 분기).
+- `extends` 경로는 `masters/` 기준 상대경로이며 **확장자를 쓰지 않는다.**
+- 주석(`#`)은 어디에나 쓸 수 있다. 파서가 무시한다.
+
 ### 4.1 `meta`
 
 ```yaml
@@ -124,11 +146,16 @@ extraction:
 ```yaml
 split:
   by: none | shipment | <키>
-  label: "출하처(Shipment)별로 오더를 나눈다"
+  label: "출하처(Shipment)별로 오더를 나눈다"   # 선택. 화면 표시용
+  description: |                                # 선택. 문서화용
+    화면에는 한 그리드로 통합해 보여준다.
 ```
 
 `none` 이면 문서 1부 = 오더 1건. `shipment` 면 추출된 shipment 수만큼 오더가 생긴다.
 화면에는 항상 한 그리드로 통합되고, 행마다 다른 값(BSTKD 등)만 달라진다.
+
+> `label` / `description` 은 **엔진이 쓰지 않는다.** 화면·문서 생성용이다.
+> 이 문서 전반에서 `label` `description` `explain` 은 항상 이 성격이다.
 
 ### 4.4 `tables` — 결정표 (여러 값을 한 번에 결정)
 
@@ -136,11 +163,13 @@ split:
 tables:
   <표이름>:
     label: "화면에 보여줄 이름"
+    description: "선택"
     scope: header | shipment | line     # 평가 단위
     when:                                # 조건 컬럼 (N개)
       - source: shipment.ship_to_text
         op: contains_ci | equals | equals_ci | regex | starts_with
-        fallback_source: header.ship_to_text   # 선택
+        fallback_source: header.ship_to_text   # 선택. source 가 비면 이걸 본다
+        label: "출하처 블록에 포함"              # 선택. 화면 컬럼 머리글
     then: [KUNNR2, _city, _pack_base]    # 결과 컬럼 (N개). _접두사 = 파생변수
     rows:
       - { when: ["ELKHART"], then: ["100249", "ELKHART", "C"] }
@@ -153,10 +182,18 @@ tables:
 - `then` 에 **SAP 필드명**을 쓰면 그 필드가 바로 채워진다.
 - `_` 로 시작하면 **파생변수**로만 남고 전송되지 않는다.
 - 행은 **위에서부터** 평가하고 첫 일치에서 멈춘다 (우선순위 = 작성 순서).
+- `rows[].when` 의 길이는 `when` 컬럼 수와, `rows[].then` 의 길이는 `then` 컬럼 수와 **같아야 한다.**
 
 ### 4.5 `rules` — 값 매핑
 
-공통 필드: `kind`, `label`, `description`, `on_no_match`.
+공통 키: `kind`(필수), `label`, `description`, `on_no_match`.
+원문을 읽는 `kind`(`keyword_map` / `value_map` / `regex_extract`)는 아래 공통 옵션도 쓸 수 있다.
+
+| 공통 옵션 | 의미 |
+|---|---|
+| `source` | 읽을 경로. 예: `line.brand_text` |
+| `fallback_source` | `source` 가 비었을 때 대신 읽을 경로 (선택) |
+| `case_insensitive` | 대소문자 무시 비교 (기본 `false`) |
 
 | `kind` | 용도 | 필수 키 |
 |---|---|---|
@@ -165,6 +202,12 @@ tables:
 | `lookup` | 참조표(CSV) 조회 | `table_file`, `key`, `key_column`, `return[]` |
 | `regex_extract` | 원문에서 부분 추출 | `source`, `pattern`, `group` |
 | `fixed` | 상수 (문서화 목적) | `value` |
+
+`lookup` 전용 옵션:
+
+| 키 | 의미 |
+|---|---|
+| `optional` | `true` 면 **참조표 파일이 없어도 로딩·실행이 성공**하고, 조회 결과는 빈값이 된다. 기본 `false`(파일 없으면 오류) |
 
 ```yaml
 rules:
@@ -178,11 +221,12 @@ rules:
 ```
 
 `on_no_match.action`: `error`(전송 차단) / `warn`(경고, 전송 가능) / `default`(값 지정) / `empty`(빈값).
+`message` 안의 `{키}` 는 컨텍스트 값으로 치환된다 (예: `"참조표에 없는 품번입니다: {our_item}"`).
 
 ### 4.6 `fields` — 전송 필드 매핑 ★
 
-**`_base/sap_defaults.yaml` 의 필드 전부를 선언해야 한다.** 누락은 CI 실패.
-(현재 36개. 현업 협의로 줄어들면 `_base` 만 고치면 된다.)
+**`_base/sap_defaults.yaml` 의 `field_specs` 키 전부를 선언해야 한다.** 누락은 CI 실패.
+(현재 36개. 현업 협의로 줄어들면 `_base` 만 고치면 된다. **개수를 코드에 쓰지 않는다.**)
 
 | `from` | 의미 | 예 |
 |---|---|---|
@@ -208,8 +252,13 @@ MATNR:
   todo: "값 미확정 — SAP 담당 확인 필요"   # ← 값이 안 정해졌을 때
 ```
 
+- `from: table` 은 그 결정표의 `then` 에 **해당 필드명이 있을 때만** 유효하다.
+- `from: rule` 이 여러 반환키를 갖는 규칙을 가리키면 `key:` 로 하나를 고른다.
+  단일 값 규칙이면 생략한다. 같은 규칙을 여러 필드가 가리켜도 된다 (KL 의 `ZPKRE2`/`EMPST`).
+
 > **`todo` 가 원칙 2의 장치다.** 값이 미정이면 `todo` 를 달고 진행한다.
 > 스키마 검증이 목록으로 뽑아주므로 나중에 한 번에 확정하면 된다.
+> `todo` 가 달려 있어도 **엔진은 정상 동작한다.** 전송을 막지 않는다.
 
 ### 4.7 `expr` — 허용 함수 (화이트리스트, 이게 전부)
 
@@ -221,6 +270,7 @@ contains(s, sub)         replace(s, from, to)
 substr(s, start, len)    pad(s, len, ch)
 ```
 임의 코드 실행은 불가. 파서가 화이트리스트 밖 호출을 만나면 로딩 자체가 실패한다.
+리터럴은 문자열·숫자·`[ ]` 리스트만 허용한다. 빈 문자열은 거짓으로 취급한다.
 
 ### 4.8 `grid` — 검수 화면
 
@@ -238,7 +288,33 @@ checks:
   - id: shipment_total_match
     label: "출하처별 수량 합계 = 요약표 합계"
     severity: error | warn
+    description: "선택"
 ```
+
+`id` 는 엔진이 구현한 체크 함수의 이름이다. **거래처 이름이 아니라 검증 로직의 이름**이므로
+다른 거래처도 같은 `id` 를 재사용할 수 있다. 미구현 `id` 는 로딩 시 오류.
+
+### 4.10 `_base/sap_defaults.yaml` 구조 ★
+
+베이스 파일은 거래처 파일과 **스키마가 다르다.** 최상위 키는 둘뿐이다.
+
+| 키 | 필수 | 의미 |
+|---|---|---|
+| `sap_defaults` | ✅ | `{필드명: 값}` — `from: base` 가 참조하는 공통 고정값 |
+| `field_specs` | ✅ | `{필드명: 스펙}` — **전송 필드의 유일한 원천.** 선언 순서 = 전송·화면 컬럼 순서 |
+
+`field_specs` 의 스펙:
+
+| 키 | 필수 | 의미 |
+|---|---|---|
+| `label` | ✅ | 한글 이름 (화면 헤더) |
+| `sheet` | — | 업로드 양식의 영문 헤더 |
+| `max_len` | — | 최대 길이. 초과 시 ⑦ VALIDATE 에서 경고 |
+| `type` | — | `date` \| `decimal`. 생략 시 문자열 |
+| `added` | — | 추가 이력 메모 |
+
+> **필드 개수·목록·순서는 전부 이 파일에서 읽는다.** 코드·문서에 개수를 적지 않는다.
+> `sap_defaults` 에 없는 필드를 `from: base` 로 참조하면 로딩 오류.
 
 ---
 

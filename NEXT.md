@@ -1,6 +1,6 @@
 # 다음에 이어서 하기
 
-> 최종 갱신 2026-09-11 · 설계 완료 · **문서 정리 완료** · 구현 착수 직전
+> 최종 갱신 2026-09-11 · 설계 완료 · **문서 정리 완료** · **에이전트 루프 확정** · 구현 착수
 > **재개할 때 이 파일부터 읽으면 된다.**
 
 ---
@@ -10,19 +10,22 @@
 ```
 [설계]      ██████████ 완료
 [문서정리]  ██████████ 완료  (낡은 33필드/MSC=PDF/분할없음 기술 전량 수정)
+[작업규칙]  ██████████ 완료  (CLAUDE.md · 에이전트 루프 · 브랜치 B안)
 [Git]       ██████████ init · 초기커밋 · remote · developer 브랜치
 [백엔드 D1] ████████░░ 추출 파이프라인만 (규칙엔진 없음)
 [백엔드 D2] ░░░░░░░░░░ 미착수  ← 여기부터
-[프론트]    ░░░░░░░░░░ 미착수  ← 병렬로 여기부터
+[프론트 D3] ░░░░░░░░░░ 미착수  ← 병렬로 여기부터
 ```
 
 현재 브랜치 **`developer`** · remote `github.com/2shuneedev-code/po2sap.git`
-초기 커밋 `19795dc` — 추적 파일 49개. **`samples/` 는 2개만 추적됨(정상, 2026-09-11 검증).**
+최신 커밋 `6f8e2b8` — 에이전트 루프/브랜치 전략 확정.
+**`samples/` 는 2개만 추적됨(정상, 2026-09-11 검증).**
 
 ### 완료된 산출물
 
 | 파일 | 역할 |
 |---|---|
+| `CLAUDE.md` ★ | **작업 규칙 · 에이전트 실행 루프 · 브랜치 · 금지사항** |
 | `masters/SCHEMA.md` ★ | **규칙 관리 아키텍처 = 백엔드 구현 명세서** |
 | `masters/_base/sap_defaults.yaml` | 공통 고정값 + 전송 필드 스펙 (현재 36) |
 | `masters/customers/{msc,kl,ygjp,_template}.yaml` | 거래처 3곳 규칙 전량 선언 |
@@ -31,18 +34,18 @@
 | `design.md` v1.0 | 기술 스택 · 아키텍처 · 파싱 · 디렉토리 · 배포 |
 | `process.md` v1.0 | 업무 흐름 · **화면 정의(프론트 명세)** |
 | `README.md` | 진입점 · 트랙별 필독 파일 · SSOT 규칙 |
-| `CONTRIBUTING.md` | Git · 브랜치 · CI · Codespaces |
+| `CONTRIBUTING.md` | Git · CI · Codespaces |
 | `backend/app/{extraction,masters,domain}` | D1 코드 |
 
 ### 개발자가 읽을 파일 (이게 전부)
 
 ```
-공통    NEXT.md → design.md
+공통    CLAUDE.md → NEXT.md → design.md
 백엔드  masters/SCHEMA.md ★  +  masters/customers/*.yaml
 프론트  contracts/api-contract.md ★  +  contracts/examples/*.json  +  process.md §4
 ```
 
-**읽지 말 것**: `rules.md`(폐기) · `master-admin.md`(D6 보류)
+**읽지 말 것**: `rules.md`(폐기) · `master-admin.md`(D6 보류) · `.claude/agents/architect.md` 의 브리프 스펙(낡음)
 
 ---
 
@@ -62,26 +65,24 @@
 | MSC_REF | `optional: true` 슬롯. **파일 없어도 정상 동작** |
 | 관리 UI | **현재 불필요.** 도입 기준은 `masters/SCHEMA.md` §6.1 |
 | 진행 방식 | 백엔드/프론트 **병렬**. 접점은 `contracts/` 뿐 |
+| 브랜치 | **B안 — `developer` 단일 브랜치.** 상세 `CLAUDE.md` §4 |
+| 구현 루프 | architect → developer → **tester(자동)** → reviewer. 상세 `CLAUDE.md` §3 |
 
 ---
 
 ## 3. 다음에 할 일 (순서대로)
 
-### ① 문서 정리 커밋 — 지금 바로
+### ① 문서 정리 + 작업규칙 커밋 — ✅ 완료 (`0a36685`, `6f8e2b8`)
 
-> ⚠ 2026-09-11 에 Git GUI 의 "변경 취소(Discard)" 로 이 정리가 한 번 날아갔다.
+> ⚠ 2026-09-11 에 Git GUI 의 "변경 취소(Discard)" 로 정리본이 한 번 날아갔다.
 > **작업 후에는 즉시 커밋한다.**
 
-```powershell
-cd C:\vibe_coding\po2sap
-git add README.md NEXT.md design.md process.md rules.md
-git commit -m "docs: 낡은 설계문서 정리 - SSOT 확립, MSC=HTM, 오더 분할 반영"
-git push
-```
+### ② 두 트랙 동시 착수 ← **지금 여기**
 
-### ② 두 트랙 동시 착수
+두 트랙 모두 **`developer` 브랜치에서** 작업한다. 별도 `feat/*` 를 파생하지 않는다(`CLAUDE.md` §4).
+작업 1개 = 커밋 1개, 커밋 직후 tester 자동 호출.
 
-**백엔드** `feat/be-rules` — 명세는 `masters/SCHEMA.md`
+**백엔드 D2 (규칙엔진)** — 명세는 `masters/SCHEMA.md`
 ```
 1. backend/app/rules/schema.py         SCHEMA.md §4 → Pydantic 모델
 2. backend/app/rules/engine.py         SCHEMA.md §2 의 7단계 파이프라인
@@ -92,7 +93,7 @@ git push
 7. backend/app/api/routes_batch.py     contracts §4~7
 ```
 
-**프론트** `feat/fe-grid` — 명세는 `contracts/api-contract.md`, 화면은 `process.md` §4
+**프론트 D3 (그리드)** — 명세는 `contracts/api-contract.md`, 화면은 `process.md` §4
 ```
 1. Vite + React + TS 셋업 (VITE_API_MODE=mock 이면 examples/ 직접 import)
 2. CustomerPicker + RulePreviewCard   ← preview_msc.json 그대로 렌더
@@ -103,9 +104,15 @@ git push
 6. SendModal (전송 확인 → 결과)
 ```
 
+> 권장 순서: 백엔드 1~3 (엔진 코어) 을 먼저 통과시킨 뒤 4~7.
+> 프론트는 mock 모드라 백엔드와 무관하게 1~2 부터 바로 진행 가능.
+
 ### ③ 관통 확인
 모의 EAI 서버 + 실제 파싱 1회 → 결과가 `storage/llm_cache/` 에 저장되면
 이후 `LLM_PROVIDER=mock` 으로 무료·오프라인 반복 가능.
+
+### ④ main 머지
+D2 또는 D3 마일스톤이 reviewer 통과하면 `git merge --ff-only developer` (`CLAUDE.md` §4).
 
 ---
 
@@ -116,9 +123,9 @@ git push
 | **push 전 대외비 확인** | `git ls-files samples/` → **2개**(`.gitignore`, `README.md`) 가 아니면 중단 |
 | 작업 후 즉시 커밋 | GUI 의 "Discard/변경 취소" 는 **복구 불가** |
 | 문서 소유 | `design.md` `process.md` `masters/SCHEMA.md` = architect. 코드는 트랙별 |
-| `contracts/` 변경 | 양쪽 합의 후 **단독 PR** |
+| `contracts/` 변경 | 양쪽 합의 후 **단독 커밋** |
 
-> 상세는 `CONTRIBUTING.md`.
+> 커밋 타입 · 브랜치 · 금지사항 상세는 `CLAUDE.md` §4~6, 환경 설정은 `CONTRIBUTING.md`.
 
 ---
 

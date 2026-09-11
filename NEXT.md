@@ -61,6 +61,7 @@
 | BSTKD | `{PO번호}({출하처도시})` — 출하처 없으면 PO번호만 |
 | MSC 분할 | **1 Shipment 블록 = 1 오더.** 화면은 한 그리드 통합, BSTKD·KUNNR2 만 다름 |
 | ZPKRE1/2·EMPST | 코드값 아님. **자유 텍스트 비고** (예: `"C,Blue RING"`) |
+| **날짜 처리** | **① 추출 단계가 `YYYYMMDD` 8자리로 내놓는다.** 엔진에 날짜 파싱 함수는 **없다**.<br>⑦ VALIDATE 가 `type: date` 필드의 8자리 여부만 검사. 근거·경계는 `masters/SCHEMA.md` §4.2.1 |
 | 미확정 값 | YAML 에 `todo:` 달고 **그냥 진행.** 값 때문에 개발 멈추지 않는다 |
 | MSC_REF | `optional: true` 슬롯. **파일 없어도 정상 동작** |
 | 관리 UI | **현재 불필요.** 도입 기준은 `masters/SCHEMA.md` §6.1 |
@@ -89,7 +90,7 @@
 3. backend/app/rules/{decision_table,primitives,expr,reftable}.py
 4. backend/app/mapping/row_builder.py  전송 필드 행 생성 (_base 기준)
 5. backend/app/validation/validator.py
-6. scripts/validate_masters.py         SCHEMA.md §7 검증 9종
+6. scripts/validate_masters.py         SCHEMA.md §7 검증 12종
 7. backend/app/api/routes_batch.py     contracts §4~7
 ```
 
@@ -100,8 +101,14 @@
 >   1. `backend/tests/test_rules_schema.py` — msc/kl/ygjp/_base 로딩 골든 테스트 아직 없음(수동 검증만 함). **engine.py 시작 전에 추가할 것.**
 >   2. `schema.py`(D2, 구조검증 전용) ↔ `backend/app/masters/loader.py`(D1, dataclass+extends 병합) 두 로더의 통합 방향을 engine.py 작업 시 결정할 것.
 > - Python 인터프리터가 이 개발 환경에 없어서 새로 설치함(winget, `Python.Python.3.12`). 필요 시 `pip install -r backend/requirements.txt`.
-> - **문서 갭 발견(보고만, 미해결)**: `ygjp.yaml` 의 `rules.brand_code.normalize` 키와 `fields.BSTKD.expr` 의 `date_yyyymmdd(...)` 함수가
->   `SCHEMA.md` §4.5/§4.7 에 문서화되어 있지 않다. 스키마 로딩 단계는 이를 막지 않도록 설계함(G4 우선). architect 위임 여부는 사용자 판단 대기.
+> - ~~문서 갭 발견: `ygjp.yaml` 의 `normalize` / `date_yyyymmdd`~~ → **해결됨.**
+>   `normalize` 는 `SCHEMA.md` v1.2 §4.5.1 로 정식화, `date_yyyymmdd` 는 v1.3 에서 **폐지**되고
+>   `ygjp.yaml` 의 `BSTKD` 도 `join("-", ["01", header.po_date, header.po_number])` 로 단순화됨.
+
+> ⚠ **날짜 결정(v1.3)에 따른 백엔드 후속 — engine.py 전에 처리할 것**
+> `backend/app/extraction/prompt.py` 와 `schema_builder.py` 가 아직 **`YYYY-MM-DD` 로 정규화**하라고
+> 지시하고 있다(`req_date` 는 `null` 허용까지). `SCHEMA.md` §4.2.1 대로 **`YYYYMMDD` 8자리 문자열**,
+> 빈 값은 `""` 로 고쳐야 한다. 이 두 파일이 날짜 규약의 실제 진입점이다.
 
 **프론트 D3 (그리드)** — 명세는 `contracts/api-contract.md`, 화면은 `process.md` §4
 ```
@@ -150,6 +157,7 @@ D2 또는 D3 마일스톤이 reviewer 통과하면 `git merge --ff-only develope
 | 5 | 현업 협의 후 불필요 필드 제거 | `_base/sap_defaults.yaml` 만 수정 |
 | 6 | 확장 거래처 명단·우선순위 (약 20곳) | 2차 |
 | 7 | 사내 서버 인터넷 아웃바운드 허용 | 이관 시점 |
+| 8 | `.claude/agents/reviewer.md` 점검항목 3 이 `"YYYYMMDD로"` 변환 지시를 **critical** 로 본다.<br>`SCHEMA.md` §4.2.1 예외와 충돌 → **사용자 승인 후** 문구 조정 필요 | reviewer 오탐. 설계·코드에는 영향 없음 |
 
 ---
 

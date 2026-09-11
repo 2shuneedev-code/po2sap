@@ -13,7 +13,7 @@
 [작업규칙]  ██████████ 완료  (CLAUDE.md · 에이전트 루프 · 브랜치 B안)
 [Git]       ██████████ init · 초기커밋 · remote · developer 브랜치
 [백엔드 D1] ████████░░ 추출 파이프라인만 (규칙엔진 없음)
-[백엔드 D2] ░░░░░░░░░░ 미착수  ← 여기부터
+[백엔드 D2] █░░░░░░░░░ D2-1 schema.py 완료 (developer→tester→reviewer 통과, 커밋됨)
 [프론트 D3] ░░░░░░░░░░ 미착수  ← 병렬로 여기부터
 ```
 
@@ -84,14 +84,24 @@
 
 **백엔드 D2 (규칙엔진)** — 명세는 `masters/SCHEMA.md`
 ```
-1. backend/app/rules/schema.py         SCHEMA.md §4 → Pydantic 모델
-2. backend/app/rules/engine.py         SCHEMA.md §2 의 7단계 파이프라인
+1. backend/app/rules/schema.py         SCHEMA.md §4 → Pydantic 모델   ✅ 완료
+2. backend/app/rules/engine.py         SCHEMA.md §2 의 7단계 파이프라인  ← 다음
 3. backend/app/rules/{decision_table,primitives,expr,reftable}.py
 4. backend/app/mapping/row_builder.py  전송 필드 행 생성 (_base 기준)
 5. backend/app/validation/validator.py
 6. scripts/validate_masters.py         SCHEMA.md §7 검증 9종
 7. backend/app/api/routes_batch.py     contracts §4~7
 ```
+
+> **D2-1 완료 메모** (developer→tester→reviewer 루프, critical 없음):
+> - `backend/app/rules/schema.py` — 최상위(`CustomerMasterSchema`/`BaseDefaultsSchema`)는 `extra="forbid"`,
+>   하위 섹션은 `extra="allow"`. msc/kl/ygjp 3개 + `_base` 전부 로딩 확인됨.
+> - reviewer 후속 항목(다음 작업 착수 전 처리 권장):
+>   1. `backend/tests/test_rules_schema.py` — msc/kl/ygjp/_base 로딩 골든 테스트 아직 없음(수동 검증만 함). **engine.py 시작 전에 추가할 것.**
+>   2. `schema.py`(D2, 구조검증 전용) ↔ `backend/app/masters/loader.py`(D1, dataclass+extends 병합) 두 로더의 통합 방향을 engine.py 작업 시 결정할 것.
+> - Python 인터프리터가 이 개발 환경에 없어서 새로 설치함(winget, `Python.Python.3.12`). 필요 시 `pip install -r backend/requirements.txt`.
+> - **문서 갭 발견(보고만, 미해결)**: `ygjp.yaml` 의 `rules.brand_code.normalize` 키와 `fields.BSTKD.expr` 의 `date_yyyymmdd(...)` 함수가
+>   `SCHEMA.md` §4.5/§4.7 에 문서화되어 있지 않다. 스키마 로딩 단계는 이를 막지 않도록 설계함(G4 우선). architect 위임 여부는 사용자 판단 대기.
 
 **프론트 D3 (그리드)** — 명세는 `contracts/api-contract.md`, 화면은 `process.md` §4
 ```

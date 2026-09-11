@@ -40,8 +40,8 @@ def _value_schema(description: str) -> dict[str, Any]:
 
 _HEADER_FIELDS: dict[str, str] = {
     "po_number": "고객 발주번호 (Purchase Order No.)",
-    "po_date": "발주일. YYYY-MM-DD 형식으로 변환해서 넣을 것",
-    "requested_date": "납품요청일/납기일. YYYY-MM-DD 형식",
+    "po_date": "발주일. YYYYMMDD(구분자 없는 8자리 숫자 문자열)로 변환해서 넣을 것",
+    "requested_date": "납품요청일/납기일. YYYYMMDD(구분자 없는 8자리 숫자 문자열)로 변환해서 넣을 것",
     "ship_to_text": "출하처(Ship To) 주소 블록 전체를 원문 그대로",
     "bill_to_text": "청구처(Bill To) 주소 블록 전체를 원문 그대로",
     "brand_text": "발주서에 표기된 브랜드 문구 원문 (코드로 변환하지 말 것)",
@@ -61,7 +61,7 @@ _LINE_FIELDS: dict[str, str] = {
     "quantity": "수량. 숫자만 (쉼표 제거). 예: '25' 또는 '25.000'",
     "unit": "단위 (EA, PCS 등)",
     "unit_price": "단가. 합계금액(Extended/Amount)이 아니라 **단가**임에 주의",
-    "req_date": "이 품목의 납기일. 라인별 납기가 없으면 null. YYYY-MM-DD",
+    "req_date": "이 품목의 납기일. 라인별 납기가 없으면 null. YYYYMMDD(구분자 없는 8자리 숫자 문자열)로 변환해서 넣을 것",
     "ship_to_text": "이 품목의 출하처가 헤더와 다를 경우에만 채울 것. 같으면 null",
     "brand_text": "이 품목의 브랜드 문구 원문. 라인별 브랜드가 없으면 null",
 }

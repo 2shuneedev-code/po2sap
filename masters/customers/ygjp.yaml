@@ -23,7 +23,8 @@ extraction:
 
     [헤더]
       "Created On:  2026-05-18"       → po_date (원문 그대로)
-      "Purchase Order ID:  10972"     → po_id
+      "Purchase Order ID:  10972"     → po_number (원문 그대로)
+                                        ※ 문서 라벨은 "ID" 지만 표준 키는 po_number 다
       "Incoterms: CIP"                → incoterms_text
       "Payment Terms: ..." 뒤 문장     → payment_terms_text
       "Ship-to Address:" 뒤 주소 블록  → ship_to_text
@@ -64,8 +65,9 @@ rules:
     label: "브랜드 텍스트 → SAP 브랜드 코드"
     description: "문서 하단 브랜드 텍스트를 매핑표와 완전 일치로 대조한다"
     source: header.brand_text
-    case_insensitive: true
+    # PDF 추출 잡음(앞뒤 공백·줄바꿈이 만든 연속 공백) 제거 후 완전 일치 비교. SCHEMA.md §4.5.1
     normalize: [trim, collapse_spaces]
+    case_insensitive: true
     entries:
       - { equals: "YG BRAND",                   value: "1"   }
       - { equals: "YAMAKATSU BRAND",            value: "142" }
@@ -107,7 +109,7 @@ fields:
   KUNNR3:  { from: const, value: "3200" }
   BSTKD:
     from: expr
-    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_id])'
+    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
     explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
     required: true
   VDATU:   { from: const, value: "" }

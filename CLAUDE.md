@@ -25,6 +25,7 @@
 | 주제 | 유일한 원천 | 다른 곳에서는 |
 |---|---|---|
 | 전송 필드 목록·개수·max_len | `masters/_base/sap_defaults.yaml` | "전송 필드 전량"이라고만 쓴다 |
+| 거래처 공통 필드 매핑 | `masters/profiles/standard.yaml` | 거래처 파일은 **다른 것만** 적는다 |
 | 규칙 스키마 · 엔진 7단계 | `masters/SCHEMA.md` | 참조 링크만 |
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
@@ -73,6 +74,10 @@ ruff check backend scripts
 
 ```
 masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고침)
+├── _base/          전송 필드 스펙 36개 + 공통 고정값
+├── profiles/       standard.yaml — 대부분의 거래처가 쓰는 필드 매핑
+├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
+└── refs/           참조표 CSV (brand_master 430곳/1,207행)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
 
 backend/app/
@@ -82,7 +87,7 @@ backend/app/
 ├── masters/      마스터 로더                                    [완료]
 ├── domain/       RawPO / SapRow / Batch                         [부분]
 ├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
-├── tests/        pytest 73종 + 픽스처 + 골든                     [완료]
+├── tests/        pytest 80종 + 픽스처 + 골든                     [완료]
 ├── mapping/      전송 필드 행 생성                              [미착수]
 ├── validation/   검증                                           [미착수]
 ├── transport/    EAI 전송                                       [미착수]
@@ -108,6 +113,8 @@ storage/          런타임 산출물 — Git 제외
 | `.env` 커밋 | API 키·EAI URL |
 | 코드에 거래처 이름 하드코딩 | P2 위반 |
 | 전송 필드 개수 하드코딩 | `_base`가 유일한 원천 |
+| 거래처 파일에 36필드 전량 나열 | 프로필과 다른 것만 적는다. 거래처 수만큼 유지 비용이 늘어난다 |
+| 프로필 필드를 일부만 덮어쓰기 | 항목은 **통째로 교체**된다 (SCHEMA §1). 필요한 키를 전부 다시 적는다 |
 | LLM에게 코드값/형식변환 지시 | P1 위반. `hints`에 "YYYYMMDD로 바꿔라" 같은 지시 금지 |
 | SSOT 아닌 문서에 값 복사 | 어긋나면 오더가 잘못 생성된다 |
 | `rules.md` / `master-admin.md` 참조 | 폐기·보류 문서. 낡은 값(AUART=ZOR, 33필드)이 남아 있다 |

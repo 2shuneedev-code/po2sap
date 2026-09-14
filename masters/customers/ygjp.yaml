@@ -12,7 +12,7 @@ meta:
   status: draft
   file_types: [pdf]
 
-extends: [_base/sap_defaults]
+extends: [_base/sap_defaults, profiles/standard]
 
 extraction:
   input: text
@@ -98,49 +98,22 @@ rules:
       message: "YGJP 브랜드 텍스트를 매핑표에서 찾을 수 없습니다: {brand_text}"
 
 fields:
-  AUART:   { from: base }
-  VKORG:   { from: base }
-  VTWEG:   { from: base }
-  VBELN:   { from: const, value: "" }
-  KUNNR1:  { from: const, value: "3200" }
+  # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
   KUNNR2:  { from: const, value: "319854" }
-  KUNNR3:  { from: const, value: "3200" }
   BSTKD:
     from: expr
     expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
     explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
     required: true
-  VDATU:   { from: const, value: "" }
-  ZTERM:   { from: const, value: "" }
-  INCO1:   { from: const, value: "" }
-  INCO2:   { from: const, value: "" }
   ZBRAND:  { from: rule,  rule: brand_code, required: true }
   ZSHCO:
     from: expr
     expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'
     explain: '브랜드 코드가 471 또는 507 이면 A, 그 외 L'
-  ZPKRE1:  { from: const, value: "" }
   MATNR:   { from: doc,   path: line.item_code, required: true }
-  MAKTX:   { from: const, value: "" }
-  KWMENG:  { from: doc,   path: line.quantity, format: integer, required: true }
-  LGORT:   { from: const, value: "" }
-  ETDAT:   { from: const, value: "" }
-  BATCH:   { from: const, value: "" }
-  VALTY:   { from: const, value: "" }
   ZPKRE2:  { from: doc,   path: header.packing_spec }
   EMPST:   { from: doc,   path: line.remark, fallback: header.remark_default }
-  VSART:   { from: const, value: "04" }
-  PRICE:   { from: const, value: "" }
   WAERK:   { from: const, value: "JPY" }
-  BSTDK_E: { from: const, value: "" }
-  POSEX:   { from: const, value: "" }
-  DELCO:   { from: const, value: "" }
-  BSTKD_E: { from: const, value: "" }
-  AUGRU:   { from: const, value: "" }
-  VKAUS:   { from: const, value: "" }
-  IHREZ_E: { from: const, value: "" }
-  VGBEL:   { from: const, value: "" }
-  VGPOS:   { from: const, value: "" }
 
 grid:
   pinned: [BSTKD, MATNR, KWMENG]

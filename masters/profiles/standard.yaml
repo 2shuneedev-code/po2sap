@@ -1,0 +1,76 @@
+# ═══════════════════════════════════════════════════════════════
+#  표준 프로필 — 대부분의 거래처가 그대로 쓰는 전송 필드 매핑
+#
+#  거래처 파일은 `extends: [_base/sap_defaults, profiles/standard]` 로 이것을 깔고
+#  **다른 것만** 덮어쓴다. 전량 선언(SCHEMA §4.6)은 병합 결과 기준으로 검사하므로
+#  거래처 파일에서 36개를 다시 적을 필요가 없다.
+#
+#  여기에 값을 넣는 기준:
+#    · 거래처 3곳 이상에서 같은 값이면 올린다
+#    · 한 곳이라도 다르면 그 거래처가 덮어쓴다 (병합은 거래처 우선)
+#    · **거래처 고유값을 여기 넣지 않는다** — 고객코드는 meta.customer_no 로 받는다
+#
+#  스키마: masters/SCHEMA.md §4.6
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+fields:
+  # ── 공통 고정값 (_base/sap_defaults.yaml 의 sap_defaults) ──────
+  AUART:   { from: base }
+  VKORG:   { from: base }
+  VTWEG:   { from: base }
+
+  # ── 거래처 식별 — meta 에서 받는다 ────────────────────────────
+  # 판매처·최종고객은 고객코드 그대로다. 출하처(KUNNR2)는 거래처마다
+  # 다르므로(결정표/고정값) 여기 두지 않는다.
+  KUNNR1:  { from: expr, expr: 'meta.customer_no', required: true }
+  KUNNR3:  { from: expr, expr: 'meta.customer_no', required: true }
+
+  # ── 문서에서 그대로 읽는 값 ───────────────────────────────────
+  KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
+
+  # ── 전 거래처 동일 고정값 ─────────────────────────────────────
+  VSART:   { from: const, value: "04", explain: "운송수단 — 전 거래처 04" }
+
+  # ── 미사용 (양식에는 있으나 채우지 않는다) ────────────────────
+  # 전송 JSON 에는 "" 로 들어간다. 현업 협의로 필요해지면 거래처 파일에서 덮어쓴다.
+  VBELN:   { from: const, value: "" }
+  VDATU:   { from: const, value: "" }
+  ZTERM:   { from: const, value: "" }
+  INCO1:   { from: const, value: "" }
+  INCO2:   { from: const, value: "" }
+  ZPKRE1:  { from: const, value: "" }
+  MAKTX:   { from: const, value: "" }
+  LGORT:   { from: const, value: "" }
+  ETDAT:   { from: const, value: "" }
+  BATCH:   { from: const, value: "" }
+  VALTY:   { from: const, value: "" }
+  PRICE:   { from: const, value: "" }
+  WAERK:   { from: const, value: "" }
+  BSTDK_E: { from: const, value: "" }
+  POSEX:   { from: const, value: "" }
+  DELCO:   { from: const, value: "" }
+  BSTKD_E: { from: const, value: "" }
+  AUGRU:   { from: const, value: "" }
+  VKAUS:   { from: const, value: "" }
+  IHREZ_E: { from: const, value: "" }
+  VGBEL:   { from: const, value: "" }
+  VGPOS:   { from: const, value: "" }
+
+  # ── 거래처가 반드시 덮어써야 하는 필드 ────────────────────────
+  # 여기 두는 이유: 선언을 빠뜨렸을 때 CI 가 아니라 TODO 리포트로 드러나게 하려고.
+  # 값이 비어 있으면 전송은 되지만 검증기가 목록으로 뽑아준다.
+  KUNNR2:  { from: const, value: "", todo: "출하처 — 거래처 파일에서 덮어쓸 것" }
+  BSTKD:   { from: const, value: "", todo: "고객발주번호 — 거래처 파일에서 덮어쓸 것" }
+  ZBRAND:  { from: const, value: "", todo: "브랜드 — 거래처 파일에서 덮어쓸 것" }
+  ZSHCO:   { from: const, value: "", todo: "출하조건 — 거래처 파일에서 덮어쓸 것" }
+  MATNR:   { from: const, value: "", todo: "자재번호 — 거래처 파일에서 덮어쓸 것" }
+  ZPKRE2:  { from: const, value: "" }
+  EMPST:   { from: const, value: "" }
+
+grid:
+  pinned: [BSTKD, MATNR, KWMENG]
+  hidden: [VTWEG, VBELN, VDATU, ZTERM, INCO1, INCO2, ZPKRE1, MAKTX, LGORT,
+           ETDAT, BATCH, VALTY, PRICE, WAERK, BSTDK_E, DELCO, BSTKD_E,
+           AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
+  width:  { MATNR: 140 }

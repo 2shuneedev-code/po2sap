@@ -27,16 +27,44 @@ masters/
 ├── SCHEMA.md              ← 이 문서 (스키마 정의)
 ├── _base/
 │   └── sap_defaults.yaml  ← 전 거래처 공통 고정값 + 전송 필드 목록(현 36개)
+├── profiles/
+│   └── standard.yaml      ← 대부분의 거래처가 그대로 쓰는 필드 매핑
 ├── customers/
-│   ├── msc.yaml           ← 거래처 1개 = 파일 1개
+│   ├── msc.yaml           ← 거래처 1개 = 파일 1개. **다른 것만** 적는다
 │   ├── kl.yaml
 │   └── ygjp.yaml
 └── refs/
     └── *.csv              ← 참조표 (품번→값 매핑 등). 없으면 없는 대로 동작
 ```
 
-**해석 순서**: `_base` → `extends` 로 병합 → 거래처 파일이 덮어씀.
-거래처 파일에 없는 필드는 `_base` 값이 그대로 쓰인다.
+**해석 순서**: `extends` 를 **적힌 순서대로** 깔고 거래처 파일이 덮어쓴다.
+
+```yaml
+extends: [_base/sap_defaults, profiles/standard]
+```
+
+거래처 파일에 없는 것은 프로필 값이 그대로 쓰인다. 병합 규칙은 두 가지뿐이다.
+
+| 대상 | 규칙 |
+|---|---|
+| `fields` · `tables` · `rules` 의 **항목 하나** | **통째로 교체.** 거래처가 `fields.KUNNR2` 를 다시 쓰면 프로필의 KUNNR2 는 사라진다 — 일부만 덮어쓸 수 없다 |
+| 리스트 (`grid.hidden`, 결정표 `rows` …) | **교체.** 항목을 더하려면 전체를 다시 적는다 |
+
+> 항목을 통째로 교체하는 이유: 깊게 합치면 프로필의 `todo`·`value` 가 거래처의
+> 재정의에 섞여 `from: table` 인데 `value` 도 있는 스펙이 만들어진다.
+
+### 1.1 프로필
+
+`profiles/standard.yaml` 은 **거래처가 아니다.** `meta` 도 `extraction` 도 없고
+`fields` 와 `grid` 만 있다. 값을 올리는 기준:
+
+- 거래처 3곳 이상에서 같은 값이면 올린다
+- 한 곳이라도 다르면 그 거래처가 덮어쓴다
+- **거래처 고유값을 넣지 않는다** — 고객코드는 `meta.customer_no`(§3) 로 받는다
+
+거래처가 반드시 채워야 하는 필드(KUNNR2·BSTKD·ZBRAND·ZSHCO·MATNR)는 프로필에
+`todo` 를 단 빈값으로 둔다. 선언을 빠뜨려도 CI 가 막는 대신 `validate_masters` 의
+TODO 리포트(§7-8)에 뜬다 — **새 거래처를 추가하다 만 상태로도 개발이 진행된다**(원칙 2).
 
 ---
 
@@ -94,6 +122,7 @@ masters/
 
 | 네임스페이스 | 의미 | 예 |
 |---|---|---|
+| `meta.*` | 거래처 마스터의 `meta` 값 (§4.1) | `meta.customer_no`, `meta.code` |
 | `header.*` | 문서 헤더에서 읽은 원문 | `header.po_number`, `header.brand_text` |
 | `shipment.*` | 분할 단위(출하처 등)에서 읽은 원문 | `shipment.ship_to_text` |
 | `line.*` | 품목 라인에서 읽은 원문 | `line.item_code`, `line.quantity` |
@@ -102,6 +131,11 @@ masters/
 
 > `header/shipment/line` 의 하위 키는 **추출 스키마**(`extraction`)가 정의한다.
 > 거래처마다 다를 수 있으나, 아래 **표준 키**를 우선 쓴다.
+
+**`meta.*` 로 참조할 수 있는 것**: `meta.code` · `meta.customer_no` · `meta.name`.
+문서에서 읽는 값이 아니라 마스터에 적힌 값이라 항상 채워져 있다. 덕분에
+판매처(KUNNR1)·최종고객(KUNNR3)처럼 "고객코드 그대로"인 필드를 프로필에 한 번만
+적어두면 거래처마다 다시 쓰지 않아도 된다.
 
 ### 3.1 표준 키 (거래처 공통 어휘)
 
@@ -316,8 +350,12 @@ rules:
 
 ### 4.6 `fields` — 전송 필드 매핑 ★
 
-**`_base/sap_defaults.yaml` 의 필드 전부를 선언해야 한다.** 누락은 CI 실패.
+**`_base/sap_defaults.yaml` 의 필드 전부가 선언되어야 한다.** 누락은 CI 실패.
 (현재 36개. 현업 협의로 줄어들면 `_base` 만 고치면 된다.)
+
+검사는 **병합 결과**(§1) 기준이다. 거래처 파일에는 `profiles/standard.yaml` 과
+**다른 것만** 적는다 — 36개를 다시 나열하지 않는다. 거래처가 늘어날수록
+손으로 유지할 선언이 선형으로 늘어나는 것을 막기 위한 규약이다.
 
 | `from` | 의미 | 예 |
 |---|---|---|
@@ -456,14 +494,18 @@ checks:
 
 ```
 1. cp masters/customers/_template.yaml masters/customers/<코드>.yaml
-2. meta 채우기
+2. meta 채우기 (code · name · customer_no · owner · file_types)
 3. extraction.hints 작성 (샘플 발주서 보며 문서 구조 설명)
 4. tables / rules 작성 (분기·매핑이 있으면)
-5. fields 전부 선언 — 모르는 값은 const "" + todo
+5. fields — profiles/standard.yaml 과 **다른 것만** 적는다
+   보통 KUNNR2 · BSTKD · ZBRAND · ZSHCO · MATNR 다섯 개다
 6. python scripts/validate_masters.py     ← 스키마·커버리지 검증
 7. python scripts/parse_one.py <샘플> --customer <코드>
 8. 기존 결과지와 diff → 맞을 때까지 YAML 만 수정
 ```
+
+5번을 다 못 채워도 6~8번은 돌아간다. 미확정 값은 프로필의 `todo` 가 그대로 남아
+검증 리포트에 뜬다.
 
 **엔진 코드는 건드리지 않는다.** 새 `kind` 나 새 `format` 이 필요할 때만 코드를 고치고,
 그때는 이 문서에 추가한다.

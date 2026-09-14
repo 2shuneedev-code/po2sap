@@ -12,7 +12,7 @@ meta:
   status: active
   file_types: [htm, html]
 
-extends: [_base/sap_defaults]
+extends: [_base/sap_defaults, profiles/standard]
 
 extraction:
   input: text
@@ -124,49 +124,20 @@ rules:
       message: "참조표에 없는 품번입니다: {our_item}"
 
 fields:
-  AUART:   { from: base }
-  VKORG:   { from: base }
-  VTWEG:   { from: base }
-  VBELN:   { from: const, value: "" }
-  KUNNR1:  { from: const, value: "100249" }
+  # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
   KUNNR2:  { from: table, table: ship_to_routing }
-  KUNNR3:  { from: const, value: "100249" }
   BSTKD:
     from: expr
     expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)'
     explain: '발주번호 뒤에 출하처 도시명을 괄호로 붙입니다 (예: 7588650(ATLANTA))'
     required: true
-  VDATU:   { from: const, value: "" }
-  ZTERM:   { from: const, value: "" }
-  INCO1:   { from: const, value: "" }
-  INCO2:   { from: const, value: "" }
   ZBRAND:  { from: rule,  rule: brand_code, required: true }
   ZSHCO:   { from: const, value: "A" }
-  ZPKRE1:  { from: const, value: "" }
   MATNR:   { from: doc,   path: line.item_code, required: true }
-  MAKTX:   { from: const, value: "" }
-  KWMENG:  { from: doc,   path: line.quantity, format: integer, required: true }
-  LGORT:   { from: const, value: "" }
-  ETDAT:   { from: const, value: "" }
-  BATCH:   { from: const, value: "" }
-  VALTY:   { from: const, value: "" }
   ZPKRE2:
     from: expr
     expr: 'join(",", compact([_pack_base, ref_codes.b_code, ref_codes.c_code]))'
     explain: '출하처 기본값(C/N/O/A) 뒤에 참조표 값을 쉼표로 연결 (예: "C,Blue RING")'
-  EMPST:   { from: const, value: "" }
-  VSART:   { from: const, value: "04" }
-  PRICE:   { from: const, value: "" }
-  WAERK:   { from: const, value: "" }
-  BSTDK_E: { from: const, value: "" }
-  POSEX:   { from: const, value: "" }
-  DELCO:   { from: const, value: "" }
-  BSTKD_E: { from: const, value: "" }
-  AUGRU:   { from: const, value: "" }
-  VKAUS:   { from: const, value: "" }
-  IHREZ_E: { from: const, value: "" }
-  VGBEL:   { from: const, value: "" }
-  VGPOS:   { from: const, value: "" }
 
 grid:
   pinned: [BSTKD, KUNNR2, MATNR, KWMENG]

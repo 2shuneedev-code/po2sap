@@ -101,12 +101,22 @@ def _apply_extends(data: dict[str, Any], masters_dir: Path) -> dict[str, Any]:
     return _deep_merge(merged, data)
 
 
-def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+# 이 섹션들은 **항목 하나가 원자 단위**다. 거래처가 fields.KUNNR2 를 다시 쓰면
+# 프로필의 KUNNR2 는 통째로 교체된다 — 깊게 합치면 프로필의 todo/value 가
+# 거래처의 재정의에 섞여 들어가 "from: table 인데 value 도 있는" 스펙이 만들어진다.
+_ATOMIC_SECTIONS = {"fields", "tables", "rules", "field_specs"}
+
+
+def _deep_merge(
+    base: dict[str, Any], override: dict[str, Any], depth: int = 0
+) -> dict[str, Any]:
     out = dict(base)
     for k, v in override.items():
-        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            # 리스트(결정표 rows 등)는 병합하지 않고 교체한다.
+        if not (k in out and isinstance(out[k], dict) and isinstance(v, dict)):
+            # 리스트(결정표 rows, grid.hidden 등)는 병합하지 않고 교체한다.
             out[k] = v
+        elif depth == 0 and k in _ATOMIC_SECTIONS:
+            out[k] = {**out[k], **v}          # 항목 단위로 합치고, 항목은 통째로 교체
+        else:
+            out[k] = _deep_merge(out[k], v, depth + 1)
     return out

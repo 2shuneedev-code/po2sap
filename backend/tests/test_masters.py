@@ -26,11 +26,19 @@ def run(validate_masters, workspace, code="msc"):
     return validate_masters.validate_customer(code, base, workspace)
 
 
-def break_msc(workspace, old: str, new: str) -> None:
-    path = workspace / "customers" / "msc.yaml"
+def _patch(path, old: str, new: str) -> None:
     text = path.read_text(encoding="utf-8")
     assert text.count(old) == 1, f"앵커가 유일하지 않다: {old!r}"
     path.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def break_msc(workspace, old: str, new: str) -> None:
+    _patch(workspace / "customers" / "msc.yaml", old, new)
+
+
+def break_profile(workspace, old: str, new: str) -> None:
+    """프로필이 채우던 필드를 없애면 병합 결과에서 빠진다 (SCHEMA §4.6)."""
+    _patch(workspace / "profiles" / "standard.yaml", old, new)
 
 
 # ── 1) 현재 마스터 ─────────────────────────────────────────────────────
@@ -69,18 +77,19 @@ def test_expressions_in_masters_are_valid(validate_masters, masters_dir):
 
 
 # ── 2) 역테스트: 깨뜨린 것을 잡는가 ────────────────────────────────────
+# 거래처 파일을 깨뜨리는 결함 (msc.yaml 은 이제 델타만 담는다)
 FAULTS = [
-    ("§7-1 필드 누락", 'VGPOS:   { from: const, value: "" }\n', ""),
-    ("§7-1 없는 필드", 'VGPOS:   { from: const, value: "" }',
-     'VGPOS:   { from: const, value: "" }\n  NOPE: { from: const, value: "" }'),
-    ("§7-2 잘못된 from", 'VSART:   { from: const, value: "04" }',
-     'VSART:   { from: lambda, value: "04" }'),
-    ("§7-2 잘못된 format", "format: integer, required: true }", "format: yyyy, required: true }"),
+    ("§7-1 없는 필드", 'ZSHCO:   { from: const, value: "A" }',
+     'ZSHCO:   { from: const, value: "A" }\n  NOPE: { from: const, value: "" }'),
+    ("§7-2 잘못된 from", "MATNR:   { from: doc,   path: line.item_code, required: true }",
+     "MATNR:   { from: lambda, path: line.item_code, required: true }"),
+    ("§7-2 잘못된 format", "MATNR:   { from: doc,   path: line.item_code, required: true }",
+     "MATNR:   { from: doc,   path: line.item_code, format: yyyy }"),
     ("§7-2 잘못된 op", "op: contains_ci", "op: fuzzy_match"),
     ("§7-2 doc 인데 path 없음", "MATNR:   { from: doc,   path: line.item_code, required: true }",
      "MATNR:   { from: doc,   required: true }"),
-    ("§7-2 미정의 필드 옵션", "MAKTX:   { from: const, value: \"\" }",
-     "MAKTX:   { from: const, value: \"\", bogus: 1 }"),
+    ("§7-2 미정의 필드 옵션", 'ZSHCO:   { from: const, value: "A" }',
+     'ZSHCO:   { from: const, value: "A", bogus: 1 }'),
     ("§7-3 없는 규칙 참조", "rule: brand_code, required: true }", "rule: no_such_rule, required: true }"),
     ("§7-3 없는 결정표", "table: ship_to_routing }", "table: no_such_table }"),
     ("§7-4 금지 함수", "expr: 'if(_city,", "expr: 'eval(_city,"),
@@ -99,6 +108,18 @@ FAULTS = [
 def test_fault_is_detected_as_error(validate_masters, workspace, label, old, new):
     break_msc(workspace, old, new)
     assert run(validate_masters, workspace).errors, f"{label} 을 놓쳤다"
+
+
+def test_field_missing_from_merged_result_is_an_error(validate_masters, workspace):
+    """§7-1 — 프로필에서 빠지면 그 프로필을 쓰는 전 거래처가 걸린다."""
+    break_profile(workspace, '  VGPOS:   { from: const, value: "" }\n', "")
+    report = run(validate_masters, workspace)
+    assert any("VGPOS" in e for e in report.errors), report.errors
+
+
+def test_profile_is_not_listed_as_a_customer(validate_masters, masters_dir):
+    """프로필은 거래처가 아니다 — 목록·검증 대상에 끼면 안 된다."""
+    assert validate_masters.customer_codes(masters_dir) == ["kl", "msc", "ygjp"]
 
 
 WARN_FAULTS = [
@@ -148,3 +169,68 @@ def test_missing_reference_table_blocks_unless_optional(validate_masters, worksp
         encoding="utf-8",
     )
     assert run(validate_masters, workspace).errors
+
+
+# ── 프로필 상속 (SCHEMA §1.1) ──────────────────────────────────────────
+def test_merged_declaration_covers_every_field(validate_masters, masters_dir):
+    """거래처 파일은 델타만 적지만, 병합 결과는 전송 필드 전량을 채운다."""
+    from app.masters.loader import load_customer
+
+    base = set(validate_masters.load_base_fields(masters_dir))
+    for code in validate_masters.customer_codes(masters_dir):
+        assert set(load_customer(code, masters_dir).fields) == base, code
+
+
+def test_customer_files_declare_only_deltas(masters_dir):
+    """거래처 파일이 36개를 다시 나열하면 프로필의 의미가 없다."""
+    import yaml
+
+    for code in ("msc", "kl", "ygjp"):
+        raw = yaml.safe_load((masters_dir / "customers" / f"{code}.yaml").read_text("utf-8"))
+        declared = raw.get("fields") or {}
+        assert "profiles/standard" in raw["extends"], code
+        assert len(declared) <= 12, f"{code}: {len(declared)}개 — 델타만 적어야 한다"
+
+
+def test_profile_override_replaces_the_whole_spec(masters_dir):
+    """§1 — 항목은 통째로 교체된다. 프로필의 todo/value 가 새면 안 된다."""
+    from app.masters.loader import load_customer
+
+    msc = load_customer("msc", masters_dir).fields["KUNNR2"]
+    assert msc == {"from": "table", "table": "ship_to_routing"}
+    assert "todo" not in msc and "value" not in msc
+
+
+def test_customer_code_comes_from_meta_not_a_literal(masters_dir):
+    """KUNNR1/KUNNR3 은 프로필에서 meta.customer_no 로 한 번만 적는다."""
+    import yaml
+    from app.masters.loader import load_customer
+
+    for code in ("msc", "kl", "ygjp"):
+        m = load_customer(code, masters_dir)
+        for field in ("KUNNR1", "KUNNR3"):
+            assert m.fields[field]["expr"] == "meta.customer_no", f"{code}.{field}"
+        raw = yaml.safe_load((masters_dir / "customers" / f"{code}.yaml").read_text("utf-8"))
+        assert "KUNNR1" not in (raw.get("fields") or {}), code
+
+
+def test_meta_paths_are_valid_references(validate_masters, masters_dir):
+    """§3 — meta.* 가 참조 가능한 경로로 인정되어야 §7-5 가 오탐하지 않는다."""
+    from app.masters.loader import load_customer
+
+    allowed = validate_masters.valid_paths(load_customer("msc", masters_dir))
+    assert {"meta.code", "meta.customer_no", "meta.name"} <= allowed
+
+
+def test_new_customer_from_template_validates(validate_masters, workspace):
+    """템플릿을 복사해 코드만 채우면 오류 없이 통과하고, 미정 값은 TODO 로 뜬다."""
+    src = workspace / "customers" / "_template.yaml"
+    text = src.read_text(encoding="utf-8").replace("code: XXX", "code: NEWCO")
+    (workspace / "customers" / "newco.yaml").write_text(text, encoding="utf-8")
+
+    base = validate_masters.load_base_fields(workspace)
+    report = validate_masters.validate_customer("newco", base, workspace)
+    assert report.errors == []
+    assert report.todos, "미확정 값이 리포트에 떠야 한다 (원칙 2)"
+    assert "newco" in validate_masters.customer_codes(workspace)
+    assert "_template" not in validate_masters.customer_codes(workspace)

@@ -13,7 +13,7 @@ meta:
   status: draft            # draft 는 화면 거래처 목록에 안 뜬다
   file_types: [pdf]
 
-extends: [_base/sap_defaults]
+extends: [_base/sap_defaults, profiles/standard]
 
 extraction:
   input: text
@@ -46,43 +46,24 @@ split:
 
 # ── 전송 필드는 전부 선언해야 한다 (누락 시 검증 실패) ─────────
 fields:
-  AUART:   { from: base }
-  VKORG:   { from: base }
-  VTWEG:   { from: base }
-  VBELN:   { from: const, value: "" }
-  KUNNR1:  { from: const, value: "", todo: "고객코드" }
-  KUNNR2:  { from: const, value: "", todo: "출하처 코드" }
-  KUNNR3:  { from: const, value: "", todo: "최종고객 코드" }
-  BSTKD:   { from: doc,   path: header.po_number, required: true }
-  VDATU:   { from: const, value: "" }
-  ZTERM:   { from: const, value: "" }
-  INCO1:   { from: const, value: "" }
-  INCO2:   { from: const, value: "" }
-  ZBRAND:  { from: const, value: "", todo: "브랜드 규칙" }
-  ZSHCO:   { from: const, value: "" }
-  ZPKRE1:  { from: const, value: "" }
-  MATNR:   { from: doc,   path: line.item_code, required: true }
-  MAKTX:   { from: const, value: "" }
-  KWMENG:  { from: doc,   path: line.quantity, format: integer, required: true }
-  LGORT:   { from: const, value: "" }
-  ETDAT:   { from: const, value: "" }
-  BATCH:   { from: const, value: "" }
-  VALTY:   { from: const, value: "" }
-  ZPKRE2:  { from: const, value: "" }
-  EMPST:   { from: const, value: "" }
-  VSART:   { from: const, value: "04" }
-  PRICE:   { from: const, value: "" }
-  WAERK:   { from: const, value: "" }
-  BSTDK_E: { from: const, value: "" }
-  POSEX:   { from: const, value: "" }
-  DELCO:   { from: const, value: "" }
-  BSTKD_E: { from: const, value: "" }
-  AUGRU:   { from: const, value: "" }
-  VKAUS:   { from: const, value: "" }
-  IHREZ_E: { from: const, value: "" }
-  VGBEL:   { from: const, value: "" }
-  VGPOS:   { from: const, value: "" }
+  # ── profiles/standard.yaml 과 **다른 것만** 적는다 ────────────────
+  #  36개를 다시 나열하지 않는다. 병합 결과가 전량을 채우면 검증을 통과한다.
+  #  아래 다섯 개는 거의 모든 거래처가 덮어써야 한다 — 그대로 두면
+  #  프로필의 todo 가 남아 validate_masters 리포트에 뜬다 (막지는 않는다).
 
-grid:
-  pinned: [BSTKD, MATNR, KWMENG]
-  hidden: []
+  KUNNR2:  { from: const, value: "", todo: "출하처 코드" }
+  BSTKD:   { from: doc,   path: header.po_number, required: true }
+  ZBRAND:  { from: const, value: "", todo: "브랜드 — 고정값이면 const, 원문 판정이면 rule" }
+  ZSHCO:   { from: const, value: "", todo: "출하조건" }
+  MATNR:   { from: doc,   path: line.item_code, required: true }
+
+  # 필요할 때만 추가로 덮어쓴다 (기본값은 프로필에 있다)
+  # ZPKRE2:  { from: doc,   path: header.packing_spec }
+  # EMPST:   { from: doc,   path: line.remark, fallback: header.remark_default }
+  # POSEX:   { from: doc,   path: line.posex, format: integer }
+  # WAERK:   { from: const, value: "USD" }
+
+# grid:                    # 화면 배치가 프로필과 다를 때만 작성.
+#   pinned: [BSTKD, MATNR, KWMENG]
+#   hidden: [...]          # 리스트는 병합되지 않는다 — 전체를 다시 적는다
+#   width:  { MATNR: 140 }

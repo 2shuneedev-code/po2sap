@@ -82,7 +82,8 @@ def valid_paths(master: Any) -> set[str]:
     schema = build_tool_schema(extra_fields, include_shipments=splits_by_shipment(master))
     props = schema["properties"]
 
-    out: set[str] = set()
+    # meta.* 는 문서가 아니라 마스터에 적힌 값이다 (SCHEMA §3).
+    out: set[str] = {"meta.code", "meta.customer_no", "meta.name"}
     for key in props["header"]["properties"]:
         if key != "extra":
             out.add(f"header.{key}")

@@ -1,6 +1,6 @@
 """거래처 마스터(YAML) 로더.
 
-D1 범위에서는 meta / extraction 만 사용한다.
+D1 범위에서는 meta / extraction / split 만 사용한다.
 tables / rules / fields / grid 는 D2(규칙엔진)에서 확장한다.
 """
 
@@ -25,6 +25,7 @@ class CustomerMaster:
     customer_no: str
     file_types: list[str] = field(default_factory=list)
     extraction: dict[str, Any] = field(default_factory=dict)
+    split: dict[str, Any] = field(default_factory=dict)
     # D2 확장 지점
     tables: dict[str, Any] = field(default_factory=dict)
     rules: dict[str, Any] = field(default_factory=dict)
@@ -75,6 +76,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
         customer_no=str(meta.get("customer_no") or ""),
         file_types=[str(t).lower() for t in (meta.get("file_types") or [])],
         extraction=data.get("extraction") or {},
+        split=data.get("split") or {},
         tables=data.get("tables") or {},
         rules=data.get("rules") or {},
         fields=data.get("fields") or {},

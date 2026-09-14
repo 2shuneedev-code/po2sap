@@ -46,7 +46,7 @@ masters/
 
 ```
 ① EXTRACT   Claude 가 문서를 읽어 RawPO(원문 값) 생성      ← extraction.hints
-② SPLIT     RawPO 를 오더 단위로 분할                       ← split
+② SPLIT     RawPO 를 오더 단위(order unit)로 분할            ← split
 ③ CONTEXT   header / shipment / line 네임스페이스 조립      ← (엔진 고정)
 ④ TABLES    결정표 평가 → 파생변수(_xxx) 생성               ← tables
 ⑤ RULES     매핑 규칙 평가 → 규칙 결과 생성                 ← rules
@@ -56,6 +56,35 @@ masters/
 
 ④가 ⑤보다 먼저인 이유: 결정표의 파생변수를 규칙과 필드에서 쓰기 때문.
 ⑤끼리는 서로 참조할 수 없다 (순환 방지). 필요하면 `expr` 에서 조합한다.
+
+### 2.1 ② SPLIT 규약 — 1문서 → N오더
+
+엔진은 `RawPO` 를 **오더 단위(order unit)** 의 목록으로 편다. 이후 ③~⑦은 오더 단위마다 1회씩 돈다.
+
+| `split.by` | 오더 단위 | `shipment.*` 네임스페이스 |
+|---|---|---|
+| `none` | 문서 전체 1건. 품목은 `RawPO.lines` | 전부 빈 값 |
+| `shipment` | `RawPO.shipments` 의 항목 1개 = 오더 1건 | 해당 shipment 의 값 |
+
+**`split.by: shipment` 일 때**
+
+1. **라인 소속** — 품목은 `shipments[i].lines` 에서 가져온다. 추출 단계에서 이미
+   출하처 블록별로 나뉘어 들어오므로 엔진이 라인을 재배정하지 않는다.
+2. **`RawPO.lines` 의 처리** — 문서 상단 요약표가 여기 담긴다. **오더 생성에 쓰지 않는다.**
+   `checks` 의 합계 대조(요약표 합계 = 출하처별 합계)에만 쓴다.
+3. **`shipments` 가 비어 있으면** — 🔴 오류. 분할 대상을 하나도 찾지 못한 것이다.
+4. **`shipments` 가 1건이면** — 단일 출하처 문서다. 정상이며 오더도 1건이다.
+5. **헤더 폴백** — `shipment.*` 가 비면 같은 이름의 `header.*` 로 폴백한다
+   (`tables.when.fallback_source` 가 그 선언 수단이다).
+
+**공통 (`split.by` 무관)**
+
+6. **`line_no`** 는 오더 단위 **안에서** 1부터 센다. 문서 전체 통번호가 아니다.
+7. **`POSEX`** 는 ⑥ FIELDS 에서 오더 단위마다 다시 매긴다. 원문 `line.posex` 가 있으면
+   그 값을, 없으면 `gen: line_no_x10` 같은 생성기가 정한다. **⑤ 이전 단계에서 만들지 않는다.**
+8. **`BSTKD`** 는 오더 단위마다 달라진다 — 같은 문서에서 나온 오더를 구분하는 유일한 키다
+   (전송 페이로드에는 `batch_id` 도 파일명도 들어가지 않는다).
+9. **파생변수(`_xxx`)** 는 오더 단위 안에서만 유효하다. 오더 간에 넘기지 않는다.
 
 ---
 
@@ -76,18 +105,50 @@ masters/
 
 ### 3.1 표준 키 (거래처 공통 어휘)
 
+> **이 목록이 추출 스키마의 단일 원천이다.** `backend/app/extraction/schema_builder.py`
+> 와 `backend/app/domain/models.py` 는 여기에 맞춘다. 반대 방향으로 맞추지 않는다.
+> 키를 추가·변경할 때는 **이 절을 먼저 고치고** 코드를 따라오게 한다.
+
 ```
-header:    po_number, po_date, brand_text, currency_text, incoterms_text,
-           payment_terms_text, ship_to_text, packing_spec, remark_default
-shipment:  ship_to_text, ship_by_text, remark
-line:      line_no, posex, item_code, our_item, description,
-           quantity, unit_price, net_value, delivery_date, brand_text, remark
+header:    po_number, po_date, requested_date,
+           brand_text, order_text,
+           ship_to_text, bill_to_text,
+           currency_text, incoterms_text, payment_terms_text,
+           packing_spec, remark_default
+
+shipment:  shipment_no, receiving_loc, ship_to_text, ship_by_text, remark
+
+line:      line_no, posex,
+           item_code, our_item, description,
+           quantity, unit, unit_price, net_value,
+           delivery_date, ship_to_text, brand_text, remark
 ```
+
+**품번 두 개를 혼동하지 않는다** — 거래처마다 컬럼명이 반대인 경우가 있다.
 
 - `item_code` = **우리(YG) 품번** → 보통 `MATNR`
 - `our_item` = **거래처 품번** → 보통 참조표 조회 키
 - 거래처 문서의 컬럼명이 무엇이든 이 두 개로 정규화해서 담는다.
-- 표준 키로 안 잡히는 값은 `header.extra.*` 에 자유롭게 담을 수 있다.
+  (MSC 는 `Your Item Number` 가 `item_code`, `Our Item Number` 가 `our_item` 이다.)
+
+**키별 주의**
+
+| 키 | 내용 |
+|---|---|
+| `po_number` | 거래처 발주번호. 문서가 `Purchase Order ID` 등 다른 이름을 써도 **이 키로 정규화**한다 |
+| `order_text` | 브랜드·특기사항이 적힌 헤더 부근 원문 블록. 브랜드 키워드 탐색용 |
+| `packing_spec` / `remark_default` | 문서 하단 포장 지시·공통 비고 원문 |
+| `posex` | 문서에 인쇄된 품목 번호 원문. 없으면 비운다 — **생성은 ⑥ FIELDS 의 몫** |
+| `net_value` | 라인 합계금액. `unit_price`(단가) 와 반드시 구분한다 |
+| `delivery_date` | 라인별 납기. 라인별 납기가 없으면 비우고 `header.requested_date` 로 폴백한다 |
+| `unit` | EA / PCS 등 단위 원문 |
+
+**라인 폴백** — `line.ship_to_text` · `line.brand_text` · `line.delivery_date` 는
+품목마다 다를 수 있어 라인에도 둔다. 비어 있으면 같은 이름의 `header.*` 로 폴백한다
+(`fields.*.fallback` 으로 선언).
+
+**표준 키로 안 잡히는 값**은 `extraction.extra_fields`(§4.2) 로 선언하고
+`header.extra.*` / `line.extra.*` 로 참조한다. 코드 수정은 필요 없다.
 
 ---
 
@@ -119,6 +180,27 @@ extraction:
 **규칙**: `hints` 에 "코드로 바꿔라", "날짜를 YYYYMMDD로" 같은 **변환 지시를 쓰지 않는다.**
 변환은 전부 `rules`/`fields` 의 몫이다.
 
+#### `extra_fields` — 표준 키로 안 잡히는 값 (코드 수정 없이 확장)
+
+§3.1 표준 키에 없는 값이 필요하면 여기에 선언한다. 추출 스키마에 자동으로 끼워지고
+`header.extra.<name>` / `line.extra.<name>` 으로 참조할 수 있다.
+
+```yaml
+extraction:
+  extra_fields:
+    - name: contract_no
+      description: "계약번호. 헤더 'Contract No.' 뒤의 값"
+```
+
+| 키 | 내용 |
+|---|---|
+| `name` | 참조 이름. `header.extra.<name>` · `line.extra.<name>` 양쪽에 생성된다 |
+| `description` | Claude 에게 줄 설명. **무엇을 어디서 읽는지**만 쓴다 (변환 지시 금지) |
+
+- 값 형태는 표준 키와 같은 `{value, evidence, page, confidence}` 4종 세트다.
+- **먼저 §3.1 에 넣을 수 있는지 검토한다.** 두 거래처 이상에서 같은 뜻으로 쓰이면
+  `extra_fields` 가 아니라 표준 키로 올린다.
+
 ### 4.3 `split` — 1문서 → N오더
 
 ```yaml
@@ -129,6 +211,10 @@ split:
 
 `none` 이면 문서 1부 = 오더 1건. `shipment` 면 추출된 shipment 수만큼 오더가 생긴다.
 화면에는 항상 한 그리드로 통합되고, 행마다 다른 값(BSTKD 등)만 달라진다.
+
+**엔진 동작은 §2.1 이 정한다.** `split.by` 가 `none` 이 아니면 추출 스키마에
+`shipments[]` 블록이 생기므로, `hints` 에 **출하처 블록을 어떻게 알아보는지**와
+**어느 품목표가 그 블록의 것인지**를 반드시 설명해야 한다.
 
 ### 4.4 `tables` — 결정표 (여러 값을 한 번에 결정)
 
@@ -291,7 +377,7 @@ checks:
 | 2 | `from` / `kind` / `op` 가 허용 목록에 있는가 | 오류 |
 | 3 | 참조하는 `table`/`rule` 이 존재하는가 | 오류 |
 | 4 | `expr` 이 화이트리스트 함수만 쓰는가 | 오류 |
-| 5 | `path` 가 추출 스키마에 있는 키인가 | 경고 |
+| 5 | `path` 가 추출 스키마(§3.1 표준 키 + `extra_fields`)에 있는 키인가 | **오류** |
 | 6 | 결정표에 도달 불가 행 / 중복 조건이 있는가 | 경고 |
 | 7 | `on_no_match` 가 선언됐는가 | 경고 |
 | 8 | `todo` 가 달린 필드 목록 | 리포트 |

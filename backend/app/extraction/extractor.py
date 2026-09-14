@@ -16,6 +16,7 @@ from ..domain.models import (
     ParseResult,
     POHeader,
     POLine,
+    POShipment,
     POTotals,
     RawPO,
 )
@@ -26,6 +27,14 @@ from .prompt import SYSTEM_PROMPT, build_user_prompt
 from .providers import DocumentInput, create_provider
 from .providers import cache as llm_cache
 from .schema_builder import build_tool
+
+
+def splits_by_shipment(master: CustomerMaster) -> bool:
+    """`split.by` 가 none 이 아니면 추출 스키마에 shipments 블록을 넣는다.
+
+    거래처 이름으로 분기하지 않는다 (SCHEMA.md §0-1). YAML 이 정한다.
+    """
+    return str((master.split or {}).get("by") or "none").strip().lower() != "none"
 
 
 class Extractor:
@@ -97,7 +106,10 @@ class Extractor:
         if cached is not None and self._provider.name != "mock":
             return cached, True
 
-        tool = build_tool(master.extraction.get("extra_fields"))
+        tool = build_tool(
+            master.extraction.get("extra_fields"),
+            include_shipments=splits_by_shipment(master),
+        )
         result = self._provider.extract(
             system=SYSTEM_PROMPT,
             tool=tool,
@@ -142,40 +154,65 @@ def _extra(data: Any) -> dict[str, ExtractedValue]:
     return {k: _val(v) for k, v in data.items()}
 
 
+def _to_line(item: Any, fallback_no: int) -> POLine:
+    item = item if isinstance(item, dict) else {}
+    return POLine(
+        line_no=int(item.get("line_no") or fallback_no),
+        posex=_val(item.get("posex")),
+        our_item=_val(item.get("our_item")),
+        item_code=_val(item.get("item_code")),
+        description=_val(item.get("description")),
+        quantity=_val(item.get("quantity")),
+        unit=_val(item.get("unit")),
+        unit_price=_val(item.get("unit_price")),
+        net_value=_val(item.get("net_value")),
+        delivery_date=_val(item.get("delivery_date")),
+        ship_to_text=_val(item.get("ship_to_text")),
+        brand_text=_val(item.get("brand_text")),
+        remark=_val(item.get("remark")),
+        extra=_extra(item.get("extra")),
+    )
+
+
+def _to_lines(data: Any) -> list[POLine]:
+    """line_no 는 오더 단위 안에서 1부터 센다 (SCHEMA.md §2.1-6)."""
+    return [_to_line(item, idx) for idx, item in enumerate(data or [], start=1)]
+
+
+def _to_shipments(data: Any) -> list[POShipment]:
+    out: list[POShipment] = []
+    for block in data or []:
+        block = block if isinstance(block, dict) else {}
+        out.append(
+            POShipment(
+                shipment_no=_val(block.get("shipment_no")),
+                receiving_loc=_val(block.get("receiving_loc")),
+                ship_to_text=_val(block.get("ship_to_text")),
+                ship_by_text=_val(block.get("ship_by_text")),
+                remark=_val(block.get("remark")),
+                lines=_to_lines(block.get("lines")),
+            )
+        )
+    return out
+
+
 def _to_raw_po(payload: dict[str, Any], *, customer_code: str, source_file: str) -> RawPO:
     h = payload.get("header") or {}
     header = POHeader(
         po_number=_val(h.get("po_number")),
         po_date=_val(h.get("po_date")),
         requested_date=_val(h.get("requested_date")),
+        brand_text=_val(h.get("brand_text")),
+        order_text=_val(h.get("order_text")),
         ship_to_text=_val(h.get("ship_to_text")),
         bill_to_text=_val(h.get("bill_to_text")),
-        brand_text=_val(h.get("brand_text")),
-        incoterms=_val(h.get("incoterms")),
-        payment_terms=_val(h.get("payment_terms")),
-        currency=_val(h.get("currency")),
-        order_text=_val(h.get("order_text")),
+        currency_text=_val(h.get("currency_text")),
+        incoterms_text=_val(h.get("incoterms_text")),
+        payment_terms_text=_val(h.get("payment_terms_text")),
+        packing_spec=_val(h.get("packing_spec")),
+        remark_default=_val(h.get("remark_default")),
         extra=_extra(h.get("extra")),
     )
-
-    lines: list[POLine] = []
-    for idx, item in enumerate(payload.get("lines") or [], start=1):
-        item = item or {}
-        lines.append(
-            POLine(
-                line_no=int(item.get("line_no") or idx),
-                our_item=_val(item.get("our_item")),
-                item_code=_val(item.get("item_code")),
-                description=_val(item.get("description")),
-                quantity=_val(item.get("quantity")),
-                unit=_val(item.get("unit")),
-                unit_price=_val(item.get("unit_price")),
-                req_date=_val(item.get("req_date")),
-                ship_to_text=_val(item.get("ship_to_text")),
-                brand_text=_val(item.get("brand_text")),
-                extra=_extra(item.get("extra")),
-            )
-        )
 
     t = payload.get("totals") or {}
     totals = POTotals(
@@ -184,13 +221,12 @@ def _to_raw_po(payload: dict[str, Any], *, customer_code: str, source_file: str)
         total_amount=None if t.get("total_amount") is None else str(t["total_amount"]),
     )
 
-    notes = [str(n) for n in (payload.get("notes") or [])]
-
     return RawPO(
         customer_code=customer_code,
         source_file=source_file,
         header=header,
-        lines=lines,
+        lines=_to_lines(payload.get("lines")),
+        shipments=_to_shipments(payload.get("shipments")),
         totals=totals,
-        notes=notes,
+        notes=[str(n) for n in (payload.get("notes") or [])],
     )

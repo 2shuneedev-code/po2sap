@@ -135,15 +135,17 @@ storage/          런타임 산출물 — Git 제외
 
 > **`README.md`의 "이제 문서 간 모순이 없다"는 현재 사실이 아니다.** 아래를 전제로 작업할 것.
 
+> ✅ **해결됨 (2026-09-14)** — 추출 스키마 `shipments[]` 추가 및 표준 키 SSOT 정렬.
+> `masters/SCHEMA.md` §2.1(SPLIT 규약) · §3.1(표준 키) · §4.2(`extra_fields`)가 원천이고
+> `schema_builder.py` · `models.py` 가 거기에 맞춰져 있다.
+
 **치명 — D2 착수 전 해결 필요**
 
-1. **추출 스키마에 `shipments[]`가 없다.** `schema_builder.py`·`domain/models.py` 최상위가 `header/lines/totals/notes`뿐이라 `split.by: shipment`(MSC 오더 분할)가 동작 불가. `backend/`에 "shipment" 문자열 0건
-2. **표준 키가 문서·코드·YAML 3곳에서 다르다.** YAML이 참조하는 `header.po_id`, `header.packing_spec`, `header.remark_default`, `line.remark`, `line.posex`가 추출 스키마에 없음 → KL POSEX, YGJP BSTKD·ZPKRE2·EMPST가 빈값이 된다. `extractor.py`의 `extraction.extra_fields`는 코드에만 있고 SCHEMA·YAML에 없음
-3. **`ygjp.yaml`의 ZSHCO 분기식 오류** — `contains("471,507", brand_code)`는 부분 문자열 검사라 `brand_code="1"`도 참이 된다. `in(value, list)` 필요
-4. **expr 문법이 미정의** — 리터럴·리스트·함수 시그니처 규약 없음. `ygjp.yaml`의 `date_yyyymmdd(...)`는 §4.7 화이트리스트에 없어 규정상 로딩 실패. 잡아줄 `validate_masters.py`도 없음
-5. **`LLM_PROVIDER=mock`이 새 클론에서 안 돈다** — `backend/tests/fixtures/` 디렉터리 자체가 없음. 캐시 키에 YAML hints 전문이 들어가 hints를 고치면 골든이 전량 깨짐
-6. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
-7. **빌드/테스트 설정 전무** — `pyproject.toml`·`pytest.ini`·`package.json`·CI 워크플로 없음
+1. **`ygjp.yaml`의 ZSHCO 분기식 오류** — `contains("471,507", brand_code)`는 부분 문자열 검사라 `brand_code="1"`도 참이 된다. `in(value, list)` 필요
+2. **expr 문법이 미정의** — 리터럴·리스트·함수 시그니처 규약 없음. `ygjp.yaml`의 `date_yyyymmdd(...)`는 §4.7 화이트리스트에 없어 규정상 로딩 실패. 잡아줄 `validate_masters.py`도 없음
+3. **`LLM_PROVIDER=mock`이 새 클론에서 안 돈다** — `backend/tests/fixtures/` 디렉터리 자체가 없음. 캐시 키에 YAML hints 전문이 들어가 hints를 고치면 골든이 전량 깨짐
+4. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
+5. **빌드/테스트 설정 전무** — `pyproject.toml`·`pytest.ini`·`package.json`·CI 워크플로 없음
 
 **중요**
 

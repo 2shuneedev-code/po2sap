@@ -21,6 +21,22 @@ from app.extraction.providers.base import LLMError  # noqa: E402
 from app.masters import MasterError  # noqa: E402
 
 
+def _print_lines(lines, *, indent: int = 2, title: str | None = None) -> None:
+    pad = " " * indent
+    if title:
+        print(f"\n{title}")
+    print(f"{pad}{'#':>3} {'our_item':<14} {'item_code':<14} {'수량':>10} {'단가':>10}  품명")
+    for line in lines:
+        print(
+            f"{pad}{line.line_no:>3} "
+            f"{(line.our_item.value or '-'):<14} "
+            f"{(line.item_code.value or '-'):<14} "
+            f"{(line.quantity.value or '-'):>10} "
+            f"{(line.unit_price.value or '-'):>10}  "
+            f"{(line.description.value or '')[:36]}"
+        )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="발주서 1부 파싱 (D1 확인용)")
     ap.add_argument("file", help="발주서 파일 경로 (PDF/HTM)")
@@ -61,22 +77,27 @@ def main() -> int:
     h = raw.header
     print("\n[헤더]")
     for name in ("po_number", "po_date", "requested_date", "ship_to_text",
-                 "brand_text", "incoterms", "currency"):
+                 "brand_text", "incoterms_text", "currency_text",
+                 "packing_spec", "remark_default"):
         v = getattr(h, name)
         conf = f"  (신뢰도 {v.confidence:.2f})" if v.confidence is not None else ""
-        print(f"  {name:<16}: {v.value}{conf}")
+        print(f"  {name:<18}: {v.value}{conf}")
 
-    print(f"\n[품목] {len(raw.lines)}건")
-    print(f"  {'#':>3} {'our_item':<14} {'item_code':<14} {'수량':>10} {'단가':>10}  품명")
-    for line in raw.lines:
-        print(
-            f"  {line.line_no:>3} "
-            f"{(line.our_item.value or '-'):<14} "
-            f"{(line.item_code.value or '-'):<14} "
-            f"{(line.quantity.value or '-'):>10} "
-            f"{(line.unit_price.value or '-'):>10}  "
-            f"{(line.description.value or '')[:36]}"
-        )
+    if raw.shipments:
+        # split.by 가 none 이 아닌 거래처: 출하처 블록 = 오더 1건 (SCHEMA.md §2.1)
+        print(f"\n[오더 분할] {len(raw.shipments)}건")
+        for idx, shipment in enumerate(raw.shipments, start=1):
+            head = " / ".join(
+                x for x in (shipment.shipment_no.value, shipment.receiving_loc.value) if x
+            )
+            print(f"\n  ── 출하처 {idx}{f'  ({head})' if head else ''}")
+            first = (shipment.ship_to_text.value or "").strip().splitlines()
+            print(f"     ship_to: {first[0] if first else '-'}")
+            _print_lines(shipment.lines, indent=5)
+        if raw.lines:
+            print(f"\n  ※ 상단 요약표 {len(raw.lines)}건은 합계 대조용이며 오더를 만들지 않는다")
+    else:
+        _print_lines(raw.lines, indent=2, title=f"[품목] {len(raw.lines)}건")
 
     t = raw.totals
     print(f"\n[발주서 기재 합계] 품목수={t.line_count}  수량={t.total_qty}  금액={t.total_amount}")

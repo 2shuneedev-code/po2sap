@@ -23,7 +23,7 @@ extraction:
 
     [헤더]
       "Created On:  2026-05-18"       → po_date (원문 그대로)
-      "Purchase Order ID:  10972"     → po_id
+      "Purchase Order ID:  10972"     → po_number  (YGJP 는 이것이 발주번호다)
       "Incoterms: CIP"                → incoterms_text
       "Payment Terms: ..." 뒤 문장     → payment_terms_text
       "Ship-to Address:" 뒤 주소 블록  → ship_to_text
@@ -107,7 +107,7 @@ fields:
   KUNNR3:  { from: const, value: "3200" }
   BSTKD:
     from: expr
-    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_id])'
+    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
     explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
     required: true
   VDATU:   { from: const, value: "" }

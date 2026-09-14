@@ -40,9 +40,19 @@ def verify(raw: RawPO, doc: SourceDoc) -> list[GroundingIssue]:
         for name, val in _iter_line(line):
             issues += _check_value(f"lines[{idx}].{name}", val, haystack, check_evidence)
 
+    for s_idx, shipment in enumerate(raw.shipments, start=1):
+        prefix = f"shipments[{s_idx}]"
+        for name, val in _iter_shipment(shipment):
+            issues += _check_value(f"{prefix}.{name}", val, haystack, check_evidence)
+        for idx, line in enumerate(shipment.lines, start=1):
+            for name, val in _iter_line(line):
+                issues += _check_value(
+                    f"{prefix}.lines[{idx}].{name}", val, haystack, check_evidence
+                )
+
     issues += _check_totals(raw)
 
-    if not raw.lines:
+    if not raw.all_lines:
         issues.append(
             GroundingIssue(
                 level="error",
@@ -51,6 +61,20 @@ def verify(raw: RawPO, doc: SourceDoc) -> list[GroundingIssue]:
                 message="품목을 하나도 추출하지 못했습니다. 발주서 양식을 확인하세요.",
             )
         )
+
+    for s_idx, shipment in enumerate(raw.shipments, start=1):
+        if not shipment.lines:
+            issues.append(
+                GroundingIssue(
+                    level="error",
+                    field=f"shipments[{s_idx}].lines",
+                    code="NO_LINES",
+                    message=(
+                        f"{s_idx}번 출하처 블록에서 품목을 하나도 추출하지 못했습니다. "
+                        "블록 전용 품목표를 찾지 못했을 수 있습니다."
+                    ),
+                )
+            )
 
     return issues
 
@@ -121,7 +145,9 @@ def _check_totals(raw: RawPO) -> list[GroundingIssue]:
     out: list[GroundingIssue] = []
     totals = raw.totals
 
-    if totals.line_count is not None and totals.line_count != len(raw.lines):
+    lines = raw.all_lines
+
+    if totals.line_count is not None and totals.line_count != len(lines):
         out.append(
             GroundingIssue(
                 level="error",
@@ -129,7 +155,7 @@ def _check_totals(raw: RawPO) -> list[GroundingIssue]:
                 code="TOTAL_MISMATCH",
                 message=(
                     f"발주서에 적힌 품목 수({totals.line_count})와 "
-                    f"추출한 품목 수({len(raw.lines)})가 다릅니다. 라인 누락 가능성이 있습니다."
+                    f"추출한 품목 수({len(lines)})가 다릅니다. 라인 누락 가능성이 있습니다."
                 ),
             )
         )
@@ -138,7 +164,7 @@ def _check_totals(raw: RawPO) -> list[GroundingIssue]:
     if stated is not None:
         extracted = Decimal(0)
         ok = True
-        for line in raw.lines:
+        for line in lines:
             q = _to_decimal(line.quantity.value)
             if q is None:
                 ok = False
@@ -173,22 +199,38 @@ def _to_decimal(text: str | None) -> Decimal | None:
 
 
 # ── 순회 헬퍼 ──────────────────────────────────────────────────────────
+_HEADER_KEYS = (
+    "po_number", "po_date", "requested_date", "brand_text", "order_text",
+    "ship_to_text", "bill_to_text", "currency_text", "incoterms_text",
+    "payment_terms_text", "packing_spec", "remark_default",
+)
+
+_SHIPMENT_KEYS = (
+    "shipment_no", "receiving_loc", "ship_to_text", "ship_by_text", "remark",
+)
+
+_LINE_KEYS = (
+    "posex", "our_item", "item_code", "description", "quantity", "unit",
+    "unit_price", "net_value", "delivery_date", "ship_to_text", "brand_text",
+    "remark",
+)
+
+
 def _iter_header(raw: RawPO):
     h = raw.header
-    for name in (
-        "po_number", "po_date", "requested_date", "ship_to_text", "bill_to_text",
-        "brand_text", "incoterms", "payment_terms", "currency", "order_text",
-    ):
+    for name in _HEADER_KEYS:
         yield name, getattr(h, name)
     for name, val in (h.extra or {}).items():
         yield f"extra.{name}", val
 
 
+def _iter_shipment(shipment):
+    for name in _SHIPMENT_KEYS:
+        yield name, getattr(shipment, name)
+
+
 def _iter_line(line):
-    for name in (
-        "our_item", "item_code", "description", "quantity", "unit",
-        "unit_price", "req_date", "ship_to_text", "brand_text",
-    ):
+    for name in _LINE_KEYS:
         yield name, getattr(line, name)
     for name, val in (line.extra or {}).items():
         yield f"extra.{name}", val

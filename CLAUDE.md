@@ -29,6 +29,7 @@
 | 규칙 스키마 · 엔진 7단계 | `masters/SCHEMA.md` | 참조 링크만 |
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
+| 브랜드 매핑 (원문 → 코드) | `masters/refs/brand_keys.csv` | YAML에 `entries`로 다시 두지 않는다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |
 | 업무 흐름·화면 정의 | `process.md` §4 | — |
 | 진행 상태·일정·미결 | `NEXT.md` | 쓰지 않는다 |
@@ -77,7 +78,9 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 ├── _base/          전송 필드 스펙 36개 + 공통 고정값
 ├── profiles/       standard.yaml — 대부분의 거래처가 쓰는 필드 매핑
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
-└── refs/           참조표 CSV (brand_master 430곳/1,207행)
+└── refs/           참조표 CSV
+    ├── brand_master.csv   SAP 원본 430곳/1,207행 (읽기 전용, 재추출로 교체)
+    └── brand_keys.csv     발주서 원문 → 브랜드 코드 (사람이 채운다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
 
 backend/app/
@@ -87,7 +90,7 @@ backend/app/
 ├── masters/      마스터 로더                                    [완료]
 ├── domain/       RawPO / SapRow / Batch                         [부분]
 ├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
-├── tests/        pytest 80종 + 픽스처 + 골든                     [완료]
+├── tests/        pytest 88종 + 픽스처 + 골든                     [완료]
 ├── mapping/      전송 필드 행 생성                              [미착수]
 ├── validation/   검증                                           [미착수]
 ├── transport/    EAI 전송                                       [미착수]
@@ -120,6 +123,8 @@ storage/          런타임 산출물 — Git 제외
 | `rules.md` / `master-admin.md` 참조 | 폐기·보류 문서. 낡은 값(AUART=ZOR, 33필드)이 남아 있다 |
 | 코드 목록 판정에 `contains()` | 부분 문자열 검사라 오판한다. `in(value, list)` 를 쓴다 (SCHEMA §4.7.3) |
 | 마스터 YAML 수정 후 검증 생략 | `python scripts/validate_masters.py` 를 돌린다 |
+| 대량 매핑표를 YAML `entries`에 나열 | 커지면 `csv_map`으로 참조표에 둔다 (SCHEMA §4.5) |
+| SAP에 없는 코드를 매핑 | `value_check`가 막는다. 전송해도 SAP이 거부한다 |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 

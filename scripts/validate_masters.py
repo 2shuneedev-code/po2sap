@@ -13,6 +13,7 @@ CI 1단계이자 거래처 추가 절차(§5-6)의 관문이다. LLM 을 호출�
 from __future__ import annotations
 
 import argparse
+import csv
 import re
 import sys
 from collections import Counter
@@ -45,11 +46,12 @@ FIELD_OPTIONS = {
 }
 FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim"}
 GENERATORS = {"line_no_x10"}
-RULE_KINDS = {"keyword_map", "value_map", "lookup", "regex_extract", "fixed"}  # §4.5
+RULE_KINDS = {"keyword_map", "value_map", "csv_map", "lookup", "regex_extract", "fixed"}  # §4.5
 RULE_OPTIONS = {
     "kind", "label", "description", "source", "fallback_source",
     "case_insensitive", "normalize", "entries", "on_no_match",
     "table_file", "key", "key_column", "return", "optional",
+    "value_column", "mode_column", "filter_column", "value_check",
     "pattern", "group", "value",
 }
 NORMALIZE_OPS = {"trim", "collapse_spaces", "upper", "lower"}
@@ -330,6 +332,8 @@ def check_rules(
                     report.error(3, f"{where}: 참조표 파일이 없습니다: {table_file}")
             if not rule.get("return"):
                 report.error(2, f"{where}: lookup 인데 return 이 없습니다")
+        elif kind == "csv_map":
+            check_csv_map(report, where, rule, master, masters_dir)
         elif kind in {"keyword_map", "value_map"}:
             entries = rule.get("entries") or []
             if not entries:
@@ -358,6 +362,126 @@ def check_rules(
                     )
 
         check_no_match(report, where, rule, None, allowed)
+
+
+def _read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
+    with path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        return list(reader), list(reader.fieldnames or [])
+
+
+def check_csv_map(
+    report: Report, where: str, rule: dict[str, Any], master: Any, masters_dir: Path
+) -> None:
+    """§7-10 · §7-11 — 참조표 기반 매핑표 (SCHEMA §4.5)."""
+    table_file = rule.get("table_file")
+    if not table_file:
+        report.error(2, f"{where}: csv_map 인데 table_file 이 없습니다")
+        return
+
+    path = masters_dir / table_file
+    if not path.exists():
+        report.error(10, f"{where}: 참조표 파일이 없습니다: {table_file}")
+        return
+
+    rows, header = _read_csv(path)
+
+    required = {"key_column": rule.get("key_column"), "value_column": rule.get("value_column")}
+    optional = {"mode_column": rule.get("mode_column"), "filter_column": rule.get("filter_column")}
+    for name, col in required.items():
+        if not col:
+            report.error(2, f"{where}: csv_map 인데 {name} 이 없습니다")
+        elif col not in header:
+            report.error(
+                10,
+                f"{where}.{name}: {table_file} 에 없는 컬럼입니다: {col} "
+                f"(있는 컬럼: {', '.join(header)})",
+            )
+    for name, col in optional.items():
+        if col and col not in header:
+            report.error(
+                10,
+                f"{where}.{name}: {table_file} 에 없는 컬럼입니다: {col} "
+                f"(있는 컬럼: {', '.join(header)})",
+            )
+
+    key_col, value_col = rule.get("key_column"), rule.get("value_column")
+    mode_col, filter_col = rule.get("mode_column"), rule.get("filter_column")
+    if not (key_col in header and value_col in header):
+        return
+
+    mine = rows
+    if filter_col and filter_col in header:
+        mine = [r for r in rows if (r.get(filter_col) or "").strip() == master.customer_no]
+        if not mine:
+            report.warn(
+                11,
+                f"{where}: {table_file} 에 이 거래처({filter_col}={master.customer_no}) "
+                "행이 하나도 없습니다 — 항상 미매칭됩니다",
+            )
+            return
+
+    seen: Counter[str] = Counter()
+    for idx, row in enumerate(mine, start=1):
+        text = (row.get(key_col) or "").strip()
+        if not text:
+            report.error(10, f"{where}: {table_file} {idx}번째 행의 {key_col} 이 비어 있습니다")
+            continue
+        if mode_col:
+            mode = (row.get(mode_col) or "contains").strip()
+            if mode not in {"contains", "equals"}:
+                report.error(
+                    10,
+                    f"{where}: {table_file} {idx}번째 행의 {mode_col} 이 "
+                    f"허용 목록 밖입니다: {mode!r} (contains | equals)",
+                )
+        seen[text] += 1
+        if seen[text] == 2:
+            report.warn(
+                6,
+                f"{where}: {table_file} 에 같은 {key_col} 이 두 번 있습니다 — "
+                f"아래 행은 도달할 수 없습니다: {text!r}",
+            )
+        if (row.get("note") or "").strip():
+            report.todos.append(f"{table_file} [{row.get(value_col)}] {text}: {row['note'].strip()}")
+
+    check_value_registry(report, where, rule, master, masters_dir, mine, value_col)
+
+
+def check_value_registry(
+    report: Report, where: str, rule: dict[str, Any], master: Any,
+    masters_dir: Path, rows: list[dict[str, str]], value_col: str,
+) -> None:
+    """§7-10 — 결정될 값이 실제로 등록된 코드인가 (미등록 코드 전송 방지)."""
+    spec = rule.get("value_check")
+    if not spec:
+        return
+
+    path = masters_dir / (spec.get("table_file") or "")
+    if not path.exists():
+        report.error(10, f"{where}.value_check: 참조표 파일이 없습니다: {spec.get('table_file')}")
+        return
+
+    registry, header = _read_csv(path)
+    col = spec.get("value_column")
+    if col not in header:
+        report.error(10, f"{where}.value_check.value_column: 없는 컬럼입니다: {col}")
+        return
+
+    filter_col = spec.get("filter_column")
+    if filter_col and filter_col in header:
+        registry = [r for r in registry if (r.get(filter_col) or "").strip() == master.customer_no]
+
+    known = {(r.get(col) or "").strip() for r in registry}
+    for row in rows:
+        value = (row.get(value_col) or "").strip()
+        if value and value not in known:
+            report.error(
+                10,
+                f"{where}: {value_col}={value} 가 {spec['table_file']} 에 "
+                f"등록돼 있지 않습니다 (거래처 {master.customer_no}) — "
+                "SAP 이 거부할 코드입니다",
+            )
 
 
 def check_no_match(

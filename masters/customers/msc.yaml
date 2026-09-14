@@ -93,20 +93,25 @@ tables:
 
 rules:
   brand_code:
-    kind: keyword_map
+    kind: csv_map
     label: "브랜드 판별"
-    description: "ORDERED FROM 텍스트에 아래 키워드가 포함되면 해당 코드 (위에서부터)"
+    description: |
+      발주서 원문을 참조표 refs/brand_keys.csv 의 이 거래처(kunnr) 행과 대조한다.
+      매핑 추가·수정은 이 파일이 아니라 CSV 에서 한다 — 브랜드 관리 화면의 원천이다.
     source: header.brand_text
+    table_file: refs/brand_keys.csv
+    filter_column: kunnr
+    key_column: text
+    mode_column: match
+    value_column: zbrand
     case_insensitive: true
-    entries:
-      - { contains: "HERTEL",     value: "38"  }
-      - { contains: "INTERSTATE", value: "127" }
-      - { contains: "ACCUPRO",    value: "205" }
-      - { contains: "CLASS C",    value: "428" }
+    value_check:
+      table_file: refs/brand_master.csv
+      value_column: zbrand
+      filter_column: kunnr
     on_no_match:
       action: error
-      message: "MSC 브랜드 키워드를 찾을 수 없습니다 (HERTEL / INTERSTATE / ACCUPRO / CLASS C)"
-
+      message: "브랜드를 인식하지 못했습니다: {brand_text}"
   ref_codes:
     kind: lookup
     label: "MSC 참조표 조회"

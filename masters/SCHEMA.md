@@ -34,8 +34,18 @@ masters/
 │   ├── kl.yaml
 │   └── ygjp.yaml
 └── refs/
-    └── *.csv              ← 참조표 (품번→값 매핑 등). 없으면 없는 대로 동작
+    ├── brand_master.csv   ← SAP 원본 (읽기 전용, 재추출로 통째 교체)
+    ├── brand_keys.csv     ← 사람이 채우는 원문 키 (발주서 문구 → 코드)
+    └── *.csv              ← 그 밖의 참조표. 없으면 없는 대로 동작
 ```
+
+**참조표를 둘로 나눈 이유**: SAP 이 주는 것은 `코드 → 이름`뿐이고, 시스템에 필요한
+`발주서 원문 → 코드`의 **원문 키는 SAP 에 없다.** 사람이 채워야 하는 값이다.
+한 파일에 섞으면 SAP 을 다시 뽑을 때 사람 작업분이 날아간다. 나눠 두면
+`brand_master.csv` 를 통째로 갈아끼워도 `brand_keys.csv` 는 그대로다.
+
+참조표의 `note` 컬럼은 자유 메모다. 값이 있으면 `validate_masters` 가 리포트로
+뽑아준다(§7-8) — 필드의 `todo` 와 같은 역할이다.
 
 **해석 순서**: `extends` 를 **적힌 순서대로** 깔고 거래처 파일이 덮어쓴다.
 
@@ -318,7 +328,8 @@ tables:
 |---|---|---|
 | `keyword_map` | 원문에 키워드가 **포함**되면 값 결정 (위에서부터) | `source`, `entries[].contains/value` |
 | `value_map` | 원문과 **완전 일치**하면 값 결정 (대량 매핑표) | `source`, `entries[].equals/value` |
-| `lookup` | 참조표(CSV) 조회 | `table_file`, `key`, `key_column`, `return[]` |
+| `csv_map` | **참조표(CSV)에서 매핑표를 읽어** 원문을 판정 | `table_file`, `key_column`, `value_column` |
+| `lookup` | 참조표(CSV) 조회 — 키로 찾아 값을 가져온다 | `table_file`, `key`, `key_column`, `return[]` |
 | `regex_extract` | 원문에서 부분 추출 | `source`, `pattern`, `group` |
 | `fixed` | 상수 (문서화 목적) | `value` |
 
@@ -337,6 +348,42 @@ rules:
 
 `on_no_match.message` 에는 **컨텍스트 경로의 마지막 조각**을 중괄호로 끼워 넣을 수 있다.
 `{our_item}` `{brand_text}` 처럼 쓰면 실제 값으로 치환된다. 없는 이름은 오류다.
+
+`kind: csv_map` 전용 옵션 — **매핑표가 커지면 YAML 이 아니라 CSV 에 둔다**:
+
+```yaml
+rules:
+  brand_code:
+    kind: csv_map
+    source: header.brand_text
+    table_file: refs/brand_keys.csv
+    filter_column: kunnr          # meta.customer_no 와 같은 행만 본다
+    key_column: text              # 원문에서 찾을 문구
+    mode_column: match            # 행별 판정 방식 (contains | equals)
+    value_column: zbrand          # 결정될 값
+    case_insensitive: true
+    value_check:                  # 결정된 값이 실제로 등록된 코드인가
+      table_file: refs/brand_master.csv
+      value_column: zbrand
+      filter_column: kunnr
+    on_no_match: { action: error, message: "브랜드를 찾을 수 없습니다: {brand_text}" }
+```
+
+| 키 | 필수 | 내용 |
+|---|---|---|
+| `table_file` | ✅ | `masters/` 기준 상대경로 |
+| `key_column` | ✅ | 원문과 대조할 문구가 든 컬럼 |
+| `value_column` | ✅ | 매칭됐을 때 결정될 값이 든 컬럼 |
+| `mode_column` | | 행마다 `contains`(포함) / `equals`(완전일치)를 고르게 한다. 생략하면 전 행 `contains` |
+| `filter_column` | | 이 컬럼이 `meta.customer_no` 와 같은 행만 쓴다. 거래처별 매핑표를 한 파일에 모을 때 |
+| `value_check` | | 결정된 값이 다른 참조표에 등록돼 있는지 검증한다(§7-10). 등록되지 않은 SAP 코드를 전송하는 사고를 막는다 |
+
+**행 순서가 곧 우선순위다** — 위에서부터 평가하고 첫 일치에서 멈춘다.
+`contains` 행은 짧은 문구가 위에 오면 아래 행이 도달 불가가 되므로 순서에 주의한다.
+
+> `csv_map` 과 `lookup` 은 방향이 반대다. `lookup` 은 **키를 알고** 값을 가져오고
+> (품번 → 포장비고), `csv_map` 은 **원문을 훑어** 어느 행에 걸리는지 찾는다
+> (발주서 문구 → 브랜드 코드). 원문 판정에 `lookup` 을 쓸 수 없다.
 
 `kind: lookup` 전용 옵션:
 
@@ -546,5 +593,7 @@ checks:
 | 5 | `path` 가 추출 스키마(§3.1 표준 키 + `extra_fields`)에 있는 키인가 | **오류** |
 | 6 | 결정표에 도달 불가 행 / 중복 조건이 있는가 | 경고 |
 | 7 | `on_no_match` 가 선언됐는가 | 경고 |
-| 8 | `todo` 가 달린 필드 목록 | 리포트 |
+| 8 | `todo` 가 달린 필드 · 참조표의 `note` 가 달린 행 목록 | 리포트 |
 | 9 | `meta.owner` 가 비었는가 | 경고 |
+| 10 | `csv_map` 의 참조표가 있고 컬럼이 맞는가 · `value_check` 의 값이 전부 등록돼 있는가 | 오류 |
+| 11 | `csv_map` 이 이 거래처(`filter_column`) 행을 하나라도 가지는가 | 경고 |

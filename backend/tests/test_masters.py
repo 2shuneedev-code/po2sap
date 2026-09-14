@@ -128,14 +128,21 @@ WARN_FAULTS = [
      '- { when: ["RENO"],       then: ["319678", "RENO",       "O"] }\n'
      '      - { when: ["ELKHART"],    then: ["100249", "X", "C"] }',
      "§7-6"),
-    ("§7-6 중복 entries", '- { contains: "ACCUPRO",    value: "205" }',
-     '- { contains: "ACCUPRO",    value: "205" }\n'
-     '      - { contains: "HERTEL",     value: "999" }',
+    ("§7-6 중복 entries", "rules:\n  brand_code:",
+     'rules:\n'
+     '  dup_probe:\n'
+     '    kind: keyword_map\n'
+     '    source: header.brand_text\n'
+     '    entries:\n'
+     '      - { contains: "A", value: "1" }\n'
+     '      - { contains: "A", value: "2" }\n'
+     '    on_no_match: { action: warn, message: "x" }\n'
+     "  brand_code:",
      "§7-6"),
     ("§7-7 on_no_match 누락",
      """    on_no_match:
       action: error
-      message: "MSC 브랜드 키워드를 찾을 수 없습니다 (HERTEL / INTERSTATE / ACCUPRO / CLASS C)\"""",
+      message: "브랜드를 인식하지 못했습니다: {brand_text}\"""",
      "", "§7-7"),
     ("§7-4 contains 오용", 'expr: \'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)\'',
      'expr: \'if(contains("A,B", _city), "x", "y")\'', "§7-4"),
@@ -234,3 +241,74 @@ def test_new_customer_from_template_validates(validate_masters, workspace):
     assert report.todos, "미확정 값이 리포트에 떠야 한다 (원칙 2)"
     assert "newco" in validate_masters.customer_codes(workspace)
     assert "_template" not in validate_masters.customer_codes(workspace)
+
+
+# ── csv_map 참조표 매핑 (SCHEMA §4.5 · §7-10 · §7-11) ──────────────────
+def break_keys(workspace, old: str, new: str) -> None:
+    _patch(workspace / "refs" / "brand_keys.csv", old, new)
+
+
+def test_brand_mapping_lives_in_csv_not_yaml(masters_dir):
+    """매핑표는 CSV 가 원천이다 — YAML 에 entries 를 다시 두면 두 곳이 어긋난다."""
+    import yaml
+
+    for code in ("msc", "ygjp"):
+        raw = yaml.safe_load((masters_dir / "customers" / f"{code}.yaml").read_text("utf-8"))
+        rule = raw["rules"]["brand_code"]
+        assert rule["kind"] == "csv_map", code
+        assert "entries" not in rule, f"{code}: entries 가 YAML 에 남아 있다"
+        assert rule["table_file"] == "refs/brand_keys.csv"
+
+
+def test_every_mapped_code_is_registered_in_sap(validate_masters, masters_dir):
+    """§7-10 — 등록되지 않은 ZBRAND 를 전송하면 SAP 이 거부한다."""
+    import csv as _csv
+
+    master = {
+        (r["kunnr"], r["zbrand"])
+        for r in _csv.DictReader((masters_dir / "refs" / "brand_master.csv").open(encoding="utf-8"))
+    }
+    keys = list(_csv.DictReader((masters_dir / "refs" / "brand_keys.csv").open(encoding="utf-8")))
+    assert keys, "brand_keys.csv 가 비어 있다"
+    unregistered = [(r["kunnr"], r["zbrand"]) for r in keys if (r["kunnr"], r["zbrand"]) not in master]
+    assert unregistered == [], f"SAP 미등록 코드: {unregistered}"
+
+
+def test_unregistered_code_is_an_error(validate_masters, workspace):
+    break_keys(workspace, "3200,1,equals,YG BRAND,", "3200,99999,equals,YG BRAND,")
+    report = run(validate_masters, workspace, "ygjp")
+    assert any("99999" in e and "등록돼 있지 않" in e for e in report.errors), report.errors
+
+
+def test_missing_column_is_an_error(validate_masters, workspace):
+    _patch(workspace / "customers" / "ygjp.yaml", "key_column: text", "key_column: nope")
+    assert any("없는 컬럼" in e for e in run(validate_masters, workspace, "ygjp").errors)
+
+
+def test_bad_match_mode_is_an_error(validate_masters, workspace):
+    break_keys(workspace, "3200,1,equals,YG BRAND,", "3200,1,fuzzy,YG BRAND,")
+    assert any("contains | equals" in e for e in run(validate_masters, workspace, "ygjp").errors)
+
+
+def test_duplicate_key_is_a_warning(validate_masters, workspace):
+    """행 순서가 우선순위다 — 같은 문구가 두 번 있으면 아래 행은 도달 불가."""
+    break_keys(workspace, "3200,1,equals,YG BRAND,",
+               "3200,1,equals,YG BRAND,\n3200,142,equals,YG BRAND,")
+    assert any("도달할 수 없습니다" in w for w in run(validate_masters, workspace, "ygjp").warnings)
+
+
+def test_customer_with_no_rows_is_a_warning(validate_masters, workspace):
+    """§7-11 — 규칙은 걸어뒀는데 그 거래처 행이 없으면 항상 미매칭된다."""
+    path = workspace / "refs" / "brand_keys.csv"
+    kept = [ln for ln in path.read_text(encoding="utf-8").splitlines() if not ln.startswith("3200,")]
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    report = run(validate_masters, workspace, "ygjp")
+    assert any("행이 하나도 없습니다" in w for w in report.warnings), report.warnings
+
+
+def test_note_column_is_reported(validate_masters, masters_dir):
+    """§7-8 — 참조표의 note 는 필드의 todo 와 같은 역할을 한다."""
+    base = validate_masters.load_base_fields(masters_dir)
+    report = validate_masters.validate_customer("ygjp", base, masters_dir)
+    assert report.errors == []
+    assert any("brand_keys.csv" in t for t in report.todos)

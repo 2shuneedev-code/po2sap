@@ -60,42 +60,25 @@ split:
 
 rules:
   brand_code:
-    kind: value_map
-    label: "브랜드 텍스트 → SAP 브랜드 코드"
-    description: "문서 하단 브랜드 텍스트를 매핑표와 완전 일치로 대조한다"
+    kind: csv_map
+    label: "브랜드 판별"
+    description: |
+      발주서 원문을 참조표 refs/brand_keys.csv 의 이 거래처(kunnr) 행과 대조한다.
+      매핑 추가·수정은 이 파일이 아니라 CSV 에서 한다 — 브랜드 관리 화면의 원천이다.
     source: header.brand_text
+    table_file: refs/brand_keys.csv
+    filter_column: kunnr
+    key_column: text
+    mode_column: match
+    value_column: zbrand
     case_insensitive: true
-    normalize: [trim, collapse_spaces]
-    entries:
-      - { equals: "YG BRAND",                   value: "1"   }
-      - { equals: "YAMAKATSU BRAND",            value: "142" }
-      - { equals: "YSK BRAND",                  value: "181" }
-      - { equals: "YMKT BRAND",                 value: "183" }
-      - { equals: "YCS BRAND",                  value: "209" }
-      - { equals: "NIKKO KIZAI BRAND",          value: "227" }
-      - { equals: "SUGIMOTO BRAND",             value: "245" }
-      - { equals: "KURODA BRAND",               value: "248" }
-      - { equals: "SAKANOSHITA BRAND",          value: "249" }
-      - { equals: "DAIWA SHOKAI",               value: "250" }
-      - { equals: "TOSA KIKO BRAND",            value: "411" }
-      - { equals: "CHUO KOKI BRAND",            value: "412" }
-      - { equals: "SIAM YAMAKATSU BRAND",       value: "435" }
-      - { equals: "YAMA-K",                     value: "439" }
-      # ↓ 아래 3건은 원문 구분 키가 미확정. 실물 확인 후 equals 값 교정 필요.
-      - { equals: "NIKKO KIZAI BRAND (2)",      value: "448", todo: "원문 구분 키 확인" }
-      - { equals: "YG BRAND (2)",               value: "449", todo: "원문 구분 키 확인" }
-      - { equals: "YAMAKATSU BRAND (2)",        value: "450", todo: "원문 구분 키 확인" }
-      - { equals: "KUMAZAWA",                   value: "465" }
-      - { equals: "YG BRAND (COMINIX)",         value: "471" }
-      - { equals: "SAKUSAKU BRAND",             value: "476" }
-      - { equals: "YG BRAND (SAKUSAKU)",        value: "477" }
-      - { equals: "YG BRAND (YGT Y)",           value: "480" }
-      - { equals: "YG BRAND (CHUO KOKI)",       value: "481" }
-      - { equals: "YG BRAND (IBIDEN)",          value: "482" }
-      - { equals: "NEW CENTURY BRAND(COMINIX)", value: "507" }
+    value_check:
+      table_file: refs/brand_master.csv
+      value_column: zbrand
+      filter_column: kunnr
     on_no_match:
       action: error
-      message: "YGJP 브랜드 텍스트를 매핑표에서 찾을 수 없습니다: {brand_text}"
+      message: "브랜드를 인식하지 못했습니다: {brand_text}"
 
 fields:
   # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──

@@ -53,8 +53,10 @@ python scripts/parse_one.py <발주서> --customer MSC
 # API 서버
 cd backend && uvicorn app.main:app --reload        # → /api/health
 
-# 검증 (CI 1단계) — ※ 아직 미구현
+# 마스터 검증 (CI 1단계) — SCHEMA.md §7 의 9종 검사. LLM 호출 없음 = 비용 0
 python scripts/validate_masters.py
+python scripts/validate_masters.py --customer MSC   # 한 곳만
+python scripts/validate_masters.py --quiet          # 오류만
 
 # 테스트 (CI 2단계) — ※ 아직 미구현
 pytest
@@ -77,14 +79,14 @@ backend/app/
 │   └── grounding.py  환각 차단 · 합계 검증 · 신뢰도
 ├── masters/      마스터 로더                                    [완료]
 ├── domain/       RawPO / SapRow / Batch                         [부분]
-├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [미착수]
+├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
 ├── mapping/      전송 필드 행 생성                              [미착수]
 ├── validation/   검증                                           [미착수]
 ├── transport/    EAI 전송                                       [미착수]
 └── api/          라우트                                          [미착수 — main.py에 health/customers만]
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
-scripts/          parse_one.py만 존재. validate_masters·mock_eai_server 미작성
+scripts/          parse_one.py · validate_masters.py. mock_eai_server 미작성
 samples/          실물 발주서 — Git 제외 (대외비)
 storage/          런타임 산출물 — Git 제외
 ```
@@ -105,6 +107,8 @@ storage/          런타임 산출물 — Git 제외
 | LLM에게 코드값/형식변환 지시 | P1 위반. `hints`에 "YYYYMMDD로 바꿔라" 같은 지시 금지 |
 | SSOT 아닌 문서에 값 복사 | 어긋나면 오더가 잘못 생성된다 |
 | `rules.md` / `master-admin.md` 참조 | 폐기·보류 문서. 낡은 값(AUART=ZOR, 33필드)이 남아 있다 |
+| 코드 목록 판정에 `contains()` | 부분 문자열 검사라 오판한다. `in(value, list)` 를 쓴다 (SCHEMA §4.7.3) |
+| 마스터 YAML 수정 후 검증 생략 | `python scripts/validate_masters.py` 를 돌린다 |
 
 ---
 
@@ -135,17 +139,18 @@ storage/          런타임 산출물 — Git 제외
 
 > **`README.md`의 "이제 문서 간 모순이 없다"는 현재 사실이 아니다.** 아래를 전제로 작업할 것.
 
-> ✅ **해결됨 (2026-09-14)** — 추출 스키마 `shipments[]` 추가 및 표준 키 SSOT 정렬.
-> `masters/SCHEMA.md` §2.1(SPLIT 규약) · §3.1(표준 키) · §4.2(`extra_fields`)가 원천이고
-> `schema_builder.py` · `models.py` 가 거기에 맞춰져 있다.
+> ✅ **해결됨 (2026-09-14)**
+> - 추출 스키마 `shipments[]` 추가 및 표준 키 SSOT 정렬 — `masters/SCHEMA.md`
+>   §2.1(SPLIT 규약) · §3.1(표준 키) · §4.2(`extra_fields`)가 원천이고
+>   `schema_builder.py` · `models.py` 가 거기에 맞춰져 있다.
+> - expr 문법 명세(§4.7) · 파서(`backend/app/rules/expr.py`) · `validate_masters.py`.
+>   **마스터를 고쳤으면 검증기를 돌린다.** YGJP ZSHCO 분기식 오류도 이때 잡혀 수정됐다.
 
 **치명 — D2 착수 전 해결 필요**
 
-1. **`ygjp.yaml`의 ZSHCO 분기식 오류** — `contains("471,507", brand_code)`는 부분 문자열 검사라 `brand_code="1"`도 참이 된다. `in(value, list)` 필요
-2. **expr 문법이 미정의** — 리터럴·리스트·함수 시그니처 규약 없음. `ygjp.yaml`의 `date_yyyymmdd(...)`는 §4.7 화이트리스트에 없어 규정상 로딩 실패. 잡아줄 `validate_masters.py`도 없음
-3. **`LLM_PROVIDER=mock`이 새 클론에서 안 돈다** — `backend/tests/fixtures/` 디렉터리 자체가 없음. 캐시 키에 YAML hints 전문이 들어가 hints를 고치면 골든이 전량 깨짐
-4. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
-5. **빌드/테스트 설정 전무** — `pyproject.toml`·`pytest.ini`·`package.json`·CI 워크플로 없음
+1. **`LLM_PROVIDER=mock`이 새 클론에서 안 돈다** — `backend/tests/fixtures/` 디렉터리 자체가 없음. 캐시 키에 YAML hints 전문이 들어가 hints를 고치면 골든이 전량 깨짐
+2. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
+3. **빌드/테스트 설정 전무** — `pyproject.toml`·`pytest.ini`·`package.json`·CI 워크플로 없음
 
 **중요**
 

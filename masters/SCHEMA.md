@@ -154,6 +154,25 @@ line:      line_no, posex,
 
 ## 4. 섹션별 스키마
 
+### 4.0 파일 최상위 키
+
+```yaml
+version: 2                     # 이 파일의 스키마 리비전 (정수, 필수)
+extends: [_base/sap_defaults]  # 병합할 조각 (§1)
+meta: { ... }
+extraction: { ... }
+split: { ... }
+tables: { ... }                # 없으면 생략 가능
+rules: { ... }                 # 없으면 생략 가능
+fields: { ... }                # 필수
+grid: { ... }
+checks: [ ... ]                # 없으면 생략 가능
+```
+
+`version` 은 **이 스키마 문서의 리비전**이다. 구조가 바뀌어 기존 파일을 손봐야 할 때
+올린다. 값 변경(코드·매핑 추가)으로는 올리지 않는다 — 그건 Git 이력이 기록한다.
+**위 목록에 없는 최상위 키는 오류다.**
+
 ### 4.1 `meta`
 
 ```yaml
@@ -206,7 +225,9 @@ extraction:
 ```yaml
 split:
   by: none | shipment | <키>
-  label: "출하처(Shipment)별로 오더를 나눈다"
+  label: "출하처(Shipment)별로 오더를 나눈다"   # 화면 표시용. 선택
+  description: |                                # 규칙 카드 본문. 선택
+    MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.
 ```
 
 `none` 이면 문서 1부 = 오더 1건. `shipment` 면 추출된 shipment 수만큼 오더가 생긴다.
@@ -226,7 +247,8 @@ tables:
     when:                                # 조건 컬럼 (N개)
       - source: shipment.ship_to_text
         op: contains_ci | equals | equals_ci | regex | starts_with
-        fallback_source: header.ship_to_text   # 선택
+        fallback_source: header.ship_to_text   # source 가 비면 이걸로 평가. 선택
+        label: "출하처 블록에 포함"             # 화면 열 제목. 선택
     then: [KUNNR2, _city, _pack_base]    # 결과 컬럼 (N개). _접두사 = 파생변수
     rows:
       - { when: ["ELKHART"], then: ["100249", "ELKHART", "C"] }
@@ -242,7 +264,21 @@ tables:
 
 ### 4.5 `rules` — 값 매핑
 
-공통 필드: `kind`, `label`, `description`, `on_no_match`.
+공통 옵션 (모든 `kind`):
+
+| 키 | 필수 | 내용 |
+|---|---|---|
+| `kind` | ✅ | 아래 표의 다섯 가지 중 하나 |
+| `label` | | 화면(규칙 카드)에 표시할 이름 |
+| `description` | | 화면에 표시할 설명 |
+| `source` | `fixed`·`lookup` 외 ✅ | 평가할 컨텍스트 경로 |
+| `fallback_source` | | `source` 가 비면 이 경로로 평가한다 (예: 라인 → 헤더) |
+| `case_insensitive` | | `true` 면 대소문자를 무시하고 대조한다 (기본 `false`) |
+| `normalize` | | 대조 **전에** 원문에 적용할 정규화. `[trim, collapse_spaces, upper, lower]` 중 선택 |
+| `on_no_match` | | 아래 참조. **생략하면 경고**다 |
+
+`entries[]` 의 각 행에는 `todo: "확인 필요"` 를 달 수 있다 — 값이 미확정인 행을
+표시해 두는 용도이며 `validate_masters.py` 가 목록으로 뽑는다(§7-8). 동작에는 영향이 없다.
 
 | `kind` | 용도 | 필수 키 |
 |---|---|---|
@@ -264,6 +300,19 @@ rules:
 ```
 
 `on_no_match.action`: `error`(전송 차단) / `warn`(경고, 전송 가능) / `default`(값 지정) / `empty`(빈값).
+
+`on_no_match.message` 에는 **컨텍스트 경로의 마지막 조각**을 중괄호로 끼워 넣을 수 있다.
+`{our_item}` `{brand_text}` 처럼 쓰면 실제 값으로 치환된다. 없는 이름은 오류다.
+
+`kind: lookup` 전용 옵션:
+
+| 키 | 내용 |
+|---|---|
+| `table_file` | `masters/` 기준 상대경로 (예: `refs/msc_ref.csv`) |
+| `key` | 조회 키로 쓸 컨텍스트 경로 |
+| `key_column` | CSV 에서 키로 쓸 컬럼명 |
+| `return` | 가져올 컬럼 목록. `<규칙명>.<컬럼명>` 으로 참조한다 |
+| `optional` | `true` 면 **참조표 파일이 없어도 정상 동작**한다 (전 행이 미매칭 처리). 기본 `false` — 파일이 없으면 오류 |
 
 ### 4.6 `fields` — 전송 필드 매핑 ★
 
@@ -297,16 +346,83 @@ MATNR:
 > **`todo` 가 원칙 2의 장치다.** 값이 미정이면 `todo` 를 달고 진행한다.
 > 스키마 검증이 목록으로 뽑아주므로 나중에 한 번에 확정하면 된다.
 
-### 4.7 `expr` — 허용 함수 (화이트리스트, 이게 전부)
+### 4.7 `expr` — 식 문법 ★
+
+`expr` 은 **프로그래밍 언어가 아니다.** 값·경로·함수 호출만 있는 식이고,
+연산자(`+` `==` `and` …)도 변수 대입도 제어문도 없다. 조건 분기는 `if()` 로만 쓴다.
+
+#### 4.7.1 문법
 
 ```
-join(sep, list)          compact(list)        concat(a, b, ...)
-upper(s)  lower(s)  trim(s)
-if(cond, a, b)           coalesce(a, b, ...)
-contains(s, sub)         replace(s, from, to)
-substr(s, start, len)    pad(s, len, ch)
+expr    := value
+value   := literal | list | path | call
+literal := "문자열" | '문자열' | 숫자 | true | false | null
+list    := "[" [ value ("," value)* ] "]"
+path    := ident ("." ident)*      # 컨텍스트 참조 (§3)
+call    := ident "(" [ value ("," value)* ] ")"
+ident   := [A-Za-z_][A-Za-z0-9_]*
 ```
-임의 코드 실행은 불가. 파서가 화이트리스트 밖 호출을 만나면 로딩 자체가 실패한다.
+
+- **문자열**은 `"..."` 또는 `'...'`. YAML 안에서는 식 전체를 작은따옴표로 감싸고
+  내부 문자열은 큰따옴표를 쓰는 것이 안전하다: `expr: 'concat(a, "-", b)'`
+- **이스케이프**는 `\"` `\'` `\\` 세 개만. 그 외 백슬래시는 오류다.
+- **주석·줄바꿈**은 허용하지 않는다. 한 줄로 쓴다.
+- `path` 는 §3 네임스페이스(`header.*` `shipment.*` `line.*` `_파생변수`
+  `<규칙명>` `<규칙명>.<반환키>`)만 가리킬 수 있다. 그 외 이름은 오류다.
+- `true` / `false` / `null` / 숫자는 **예약된 리터럴**이므로 경로가 아니다.
+
+#### 4.7.2 값과 참
+
+| 상황 | 결과 |
+|---|---|
+| 없는 경로 · 추출 실패 · 매칭 실패 | `null` |
+| `null` 을 텍스트로 쓸 때 | `""` (빈 문자열) |
+| **거짓**으로 치는 값 | `null`, `""`, `false`, 빈 리스트 `[]`, 숫자 `0` |
+| 그 밖의 모든 값 | **참** |
+
+식의 최종 결과는 항상 문자열로 변환되어 필드에 담긴다 (`null` → `""`).
+
+#### 4.7.3 허용 함수 (화이트리스트, 이게 전부)
+
+| 함수 | 인자 | 반환 | 동작 |
+|---|---|---|---|
+| `concat(a, b, ...)` | 1+ | text | 이어붙인다. `null` 은 `""` 로 친다 |
+| `join(sep, list)` | 2 (text, list) | text | 리스트를 구분자로 잇는다. `null`·`""` 항목도 그대로 낀다 — 보통 `compact` 와 함께 쓴다 |
+| `compact(list)` | 1 (list) | list | `null` 과 `""` 항목을 제거한다 |
+| `coalesce(a, b, ...)` | 1+ | any | 첫 번째로 비어 있지 않은 값 |
+| `if(cond, a, b)` | 3 | any | `cond` 가 참이면 `a`, 아니면 `b` |
+| `contains(s, sub)` | 2 (text, text) | bool | `s` 안에 `sub` 문자열이 있는가 — **부분 문자열 검사** |
+| `in(value, list)` | 2 (any, list) | bool | `value` 가 리스트 **항목과 완전 일치**하는가 |
+| `upper(s)` `lower(s)` `trim(s)` | 1 | text | 대문자 · 소문자 · 앞뒤 공백 제거 |
+| `replace(s, from, to)` | 3 | text | 전부 치환 |
+| `substr(s, start, len)` | 3 (text, num, num) | text | 0-기준 부분 문자열 |
+| `pad(s, len, ch)` | 3 (text, num, text) | text | 왼쪽을 `ch` 로 채워 `len` 자리로 |
+| `integer(s)` | 1 | text | 정수 표기로 정규화 (`"25.000"` → `"25"`) |
+| `decimal3(s)` | 1 | text | 소수점 3자리 문자열 (`"25"` → `"25.000"`) |
+| `date_yyyymmdd(s)` | 1 | text | 날짜를 `YYYYMMDD` 로 (`"2026-05-18"` → `"20260518"`) |
+
+`integer` · `decimal3` · `date_yyyymmdd` · `upper` · `lower` · `trim` 은
+§4.6 `format` 과 같은 이름·같은 동작이다. `format` 은 필드 **전체**에,
+이 함수들은 식 **일부**에 적용한다는 점만 다르다.
+
+> ⚠ **`contains` 와 `in` 을 혼동하지 말 것.**
+> `contains("471,507", brand_code)` 는 `brand_code` 가 `"1"` 이어도 참이 된다
+> (`"471,507"` 안에 `"1"` 이 있으므로). 코드 목록 판정은 **반드시 `in`** 을 쓴다.
+> ```yaml
+> expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'   # ✅
+> expr: 'if(contains("471,507", brand_code), "A", "L")'   # ❌ 오판
+> ```
+
+#### 4.7.4 검증
+
+`scripts/validate_masters.py` 가 모든 `expr` 을 파싱한다. 아래는 **오류**이며 CI 가 막는다.
+
+- 화이트리스트 밖 함수 호출
+- 인자 개수·타입 불일치 (`join` 의 2번째 인자가 리스트가 아닌 경우 등)
+- 파싱 불가 (연산자 사용, 괄호 불일치, 허용되지 않은 이스케이프)
+- 존재하지 않는 경로 참조 (§3.1 표준 키 · `extra_fields` · 선언된 규칙/파생변수 밖)
+
+임의 코드 실행은 불가능하다. 파서는 위 문법만 받아들이고 그 외는 거부한다.
 
 ### 4.8 `grid` — 검수 화면
 
@@ -321,10 +437,18 @@ grid:
 
 ```yaml
 checks:
-  - id: shipment_total_match
+  - id: shipment_total_match          # 엔진이 아는 검사 id
     label: "출하처별 수량 합계 = 요약표 합계"
     severity: error | warn
+    description: "복수 출하처일 때 블록을 하나라도 놓치면 여기서 걸린다"   # 선택
 ```
+
+`id` 는 엔진에 구현된 검사 이름이다. **YAML 이 새 검사를 정의할 수는 없다** —
+새 검사가 필요하면 엔진에 추가하고 이 문서에 등재한다.
+
+| `id` | 검사 |
+|---|---|
+| `shipment_total_match` | 출하처별 수량 합계 = 문서 상단 요약표 합계 (`split.by: shipment` 전용) |
 
 ---
 

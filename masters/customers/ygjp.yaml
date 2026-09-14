@@ -117,7 +117,7 @@ fields:
   ZBRAND:  { from: rule,  rule: brand_code, required: true }
   ZSHCO:
     from: expr
-    expr: 'if(contains("471,507", brand_code), "A", "L")'
+    expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'
     explain: '브랜드 코드가 471 또는 507 이면 A, 그 외 L'
   ZPKRE1:  { from: const, value: "" }
   MATNR:   { from: doc,   path: line.item_code, required: true }

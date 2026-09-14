@@ -58,8 +58,10 @@ python scripts/validate_masters.py
 python scripts/validate_masters.py --customer MSC   # 한 곳만
 python scripts/validate_masters.py --quiet          # 오류만
 
-# 테스트 (CI 2단계) — ※ 아직 미구현
+# 테스트 (CI 2단계) — LLM 호출 없음. 픽스처 재생이라 키 불필요
 pytest
+pytest backend/tests/test_masters.py   # 검증기 역테스트만
+ruff check backend scripts
 ```
 
 `.env`의 `LLM_PROVIDER=mock`이면 API 키 없이·비용 0·오프라인으로 저장된 응답을 재생한다.
@@ -80,6 +82,7 @@ backend/app/
 ├── masters/      마스터 로더                                    [완료]
 ├── domain/       RawPO / SapRow / Batch                         [부분]
 ├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
+├── tests/        pytest 73종 + 픽스처 + 골든                     [완료]
 ├── mapping/      전송 필드 행 생성                              [미착수]
 ├── validation/   검증                                           [미착수]
 ├── transport/    EAI 전송                                       [미착수]
@@ -87,6 +90,7 @@ backend/app/
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
 scripts/          parse_one.py · validate_masters.py. mock_eai_server 미작성
+.github/          CI: 마스터 검증 → pytest → ruff → samples/ 유출 확인
 samples/          실물 발주서 — Git 제외 (대외비)
 storage/          런타임 산출물 — Git 제외
 ```
@@ -109,6 +113,8 @@ storage/          런타임 산출물 — Git 제외
 | `rules.md` / `master-admin.md` 참조 | 폐기·보류 문서. 낡은 값(AUART=ZOR, 33필드)이 남아 있다 |
 | 코드 목록 판정에 `contains()` | 부분 문자열 검사라 오판한다. `in(value, list)` 를 쓴다 (SCHEMA §4.7.3) |
 | 마스터 YAML 수정 후 검증 생략 | `python scripts/validate_masters.py` 를 돌린다 |
+| 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
+| 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 
 ---
 
@@ -145,12 +151,14 @@ storage/          런타임 산출물 — Git 제외
 >   `schema_builder.py` · `models.py` 가 거기에 맞춰져 있다.
 > - expr 문법 명세(§4.7) · 파서(`backend/app/rules/expr.py`) · `validate_masters.py`.
 >   **마스터를 고쳤으면 검증기를 돌린다.** YGJP ZSHCO 분기식 오류도 이때 잡혀 수정됐다.
+> - 빌드·테스트 골격 — `pyproject.toml` · `backend/tests/` 73종 · 픽스처 · CI.
+>   **새 클론에서 `.env`·API 키 없이 `pytest` 가 전 파이프라인을 돌린다.**
+>   캐시 키에서 hints 를 뺐고(규칙 튜닝이 캐시를 깨지 않는다),
+>   픽스처는 `{거래처}__{파일명}` 으로 찾는다(프롬프트가 바뀌어도 재생된다).
 
 **치명 — D2 착수 전 해결 필요**
 
-1. **`LLM_PROVIDER=mock`이 새 클론에서 안 돈다** — `backend/tests/fixtures/` 디렉터리 자체가 없음. 캐시 키에 YAML hints 전문이 들어가 hints를 고치면 골든이 전량 깨짐
-2. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
-3. **빌드/테스트 설정 전무** — `pyproject.toml`·`pytest.ini`·`package.json`·CI 워크플로 없음
+1. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
 
 **중요**
 

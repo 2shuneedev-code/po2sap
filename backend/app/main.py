@@ -1,13 +1,19 @@
-"""FastAPI 진입점 (D1: 헬스체크 + 거래처 목록까지).
+"""FastAPI 진입점.
 
+지금 있는 것: 헬스체크 · 거래처 목록 · 브랜드 매핑 콘솔(api/routes_brands.py).
 업로드/검수/전송 엔드포인트는 D3~D4에서 추가한다.
+
+계약은 contracts/api-contract.md 가 원천이다. 오류 형태도 거기 §0 을 따른다.
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from .api import brands_router
 from .config import get_settings
 from .extraction import Extractor
 from .masters import list_customers
@@ -21,6 +27,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(brands_router)
+
+
+# ── 오류 형태 (계약 §0) ────────────────────────────────────────────────
+# 프론트가 항상 같은 모양을 받도록 FastAPI 기본 {"detail": ...} 을 감싼다.
+_ERROR_CODES = {
+    400: "BAD_REQUEST", 404: "NOT_FOUND", 409: "CONFLICT",
+    422: "INVALID_INPUT", 500: "INTERNAL_ERROR",
+}
+
+
+def _error(status: int, message: str) -> JSONResponse:
+    code = _ERROR_CODES.get(status, "ERROR")
+    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+@app.exception_handler(HTTPException)
+def http_error(_: Request, exc: HTTPException) -> JSONResponse:
+    return _error(exc.status_code, str(exc.detail))
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    first = (exc.errors() or [{}])[0]
+    where = ".".join(str(x) for x in first.get("loc", ()) if x != "body")
+    return _error(422, f"입력값이 올바르지 않습니다: {where or '요청 본문'}")
 
 
 @app.get("/api/health")

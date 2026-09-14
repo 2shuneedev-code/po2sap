@@ -1,0 +1,274 @@
+{
+  "kunnr": "100249",
+  "name": "MSC Industrial Supply",
+  "sap_name": "SID TOOL CO., INC.",
+  "code": "MSC",
+  "file_types": [
+    "htm",
+    "html"
+  ],
+  "owner": "※ 지정 필요",
+  "configured": "true",
+  "brands": [
+    {
+      "zbrand": "2",
+      "name": "OEM BRAND",
+      "keys": [],
+      "status": "unmapped"
+    },
+    {
+      "zbrand": "4",
+      "name": "NO MARKING",
+      "keys": [],
+      "status": "unmapped"
+    },
+    {
+      "zbrand": "38",
+      "name": "HERTEL BRAND",
+      "keys": [
+        {
+          "text": "HERTEL",
+          "match": "contains",
+          "note": ""
+        }
+      ],
+      "status": "mapped"
+    },
+    {
+      "zbrand": "127",
+      "name": "INTERSTATE",
+      "keys": [
+        {
+          "text": "INTERSTATE",
+          "match": "contains",
+          "note": ""
+        }
+      ],
+      "status": "mapped"
+    },
+    {
+      "zbrand": "205",
+      "name": "ACCUPRO BRAND",
+      "keys": [
+        {
+          "text": "ACCUPRO",
+          "match": "contains",
+          "note": ""
+        }
+      ],
+      "status": "mapped"
+    },
+    {
+      "zbrand": "428",
+      "name": "CLASS C SOLUTIONS GROUP",
+      "keys": [
+        {
+          "text": "CLASS C",
+          "match": "contains",
+          "note": ""
+        }
+      ],
+      "status": "mapped"
+    },
+    {
+      "zbrand": "501",
+      "name": "UNBRANDED",
+      "keys": [],
+      "status": "unmapped"
+    }
+  ],
+  "logic": {
+    "split": {
+      "by": "shipment",
+      "label": "MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.\n화면에는 한 그리드로 통합해 보여주고 BSTKD·KUNNR2 만 달라진다."
+    },
+    "tables": [
+      {
+        "id": "ship_to_routing",
+        "label": "출하처(Ship To) 분기",
+        "scope": "shipment",
+        "description": "",
+        "columns": [
+          "출하처 블록에 포함",
+          "→ KUNNR2",
+          "→ _city",
+          "→ _pack_base"
+        ],
+        "rows": [
+          [
+            "ELKHART",
+            "100249",
+            "ELKHART",
+            "C"
+          ],
+          [
+            "HARRISBURG",
+            "319677",
+            "HARRISBURG",
+            "N"
+          ],
+          [
+            "RENO",
+            "319678",
+            "RENO",
+            "O"
+          ],
+          [
+            "ATLANTA",
+            "319679",
+            "ATLANTA",
+            "A"
+          ]
+        ],
+        "on_no_match": {
+          "action": "error",
+          "message": "출하처 도시를 인식하지 못했습니다 (ATLANTA / ELKHART / HARRISBURG / RENO)"
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "brand_code",
+        "kind": "csv_map",
+        "label": "브랜드 판별",
+        "source": "header.brand_text",
+        "note": "발주서 원문을 참조표 refs/brand_keys.csv 의 이 거래처(kunnr) 행과 대조한다.\n매핑 추가·수정은 이 파일이 아니라 CSV 에서 한다 — 브랜드 관리 화면의 원천이다.",
+        "columns": [],
+        "rows": [],
+        "on_no_match": {
+          "action": "error",
+          "message": "브랜드를 인식하지 못했습니다: {brand_text}"
+        }
+      },
+      {
+        "id": "ref_codes",
+        "kind": "lookup",
+        "label": "MSC 참조표 조회",
+        "source": "",
+        "note": "MSC 품번으로 참조표를 조회해 포장 추가비고를 가져온다 (예: \"Blue RING\").\n→ ZPKRE2 에 출하처 기본값 뒤로 콤마 연결.\n참조표 파일이 없거나 비어 있으면 기본값만 적용되고 정상 동작한다.",
+        "columns": [
+          "참조표",
+          "키",
+          "→ 반환"
+        ],
+        "rows": [
+          [
+            "refs/msc_ref.csv",
+            "line.our_item",
+            "b_code, c_code"
+          ]
+        ],
+        "on_no_match": {
+          "action": "warn",
+          "message": "참조표에 없는 품번입니다: {our_item}"
+        }
+      }
+    ],
+    "fields": [
+      {
+        "field": "AUART",
+        "label": "오더유형",
+        "max_len": "4",
+        "source": "base · 공통 고정값",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "VKORG",
+        "label": "판매조직",
+        "max_len": "4",
+        "source": "base · 공통 고정값",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "VTWEG",
+        "label": "유통경로",
+        "max_len": "2",
+        "source": "base · 공통 고정값",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "KUNNR1",
+        "label": "판매처",
+        "max_len": "10",
+        "source": "meta.customer_no",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "KUNNR3",
+        "label": "최종고객",
+        "max_len": "10",
+        "source": "meta.customer_no",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "KWMENG",
+        "label": "수량",
+        "max_len": "",
+        "source": "doc · line.quantity",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "VSART",
+        "label": "운송수단",
+        "max_len": "2",
+        "source": "const · 04",
+        "explain": "운송수단 — 전 거래처 04",
+        "todo": ""
+      },
+      {
+        "field": "KUNNR2",
+        "label": "출하처",
+        "max_len": "10",
+        "source": "table · ship_to_routing",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "BSTKD",
+        "label": "고객발주번호",
+        "max_len": "35",
+        "source": "if(_city, concat(header.po_number, \"(\", _city, \")\"), header.po_number)",
+        "explain": "발주번호 뒤에 출하처 도시명을 괄호로 붙입니다 (예: 7588650(ATLANTA))",
+        "todo": ""
+      },
+      {
+        "field": "ZBRAND",
+        "label": "브랜드",
+        "max_len": "4",
+        "source": "rule · brand_code",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "MATNR",
+        "label": "자재번호",
+        "max_len": "18",
+        "source": "doc · line.item_code",
+        "explain": "",
+        "todo": ""
+      },
+      {
+        "field": "ZPKRE2",
+        "label": "포장비고",
+        "max_len": "50",
+        "source": "join(\",\", compact([_pack_base, ref_codes.b_code, ref_codes.c_code]))",
+        "explain": "출하처 기본값(C/N/O/A) 뒤에 참조표 값을 쉼표로 연결 (예: \"C,Blue RING\")",
+        "todo": ""
+      }
+    ],
+    "checks": [
+      {
+        "id": "shipment_total_match",
+        "label": "출하처별 수량 합계 = 상단 요약표 합계",
+        "severity": "error",
+        "description": "복수 출하처일 때 shipment 블록을 하나라도 놓치면 여기서 걸린다"
+      }
+    ]
+  }
+}

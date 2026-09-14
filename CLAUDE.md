@@ -87,14 +87,14 @@ backend/app/
 ├── extraction/   Claude 추출 — "읽기"만 담당                    [완료]
 │   ├── providers/  mock | anthropic_direct | gateway | cache
 │   └── grounding.py  환각 차단 · 합계 검증 · 신뢰도
-├── masters/      마스터 로더                                    [완료]
+├── masters/      마스터 로더 · brands.py(참조표 읽기/쓰기)       [완료]
 ├── domain/       RawPO / SapRow / Batch                         [부분]
 ├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
-├── tests/        pytest 88종 + 픽스처 + 골든                     [완료]
+├── tests/        pytest 104종 + 픽스처 + 골든                    [완료]
 ├── mapping/      전송 필드 행 생성                              [미착수]
 ├── validation/   검증                                           [미착수]
 ├── transport/    EAI 전송                                       [미착수]
-└── api/          라우트                                          [미착수 — main.py에 health/customers만]
+└── api/          라우트 — routes_brands.py (브랜드 매핑 콘솔)     [부분]
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
 scripts/          parse_one.py · validate_masters.py. mock_eai_server 미작성
@@ -125,6 +125,8 @@ storage/          런타임 산출물 — Git 제외
 | 마스터 YAML 수정 후 검증 생략 | `python scripts/validate_masters.py` 를 돌린다 |
 | 대량 매핑표를 YAML `entries`에 나열 | 커지면 `csv_map`으로 참조표에 둔다 (SCHEMA §4.5) |
 | SAP에 없는 코드를 매핑 | `value_check`가 막는다. 전송해도 SAP이 거부한다 |
+| 라우트에서 `get_settings()` 직접 호출 | `Depends(get_settings)`를 쓴다. 안 그러면 테스트가 실제 `masters/`를 덮어쓴다 |
+| 참조표를 통째로 다시 쓰기 | 행 순서가 판정 우선순위다. `brands.set_keys()`가 자리를 보존한다 |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 

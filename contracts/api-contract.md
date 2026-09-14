@@ -250,7 +250,114 @@ contracts/examples/
 ├── preview_msc.json        → §2
 ├── fields.json             → §3
 ├── batch_msc.json          → §5  (49행 · 오류 1 · 경고 3 · 파일 2개 중 1개 실패)
-└── send_ok.json            → §7
+├── send_ok.json            → §7
+├── brand_customers.json    → §10.1 (실제 응답에서 뽑은 6행)
+└── brand_detail_msc.json   → §10.2 (실제 응답 전문)
 ```
 백엔드는 이 파일과 **동일한 형태**를 만들고, 프론트는 이 파일로 화면을 완성한다.
 불일치가 생기면 이 문서와 예제를 먼저 고치고 양쪽이 따라간다.
+
+---
+
+## 10. 브랜드 매핑 콘솔 `/api/brands/*`
+
+거래처 선택 화면(§1)과 **대상이 다르다.** §1 은 규칙이 설정된 거래처만 보여주지만,
+여기는 SAP 브랜드 마스터에 있는 **전 고객**을 다룬다 — 규칙이 아직 없는 고객도
+브랜드 원문 키부터 채워둘 수 있어야 하기 때문이다.
+
+화면이 하는 일은 하나다: **발주서 원문 문구 → SAP 브랜드 코드(ZBRAND)** 를 잇는 것.
+SAP 이 주는 것은 `코드 → 이름`뿐이고 **원문 키는 어디에도 없다.** 사람이 채운다.
+
+| 데이터 | 원천 | 편집 |
+|---|---|---|
+| 브랜드 코드·이름 | `masters/refs/brand_master.csv` (SAP 원본) | **읽기 전용** |
+| 발주서 원문 키 | `masters/refs/brand_keys.csv` | 이 API 로 편집 |
+
+### 10.1 `GET /api/brands/customers`
+
+좌측 고객 목록. `q`(고객명·고객코드·거래처코드 부분 일치) ·
+`filter`(`all` | `configured` | `unconfigured`) · `limit`(≤500) · `offset`.
+
+```json
+{
+  "total": "430", "limit": "200", "offset": "0",
+  "customers": [
+    { "kunnr": "100249", "name": "MSC Industrial Supply", "sap_name": "SID TOOL CO., INC.",
+      "code": "MSC", "file_types": ["htm","html"], "brand_count": "7", "mapped_count": "4" },
+    { "kunnr": "100157", "name": "AMAYA", "sap_name": "AMAYA",
+      "code": "", "file_types": [], "brand_count": "4", "mapped_count": "0" }
+  ]
+}
+```
+
+- `code` 가 `""` 면 **규칙 미설정** 고객이다. 화면은 브랜드만 보여주고 로직 패널을 접는다.
+- `name` 은 표시용이다. 거래처 마스터가 있으면 그 이름을, 없으면 `sap_name` 을 쓴다 —
+  SAP 의 `name1` 이 축약형인 경우가 있다(`107525` = `"KL"`). 검색은 둘 다 본다.
+
+### 10.2 `GET /api/brands/customers/{kunnr}`
+
+```json
+{
+  "kunnr": "100249", "name": "MSC Industrial Supply", "sap_name": "SID TOOL CO., INC.",
+  "code": "MSC", "file_types": ["htm","html"], "owner": "※ 지정 필요",
+  "configured": "true",
+  "brands": [
+    { "zbrand": "38", "name": "HERTEL BRAND", "status": "mapped",
+      "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] },
+    { "zbrand": "501", "name": "UNBRANDED", "status": "unmapped", "keys": [] }
+  ],
+  "logic": {
+    "split":  { "by": "shipment", "label": "출하처별로 오더를 나눈다" },
+    "tables": [ { "id": "ship_to_routing", "label": "출하처(Ship To) 분기", "scope": "shipment",
+                  "columns": ["출하처 블록에 포함", "→ KUNNR2", "→ _city", "→ _pack_base"],
+                  "rows": [["ELKHART","100249","ELKHART","C"]],
+                  "on_no_match": { "action": "error", "message": "..." } } ],
+    "rules":  [ { "id": "brand_code", "kind": "csv_map", "label": "브랜드 판별",
+                  "source": "header.brand_text", "note": "참조표 … 로 판정합니다",
+                  "columns": [], "rows": [],
+                  "on_no_match": { "action": "error", "message": "..." } } ],
+    "fields": [ { "field": "BSTKD", "label": "고객발주번호", "max_len": "35",
+                  "source": "if(_city, concat(header.po_number, \"(\", _city, \")\"), header.po_number)",
+                  "explain": "발주번호 뒤에 출하처 도시명을 괄호로 붙입니다", "todo": "" } ],
+    "checks": [ { "id": "shipment_total_match", "label": "출하처별 수량 합계 = 요약표 합계",
+                  "severity": "error", "description": "..." } ]
+  }
+}
+```
+
+- `logic` 은 규칙이 없는 고객이면 **`null`** 이다 (§0 의 "null 을 쓰지 않는다"의 유일한 예외 —
+  "설정 없음"과 "빈 설정"은 화면에서 다르게 보여야 한다).
+- `kind: csv_map` 규칙은 `columns`·`rows` 가 비어 있다. **그 내용이 곧 위의 `brands` 표**라
+  같은 화면에 두 번 그리지 않는다.
+- `logic.fields` 는 고정 빈값 필드를 뺀 목록이다 — 화면에서 볼 의미가 있는 것만 남긴다.
+
+### 10.3 `PUT /api/brands/customers/{kunnr}/{zbrand}`
+
+원문 키 한 묶음을 **통째로 교체**한다. `keys: []` 를 보내면 매핑을 지운다.
+
+```json
+{ "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] }
+```
+
+`match` 는 `contains`(포함) 또는 `equals`(완전일치). **배열 순서가 곧 판정 우선순위다**
+(`masters/SCHEMA.md` §4.5) — 저장해도 파일에서의 위치가 유지된다.
+
+응답은 저장된 결과다.
+
+```json
+{ "kunnr": "100249", "zbrand": "38", "status": "mapped",
+  "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] }
+```
+
+**거부되는 경우** (파일을 건드리지 않는다):
+
+| 상황 | HTTP | 이유 |
+|---|---|---|
+| `zbrand` 가 그 고객에 등록돼 있지 않음 | 400 | SAP 이 거부할 코드다. 저장 자체를 막는다 |
+| 같은 문구를 다른 코드가 이미 씀 | 400 | 어느 쪽으로 판정될지 알 수 없다 |
+| 한 요청 안에 같은 문구가 두 번 | 400 | 아래 것이 도달 불가 |
+| `match` 가 허용 목록 밖 · `text` 가 빈 값 | 422 | — |
+| `kunnr` 가 브랜드 마스터에 없음 | 404 | — |
+
+> 인증·승인 흐름·감사 로그는 현재 범위 밖이다(사내망 무인증). 대신 저장 전 검증을
+> 서버에서 하고, 변경 이력은 `brand_keys.csv` 의 Git 이력이 남긴다.

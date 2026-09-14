@@ -1,0 +1,61 @@
+{
+  "total": "430",
+  "limit": "6",
+  "offset": "0",
+  "customers": [
+    {
+      "kunnr": "2000",
+      "name": "QNCT(Qingdao New Century Tool Co.,L",
+      "sap_name": "QNCT(Qingdao New Century Tool Co.,L",
+      "code": "",
+      "file_types": [],
+      "brand_count": "9",
+      "mapped_count": "0"
+    },
+    {
+      "kunnr": "2100",
+      "name": "QINGDAO YG-1 TOOL CO.,LTD",
+      "sap_name": "QINGDAO YG-1 TOOL CO.,LTD",
+      "code": "",
+      "file_types": [],
+      "brand_count": "32",
+      "mapped_count": "0"
+    },
+    {
+      "kunnr": "2300",
+      "name": "YG-1 (CHINA) HOLDINGS LIMITED",
+      "sap_name": "YG-1 (CHINA) HOLDINGS LIMITED",
+      "code": "",
+      "file_types": [],
+      "brand_count": "16",
+      "mapped_count": "0"
+    },
+    {
+      "kunnr": "2400",
+      "name": "YG-1 (THAILAND) COMPANY LIMITED",
+      "sap_name": "YG-1 (THAILAND) COMPANY LIMITED",
+      "code": "",
+      "file_types": [],
+      "brand_count": "7",
+      "mapped_count": "0"
+    },
+    {
+      "kunnr": "2500",
+      "name": "YG-1 (MALAYSIA) SDN. BHD.",
+      "sap_name": "YG-1 (MALAYSIA) SDN. BHD.",
+      "code": "",
+      "file_types": [],
+      "brand_count": "8",
+      "mapped_count": "0"
+    },
+    {
+      "kunnr": "2600",
+      "name": "Qingdao Schneider Co.,Ltd",
+      "sap_name": "Qingdao Schneider Co.,Ltd",
+      "code": "",
+      "file_types": [],
+      "brand_count": "1",
+      "mapped_count": "0"
+    }
+  ]
+}

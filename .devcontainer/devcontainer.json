@@ -1,0 +1,30 @@
+{
+  "name": "po2sap",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
+  },
+  "postCreateCommand": "pip install -r backend/requirements.txt pytest ruff && cp -n .env.example .env || true",
+  "forwardPorts": [8000, 5173],
+  "portsAttributes": {
+    "8000": { "label": "backend (FastAPI)" },
+    "5173": { "label": "frontend (Vite)" }
+  },
+  "containerEnv": {
+    "LLM_PROVIDER": "mock",
+    "PYTHONPATH": "${containerWorkspaceFolder}/backend"
+  },
+  "secrets": {
+    "LLM_API_KEY": { "description": "Claude API 키. mock 으로 개발하면 없어도 된다." },
+    "EAI_ENDPOINT": { "description": "EAI 전송 엔드포인트. 모의 서버면 없어도 된다." }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff", "redhat.vscode-yaml"],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "yaml.schemas": {}
+      }
+    }
+  }
+}

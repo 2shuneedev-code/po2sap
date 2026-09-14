@@ -48,6 +48,7 @@ class AnthropicProvider:
         document: DocumentInput,
         model_alias: str = "extract",
         max_tokens: int = 16000,
+        customer: str = "",
     ) -> ToolCallResult:
         model = self._settings.model_id(model_alias)
         content = self._build_content(user_prompt, document)

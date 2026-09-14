@@ -1,0 +1,60 @@
+<html>
+<head><title>Purchase Order #PO-SAMPLE-0001</title></head>
+<body>
+<!--
+  합성 픽스처 — 실물 발주서가 아니다.
+  msc.yaml 의 extraction.hints 가 서술한 구조(복수 출하처, potbl 품목표,
+  Our/Your Item Number 컬럼 반전)를 재현한 테스트용 문서다.
+  회사명·품번·수량은 전부 가공값이며 대외비가 아니다.
+-->
+<p>SID TOOL CO., INC.</p>
+<p>Purchase Order #PO-SAMPLE-0001</p>
+
+<table class="potbl">
+  <tr><td>Date of Order</td><td>2/17/26</td></tr>
+  <tr><td>Ship on Or Before</td><td>3/10/26</td></tr>
+  <tr><td>P.O Priced In</td><td>United States Dollars</td></tr>
+  <tr><td>Terms of Delivery</td><td>FCA</td></tr>
+  <tr><td>Terms of Payment</td><td>NET 30</td></tr>
+</table>
+
+<p>ORDERED FROM</p>
+<p>HERTEL (GP END MILLS) (APO)</p>
+
+<p>SHIP TO</p>
+<p>Check complete attachment for shipping instructions</p>
+<p>Receiving Location: See Shipment</p>
+
+<p>BILL TO</p>
+<p>SID TOOL CO INC ACCOUNTS PAYABLE</p>
+
+<p>Order Summary (all destinations)</p>
+<table class="potbl">
+  <tr><th>Quantity Ordered</th><th>Our Item Number</th><th>Your Item Number</th><th>Description</th><th>Price</th></tr>
+  <tr><td>10</td><td>09876543</td><td>YG-EM0600</td><td>END MILL 6MM 4FL</td><td>12.50</td></tr>
+  <tr><td>15</td><td>09876544</td><td>YG-DR0800</td><td>DRILL 8MM HSS</td><td>8.75</td></tr>
+</table>
+<p>Total Items: 2</p>
+<p>Total Quantity: 25</p>
+
+<p>SHIP TO</p>
+<p>Shipment No.......: 001</p>
+<p>Receiving Loc.....: ELK</p>
+<p>SID TOOL - ELKHART WAREHOUSE</p>
+<p>1000 INDUSTRIAL PKWY, ELKHART, IN 46514</p>
+<table class="potbl">
+  <tr><th>Quantity Ordered</th><th>Our Item Number</th><th>Your Item Number</th><th>Description</th></tr>
+  <tr><td>10</td><td>09876543</td><td>YG-EM0600</td><td>END MILL 6MM 4FL</td></tr>
+</table>
+
+<p>SHIP TO</p>
+<p>Shipment No.......: 002</p>
+<p>Receiving Loc.....: HAR</p>
+<p>SID TOOL Harrisburg Warehouse</p>
+<p>250 COMMERCE DR, HARRISBURG, PA 17110</p>
+<table class="potbl">
+  <tr><th>Quantity Ordered</th><th>Our Item Number</th><th>Your Item Number</th><th>Description</th></tr>
+  <tr><td>15</td><td>09876544</td><td>YG-DR0800</td><td>DRILL 8MM HSS</td></tr>
+</table>
+</body>
+</html>

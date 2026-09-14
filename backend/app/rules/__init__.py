@@ -4,6 +4,6 @@
 명세는 masters/SCHEMA.md.
 """
 
-from .expr import ExprError, ExprInfo, FUNCTIONS, analyze, parse
+from .expr import FUNCTIONS, ExprError, ExprInfo, analyze, parse
 
 __all__ = ["ExprError", "ExprInfo", "FUNCTIONS", "analyze", "parse"]

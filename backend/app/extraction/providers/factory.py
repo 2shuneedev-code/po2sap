@@ -8,12 +8,11 @@ from .base import LLMError, LLMProvider
 
 def create_provider(settings: Settings) -> LLMProvider:
     provider = (settings.llm_provider or "mock").strip().lower()
-    cache_dir = settings.storage_dir / "llm_cache"
 
     if provider == "mock":
         from .mock import MockProvider
 
-        return MockProvider(cache_dir)
+        return MockProvider(settings.llm_cache_dir, settings.llm_fixtures_dir)
 
     if provider in {"anthropic", "gateway"}:
         # gateway = 사내 LLM 게이트웨이. Anthropic 호환 엔드포인트를 전제로 하며

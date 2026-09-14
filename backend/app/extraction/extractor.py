@@ -41,7 +41,8 @@ class Extractor:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
         self._provider = create_provider(self._settings)
-        self._cache_dir = self._settings.storage_dir / "llm_cache"
+        self._cache_dir = self._settings.llm_cache_dir
+        self._fixtures_dir = self._settings.llm_fixtures_dir
 
     def parse_file(self, path: str | Path, customer_code: str) -> ParseResult:
         master = load_customer(customer_code, self._settings.masters_dir)
@@ -95,15 +96,29 @@ class Extractor:
             hints=master.extraction.get("hints"),
             document_text=body,
         )
-        # 프롬프트 버전을 캐시 키에 반영 (프롬프트가 바뀌면 캐시 무효화)
-        prompt = f"<!-- prompt:{self._settings.llm_prompt_version} -->\n{prompt}"
         return document, prompt
 
     def _call(self, document: DocumentInput, prompt: str, master: CustomerMaster):
-        key = llm_cache.cache_key(document=document, prompt=prompt)
+        """저장된 응답을 먼저 찾고, 없을 때만 실제로 호출한다.
 
+        조회 순서는 픽스처 → 런타임 캐시다. 픽스처는 Git 에 있으므로 새 클론에서도
+        곧바로 재생된다(CI 비용 0). 조회를 여기 한 곳에서만 하므로 프로바이더별로
+        경로가 갈리지 않는다.
+        """
+        fixture = llm_cache.load_fixture(
+            self._fixtures_dir, master.code, document.filename
+        )
+        if fixture is not None:
+            return fixture, True
+
+        key = llm_cache.cache_key(
+            document=document,
+            prompt_version=self._settings.llm_prompt_version,
+            customer=master.code,
+            model=self._settings.model_id("extract"),
+        )
         cached = llm_cache.load(self._cache_dir, key)
-        if cached is not None and self._provider.name != "mock":
+        if cached is not None:
             return cached, True
 
         tool = build_tool(
@@ -117,12 +132,11 @@ class Extractor:
             document=document,
             model_alias="extract",
             max_tokens=self._settings.llm_max_tokens,
+            customer=master.code,
         )
 
-        if self._provider.name != "mock":
-            # 실제 호출 결과를 저장해 두면 이후 mock 으로 무료 재생이 가능하다.
-            llm_cache.save(self._cache_dir, key, result)
-
+        # 실제 호출 결과를 저장해 두면 이후 mock 으로 무료 재생이 가능하다.
+        llm_cache.save(self._cache_dir, key, result)
         return result, False
 
     def health(self):

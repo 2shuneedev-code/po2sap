@@ -1,0 +1,80 @@
+# CONTRIBUTING.md §4 — 푸시마다 자동. 전 단계가 LLM 을 호출하지 않으므로 비용 0.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+env:
+  LLM_PROVIDER: mock          # 실수로도 실제 API 를 때리지 않는다
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest ruff
+
+      # ── 1단계: 마스터 스키마·필드 커버리지 검증 ──────────────────
+      # 실패 조건: 전송 필드 미선언 · 없는 규칙 참조 · expr 화이트리스트 위반 ·
+      #            추출 스키마에 없는 path
+      - name: 마스터 검증 (SCHEMA.md §7)
+        run: python scripts/validate_masters.py
+
+      # ── 2단계: 규칙 스펙 · 파서 · 골든 테스트 ────────────────────
+      - name: pytest
+        run: python -m pytest
+
+      - name: ruff
+        run: python -m ruff check backend scripts
+
+      # ── 대외비 확인 (NEXT.md §4) ─────────────────────────────────
+      # samples/ 에는 .gitignore 와 README.md 만 추적되어야 한다.
+      - name: samples/ 유출 확인
+        run: |
+          count=$(git ls-files samples/ | wc -l)
+          if [ "$count" -ne 2 ]; then
+            echo "::error::samples/ 에 $count 개가 추적되고 있습니다 (기대: 2). 실물 발주서는 대외비입니다."
+            git ls-files samples/
+            exit 1
+          fi
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 프론트 존재 확인
+        id: check
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "frontend/ 미착수 — 건너뜁니다."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.exists == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 설치 · 빌드
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build

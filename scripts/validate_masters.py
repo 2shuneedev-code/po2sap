@@ -286,7 +286,9 @@ def check_tables(report: Report, master: Any, allowed: set[str]) -> None:
         check_no_match(report, where, table, results, allowed)
 
 
-def check_rules(report: Report, master: Any, allowed: set[str]) -> None:
+def check_rules(
+    report: Report, master: Any, allowed: set[str], masters_dir: Path = MASTERS
+) -> None:
     for name, rule in (master.rules or {}).items():
         where = f"rules.{name}"
 
@@ -316,7 +318,7 @@ def check_rules(report: Report, master: Any, allowed: set[str]) -> None:
             table_file = rule.get("table_file")
             if not table_file:
                 report.error(2, f"{where}: lookup 인데 table_file 이 없습니다")
-            elif not (MASTERS / table_file).exists():
+            elif not (masters_dir / table_file).exists():
                 if rule.get("optional"):
                     report.warn(
                         3,
@@ -421,10 +423,12 @@ def check_grid(report: Report, master: Any, base_fields: list[str]) -> None:
 
 
 # ── 실행 ───────────────────────────────────────────────────────────────
-def validate_customer(code: str, base_fields: list[str]) -> Report:
+def validate_customer(
+    code: str, base_fields: list[str], masters_dir: Path = MASTERS
+) -> Report:
     report = Report(customer=code.upper())
     try:
-        master = load_customer(code, MASTERS)
+        master = load_customer(code, masters_dir)
     except (MasterError, yaml.YAMLError) as exc:
         report.error(2, f"로딩 실패: {exc}")
         return report
@@ -434,16 +438,25 @@ def validate_customer(code: str, base_fields: list[str]) -> Report:
     check_top_level(report, master.raw)
     check_meta(report, master)
     check_tables(report, master, allowed)
-    check_rules(report, master, allowed)
+    check_rules(report, master, allowed, masters_dir)
     check_fields(report, master, base_fields, allowed)
     check_checks(report, master)
     check_grid(report, master, base_fields)
     return report
 
 
-def load_base_fields() -> list[str]:
-    data = yaml.safe_load((MASTERS / "_base" / "sap_defaults.yaml").read_text("utf-8"))
+def load_base_fields(masters_dir: Path = MASTERS) -> list[str]:
+    data = yaml.safe_load((masters_dir / "_base" / "sap_defaults.yaml").read_text("utf-8"))
     return list((data or {}).get("field_specs") or {})
+
+
+def customer_codes(masters_dir: Path = MASTERS) -> list[str]:
+    """`_` 로 시작하는 파일(_template 등)은 거래처가 아니다."""
+    return sorted(
+        p.stem
+        for p in (masters_dir / "customers").glob("*.yaml")
+        if not p.stem.startswith("_")
+    )
 
 
 def main() -> int:
@@ -460,10 +473,7 @@ def main() -> int:
     codes = (
         [args.customer]
         if args.customer
-        else sorted(
-            p.stem for p in (MASTERS / "customers").glob("*.yaml")
-            if not p.stem.startswith("_")
-        )
+        else customer_codes()
     )
 
     print(f"전송 필드 {len(base_fields)}개 기준 · 거래처 {len(codes)}곳\n")

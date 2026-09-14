@@ -40,7 +40,7 @@ class Literal:
 
 @dataclass(frozen=True)
 class ListNode:
-    items: tuple["Node", ...]
+    items: tuple[Node, ...]
     pos: int = 0
     type: ValueType = "list"
 
@@ -65,7 +65,7 @@ class Path:
 @dataclass(frozen=True)
 class Call:
     name: str
-    args: tuple["Node", ...]
+    args: tuple[Node, ...]
     pos: int = 0
 
 

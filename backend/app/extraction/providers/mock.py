@@ -5,27 +5,27 @@
   · 프론트엔드 개발 (LLM 키 불필요)
   · CI/골든 테스트 (비용 0, 결과 고정)
 
-응답 파일은 문서 내용 해시로 찾는다:
-    storage/llm_cache/{sha256}.json
-실제 호출 결과는 자동으로 이 경로에 저장되므로, 한 번 실제 파싱을 돌려두면
-그 뒤로는 무료로 반복 재생할 수 있다.
+**저장된 응답을 찾는 일은 Extractor 가 한다.** 예전에는 이 클래스가 캐시 경로를
+직접 뒤져서 Extractor 와 조회 경로가 둘로 갈렸는데, 한쪽만 고치면 조용히
+어긋나므로 일원화했다. 여기까지 호출이 왔다는 것은 **재생할 응답이 없다**는 뜻이라,
+무엇을 어디에 두면 되는지 알려주고 실패한다.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from .base import DocumentInput, LLMError, ProviderHealth, ToolCallResult
-from .cache import cache_key, cache_path
+from .cache import count, fixture_name
 
 
 class MockProvider:
     name = "mock"
 
-    def __init__(self, cache_dir: Path) -> None:
+    def __init__(self, cache_dir: Path, fixtures_dir: Path | None = None) -> None:
         self._cache_dir = cache_dir
+        self._fixtures_dir = fixtures_dir
 
     def extract(
         self,
@@ -36,27 +36,27 @@ class MockProvider:
         document: DocumentInput,
         model_alias: str = "extract",
         max_tokens: int = 16000,
+        customer: str = "",
     ) -> ToolCallResult:
-        key = cache_key(document=document, prompt=user_prompt)
-        path = cache_path(self._cache_dir, key)
-
-        if not path.exists():
-            raise LLMError(
-                "mock 프로바이더에 저장된 응답이 없습니다.\n"
-                f"  찾은 경로: {path}\n"
-                "해결 방법:\n"
-                "  1) .env 에서 LLM_PROVIDER=anthropic 으로 바꾸고 실제 파싱을 1회 실행\n"
-                "     (결과가 자동 저장되어 이후 mock 으로 무료 재생 가능)\n"
-                "  2) 또는 위 경로에 기대 결과 JSON 을 직접 넣기"
-            )
-
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return ToolCallResult(
-            payload=data.get("payload", data),
-            model=data.get("model", "mock"),
-            provider=self.name,
+        wanted = (
+            self._fixtures_dir / fixture_name(customer or "unknown", document.filename)
+            if self._fixtures_dir
+            else None
+        )
+        raise LLMError(
+            "mock 프로바이더에 재생할 응답이 없습니다.\n"
+            f"  문서: {document.filename} (거래처 {customer or '?'})\n"
+            + (f"  픽스처 경로: {wanted}\n" if wanted else "")
+            + f"  런타임 캐시: {self._cache_dir}/\n"
+            "해결 방법:\n"
+            "  1) .env 에서 LLM_PROVIDER=anthropic 으로 바꾸고 실제 파싱을 1회 실행\n"
+            "     (결과가 런타임 캐시에 저장되어 이후 mock 으로 무료 재생 가능)\n"
+            "  2) 또는 위 픽스처 경로에 기대 결과 JSON 을 직접 넣기\n"
+            "     형태: {\"payload\": {...추출 결과...}, \"model\": \"fixture\"}"
         )
 
     def health(self) -> ProviderHealth:
-        count = len(list(self._cache_dir.glob("*.json"))) if self._cache_dir.exists() else 0
-        return ProviderHealth(ok=True, provider=self.name, detail=f"저장된 응답 {count}건")
+        dirs = [d for d in (self._cache_dir, self._fixtures_dir) if d is not None]
+        return ProviderHealth(
+            ok=True, provider=self.name, detail=f"재생 가능한 응답 {count(dirs)}건"
+        )

@@ -53,8 +53,12 @@ class LLMProvider(Protocol):
         document: DocumentInput,
         model_alias: str = "extract",
         max_tokens: int = 16000,
+        customer: str = "",
     ) -> ToolCallResult:
-        """Tool Use 로 구조화 출력을 강제해 추출 결과를 반환한다."""
+        """Tool Use 로 구조화 출력을 강제해 추출 결과를 반환한다.
+
+        customer 는 로그·오류 메시지용 거래처 코드다. 호출 내용에는 영향을 주지 않는다.
+        """
         ...
 
     def health(self) -> ProviderHealth:

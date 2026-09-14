@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     def project_root(self) -> Path:
         return _PROJECT_ROOT
 
+    @property
+    def llm_cache_dir(self) -> Path:
+        """실제 호출 결과가 쌓이는 런타임 캐시 (Git 제외)."""
+        return self.storage_dir / "llm_cache"
+
+    @property
+    def llm_fixtures_dir(self) -> Path:
+        """Git 에 커밋되는 재생용 픽스처. 새 클론에서도 mock 이 돈다."""
+        return _PROJECT_ROOT / "backend" / "tests" / "fixtures" / "llm_cache"
+
     def model_id(self, alias: str) -> str:
         """역할 별칭('extract'/'fallback')을 실제 모델 ID로 해석."""
         mapping = {

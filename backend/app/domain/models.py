@@ -148,3 +148,49 @@ class ParseResult(BaseModel):
     @property
     def warn_count(self) -> int:
         return sum(1 for i in self.issues if i.level == "warn")
+
+
+# ── 규칙엔진 산출물 (SCHEMA.md §2 의 ⑥~⑦) ─────────────────────────────
+class RowIssue(BaseModel):
+    """행 단위 문제. severity 가 error 면 전송이 막힌다."""
+
+    field: str = ""
+    severity: str = "warn"      # "error" | "warn"
+    code: str = ""              # REQUIRED_MISSING | MAX_LEN | FORMAT_ERROR | NO_MATCH …
+    message: str = ""
+
+
+class SapRow(BaseModel):
+    """전송 필드 1행 = 품목 1건.
+
+    `fields` 는 `_base/sap_defaults.yaml` 의 전송 필드를 **전량** 담는다 —
+    값이 없어도 키는 있고 값은 "" 다 (계약 §4·5 규약).
+    `_` 로 시작하는 것들은 화면 전용이며 전송 페이로드에 들어가지 않는다.
+    """
+
+    row_id: str = ""
+    file: str = ""              # → _file
+    group: str = ""             # → _group (분할 단위 라벨. 분할 없으면 "")
+    line_no: int = 0            # → _line_no (오더 단위 안에서의 순번)
+    fields: dict[str, str] = Field(default_factory=dict)
+    issues: list[RowIssue] = Field(default_factory=list)
+
+    @property
+    def error_count(self) -> int:
+        return sum(1 for i in self.issues if i.severity == "error")
+
+
+class BuildResult(BaseModel):
+    """한 문서를 규칙엔진에 통과시킨 결과."""
+
+    rows: list[SapRow] = Field(default_factory=list)
+    columns: list[str] = Field(default_factory=list)
+    grid: dict[str, object] = Field(default_factory=dict)
+
+    @property
+    def error_count(self) -> int:
+        return sum(r.error_count for r in self.rows)
+
+    @property
+    def warn_count(self) -> int:
+        return sum(len(r.issues) - r.error_count for r in self.rows)

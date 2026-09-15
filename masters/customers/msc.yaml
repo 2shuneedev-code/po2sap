@@ -68,6 +68,7 @@ extraction:
 split:
   by: shipment
   label: "출하처(Shipment)별로 오더를 나눈다"
+  group_label: _city        # 그리드 구분선에 쓸 라벨 (계약 §5 의 _group)
   description: |
     MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.
     화면에는 한 그리드로 통합해 보여주고 BSTKD·KUNNR2 만 달라진다.

@@ -437,3 +437,125 @@ def analyze(src: str) -> ExprInfo:
         warnings=lint_calls(ast),
         referenced_paths=paths(ast),
     )
+
+
+# ── 평가 (SCHEMA §4.7.2) ───────────────────────────────────────────────
+# 파서와 같은 AST 를 쓴다. 검증이 통과한 식은 여기서 반드시 돈다.
+from .primitives import FormatError, apply_format  # noqa: E402
+
+
+class EvalError(ValueError):
+    """식을 실행하다 실패. 사용자에게 보여줄 한국어 메시지를 담는다."""
+
+
+def truthy(value: object) -> bool:
+    """거짓으로 치는 값: null · "" · false · 빈 리스트 · 0 (SCHEMA §4.7.2)."""
+    if value is None or value is False:
+        return False
+    if isinstance(value, str):
+        return value != ""
+    if isinstance(value, (list, tuple)):
+        return len(value) > 0
+    if isinstance(value, (int, float)):
+        return value != 0
+    return True
+
+
+def text(value: object) -> str:
+    """텍스트로 쓸 때 null 은 빈 문자열이다."""
+    if value is None:
+        return ""
+    if value is True:
+        return "true"
+    if value is False:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _as_list(value: object, fn: str, pos: int) -> list:
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    raise EvalError(f"{fn}() 의 {pos}번째 인자는 리스트여야 합니다")
+
+
+def _number(value: object, fn: str, pos: int) -> int:
+    try:
+        return int(float(text(value)))
+    except (TypeError, ValueError) as exc:
+        raise EvalError(f"{fn}() 의 {pos}번째 인자는 숫자여야 합니다") from exc
+
+
+def _fmt(name: str):
+    def run(value: object) -> str:
+        try:
+            return apply_format(name, text(value))
+        except FormatError as exc:
+            raise EvalError(str(exc)) from exc
+
+    return run
+
+
+def _call(name: str, args: list) -> object:
+    if name == "concat":
+        return "".join(text(a) for a in args)
+    if name == "join":
+        return text(args[0]).join(text(x) for x in _as_list(args[1], "join", 2))
+    if name == "compact":
+        return [x for x in _as_list(args[0], "compact", 1) if truthy(x)]
+    if name == "coalesce":
+        return next((a for a in args if truthy(a)), None)
+    if name == "if":
+        return args[1] if truthy(args[0]) else args[2]
+    if name == "contains":
+        return text(args[1]) in text(args[0])
+    if name == "in":
+        return text(args[0]) in [text(x) for x in _as_list(args[1], "in", 2)]
+    if name in {"upper", "lower", "trim", "integer", "decimal3", "date_yyyymmdd"}:
+        return _fmt(name)(args[0])
+    if name == "replace":
+        return text(args[0]).replace(text(args[1]), text(args[2]))
+    if name == "substr":
+        start = _number(args[1], "substr", 2)
+        length = _number(args[2], "substr", 3)
+        return text(args[0])[start : start + length]
+    if name == "pad":
+        width = _number(args[1], "pad", 2)
+        filler = text(args[2]) or " "
+        return text(args[0]).rjust(width, filler[0])
+    raise EvalError(f"허용되지 않은 함수입니다: {name}()")
+
+
+def evaluate(node: Node, resolve) -> object:
+    """AST 를 값으로 만든다. `resolve(path)` 가 컨텍스트 조회를 담당한다."""
+    if isinstance(node, Literal):
+        return node.value
+    if isinstance(node, ListNode):
+        return [evaluate(item, resolve) for item in node.items]
+    if isinstance(node, Path):
+        return resolve(node.dotted)
+    if isinstance(node, Call):
+        spec = FUNCTIONS.get(node.name)
+        if spec is None:
+            raise EvalError(f"허용되지 않은 함수입니다: {node.name}()")
+        count = len(node.args)
+        if count < spec.min_args or (spec.max_args is not None and count > spec.max_args):
+            raise EvalError(f"{node.name}() 의 인자는 {spec.expected_arity()}여야 합니다")
+
+        # if() 는 선택되지 않은 가지를 평가하지 않는다 — 안 쓰는 쪽의 변환 오류로
+        # 멀쩡한 식이 죽으면 안 된다.
+        if node.name == "if":
+            cond = evaluate(node.args[0], resolve)
+            return evaluate(node.args[1] if truthy(cond) else node.args[2], resolve)
+        return _call(node.name, [evaluate(a, resolve) for a in node.args])
+
+    raise EvalError(f"알 수 없는 노드입니다: {type(node).__name__}")
+
+
+def run(source: str, resolve) -> str:
+    """식 한 줄을 문자열 결과로. 필드 렌더가 쓰는 진입점이다."""
+    info = analyze(source)
+    if not info.ok:
+        raise EvalError("; ".join(info.errors))
+    return text(evaluate(info.ast, resolve))

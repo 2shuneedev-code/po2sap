@@ -4,6 +4,7 @@
     python scripts/parse_one.py <파일경로> --customer MSC
     python scripts/parse_one.py sample.pdf --customer MSC --json out.json
     python scripts/parse_one.py sample.pdf --customer MSC --text-only   # 전처리만 확인
+    python scripts/parse_one.py sample.pdf --customer MSC --rows         # 전송 행까지
 """
 
 from __future__ import annotations
@@ -16,9 +17,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from app.config import get_settings  # noqa: E402
 from app.extraction import Extractor, load_document  # noqa: E402
 from app.extraction.providers.base import LLMError  # noqa: E402
-from app.masters import MasterError  # noqa: E402
+from app.masters import MasterError, load_customer  # noqa: E402
+from app.rules.engine import build  # noqa: E402
 
 
 def _print_lines(lines, *, indent: int = 2, title: str | None = None) -> None:
@@ -43,6 +46,7 @@ def main() -> int:
     ap.add_argument("--customer", "-c", required=True, help="거래처 코드 (예: MSC)")
     ap.add_argument("--json", "-o", help="결과를 JSON 파일로 저장")
     ap.add_argument("--text-only", action="store_true", help="전처리 결과(원문 텍스트)만 출력")
+    ap.add_argument("--rows", action="store_true", help="규칙엔진까지 돌려 전송 행을 출력")
     args = ap.parse_args()
 
     path = Path(args.file)
@@ -113,6 +117,28 @@ def main() -> int:
         print("\n[특이사항]")
         for n in raw.notes:
             print(f"  · {n}")
+
+    # ── 규칙엔진 (SCHEMA.md §2 의 ②~⑦) ───────────────────────
+    if args.rows:
+        settings = get_settings()
+        master = load_customer(args.customer, settings.masters_dir)
+        result = build(raw, master, settings.masters_dir, file_name=raw.source_file)
+
+        print(f"\n[전송 행] {len(result.rows)}건 × {len(result.columns)}필드"
+              f"  (오류 {result.error_count} / 경고 {result.warn_count})")
+        shown = [c for c in result.columns if c not in set(result.grid.get("hidden") or [])]
+        for row in result.rows:
+            head = f"  {row.row_id}"
+            if row.group:
+                head += f"  [{row.group}]"
+            print(f"\n{head}")
+            for name in shown:
+                value = row.fields.get(name, "")
+                if value:
+                    print(f"      {name:<8} {value}")
+            for issue in row.issues:
+                mark = "⛔" if issue.severity == "error" else "⚠"
+                print(f"      {mark} [{issue.code}] {issue.field}: {issue.message}")
 
     if args.json:
         out = Path(args.json)

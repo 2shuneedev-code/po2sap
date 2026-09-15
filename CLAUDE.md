@@ -52,6 +52,9 @@ python scripts/parse_one.py <발주서> --customer MSC --text-only
 # 단건 파싱
 python scripts/parse_one.py <발주서> --customer MSC
 
+# 규칙엔진까지 — 전송 행 36필드를 그대로 출력
+python scripts/parse_one.py <발주서> --customer MSC --rows
+
 # API 서버
 cd backend && uvicorn app.main:app --reload        # → /api/health
 
@@ -88,11 +91,12 @@ backend/app/
 │   ├── providers/  mock | anthropic_direct | gateway | cache
 │   └── grounding.py  환각 차단 · 합계 검증 · 신뢰도
 ├── masters/      마스터 로더 · brands.py(참조표 읽기/쓰기)       [완료]
-├── domain/       RawPO / SapRow / Batch                         [부분]
-├── rules/        규칙엔진 (SCHEMA.md §2의 7단계)                [expr 파서만]
-├── tests/        pytest 104종 + 픽스처 + 골든                    [완료]
-├── mapping/      전송 필드 행 생성                              [미착수]
-├── validation/   검증                                           [미착수]
+├── domain/       RawPO · SapRow · RowIssue · BuildResult        [완료]
+├── rules/        규칙엔진 ②~⑦ — engine · expr · decision_table       [완료]
+│                 mapping_rules · matching · primitives · reftable
+├── tests/        pytest 120종 + 픽스처 + 골든 2종               [완료]
+├── mapping/      전송 필드 행 생성 (row_builder)                [완료]
+├── validation/   필수값·길이·checks                             [완료]
 ├── transport/    EAI 전송                                       [미착수]
 └── api/          라우트 — routes_brands.py (브랜드 매핑 콘솔)     [부분]
 
@@ -127,6 +131,9 @@ storage/          런타임 산출물 — Git 제외
 | SAP에 없는 코드를 매핑 | `value_check`가 막는다. 전송해도 SAP이 거부한다 |
 | 라우트에서 `get_settings()` 직접 호출 | `Depends(get_settings)`를 쓴다. 안 그러면 테스트가 실제 `masters/`를 덮어쓴다 |
 | 참조표를 통째로 다시 쓰기 | 행 순서가 판정 우선순위다. `brands.set_keys()`가 자리를 보존한다 |
+| 변환 실패를 빈값으로 넘기기 | 날짜를 못 읽었는데 `""`로 전송되면 아무도 모른다. `FormatError`를 올려 검증이 잡게 한다 |
+| 가짜 값으로 채운 참조표에 표시 생략 | 우연히 키가 맞으면 조용히 틀린 값이 나간다. 전 행에 `note`를 단다 |
+| 엔진 코드에 전송 필드 이름 나열 | `_base`의 순서가 곧 필드 목록이다. `field_order`를 받아 돈다 |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 

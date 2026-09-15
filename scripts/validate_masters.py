@@ -332,6 +332,9 @@ def check_rules(
                     report.error(3, f"{where}: 참조표 파일이 없습니다: {table_file}")
             if not rule.get("return"):
                 report.error(2, f"{where}: lookup 인데 return 이 없습니다")
+            elif table_file and (masters_dir / table_file).exists():
+                _report_notes(report, table_file, _read_csv(masters_dir / table_file)[0],
+                              rule.get("key_column") or "")
         elif kind == "csv_map":
             check_csv_map(report, where, rule, master, masters_dir)
         elif kind in {"keyword_map", "value_map"}:
@@ -368,6 +371,17 @@ def _read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     with path.open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         return list(reader), list(reader.fieldnames or [])
+
+
+def _report_notes(
+    report: Report, table_file: str, rows: list[dict[str, Any]], key_column: str
+) -> None:
+    """§7-8 — 참조표의 note 는 필드의 todo 와 같은 역할이다 (SCHEMA §1)."""
+    for row in rows:
+        note = (row.get("note") or "").strip()
+        if note:
+            key = row.get(key_column, "") if key_column else ""
+            report.todos.append(f"{table_file} [{key}]: {note}")
 
 
 def check_csv_map(

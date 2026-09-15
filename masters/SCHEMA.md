@@ -45,7 +45,10 @@ masters/
 `brand_master.csv` 를 통째로 갈아끼워도 `brand_keys.csv` 는 그대로다.
 
 참조표의 `note` 컬럼은 자유 메모다. 값이 있으면 `validate_masters` 가 리포트로
-뽑아준다(§7-8) — 필드의 `todo` 와 같은 역할이다.
+뽑아준다(§7-8) — 필드의 `todo` 와 같은 역할이다. `csv_map` 과 `lookup` 양쪽에서 본다.
+
+> 실물을 아직 못 구해 **가짜 값으로 채워둔 참조표**는 전 행에 `note` 를 단다.
+> 그러지 않으면 우연히 키가 맞는 품번이 들어왔을 때 **조용히 틀린 값이 전송된다.**
 
 **해석 순서**: `extends` 를 **적힌 순서대로** 깔고 거래처 파일이 덮어쓴다.
 
@@ -270,9 +273,14 @@ extraction:
 split:
   by: none | shipment | <키>
   label: "출하처(Shipment)별로 오더를 나눈다"   # 화면 표시용. 선택
+  group_label: _city                            # 그리드 구분선 라벨. 선택
   description: |                                # 규칙 카드 본문. 선택
     MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.
 ```
+
+`group_label` 은 화면에서 오더 단위를 구분하는 라벨(계약 §5 의 `_group`)로 쓸
+**컨텍스트 경로**다. 결정표가 만든 파생변수를 가리키는 것이 보통이다. 생략하면
+`shipment.receiving_loc` → `shipment.shipment_no` 순으로 찾고, 그것도 없으면 빈 값이다.
 
 `none` 이면 문서 1부 = 오더 1건. `shipment` 면 추출된 shipment 수만큼 오더가 생긴다.
 화면에는 항상 한 그리드로 통합되고, 행마다 다른 값(BSTKD 등)만 달라진다.
@@ -412,7 +420,7 @@ rules:
 | `table` | 결정표 결과 | `{ from: table, table: ship_to_routing }` |
 | `rule` | 규칙 결과 | `{ from: rule, rule: brand_code }` |
 | `expr` | 식으로 조합 | `{ from: expr, expr: '...' }` |
-| `gen` | 생성기 | `{ from: gen, generator: line_no_x10 }` |
+| `gen` | 생성기 (아래 표) | `{ from: gen, generator: line_no_x10 }` |
 
 공통 옵션:
 
@@ -427,6 +435,13 @@ MATNR:
   explain: "화면 툴팁·규칙 카드에 표시할 설명"
   todo: "값 미확정 — SAP 담당 확인 필요"   # ← 값이 안 정해졌을 때
 ```
+
+**`gen` 생성기** — 엔진에 구현된 것만 쓸 수 있다. 새 생성기가 필요하면
+`backend/app/mapping/row_builder.py` 와 이 표에 함께 추가한다.
+
+| `generator` | 결과 |
+|---|---|
+| `line_no_x10` | 품목 순번 × 10 을 6자리로 (`1` → `"000010"`). 앞자리 0 을 보존해야 해서 문자열이다 |
 
 > **`todo` 가 원칙 2의 장치다.** 값이 미정이면 `todo` 를 달고 진행한다.
 > 스키마 검증이 목록으로 뽑아주므로 나중에 한 번에 확정하면 된다.

@@ -1,9 +1,14 @@
-"""규칙엔진 (D2).
+"""규칙엔진 (D2) — masters/SCHEMA.md §2 의 7단계.
 
-현재 구현된 것은 `expr` 파서뿐이다. 결정표·매핑 규칙·행 생성은 이어서 붙인다.
-명세는 masters/SCHEMA.md.
+EXTRACT 는 extraction/ 가, 나머지 여섯 단계를 여기와 mapping/·validation/ 이 맡는다.
 """
 
-from .expr import FUNCTIONS, ExprError, ExprInfo, analyze, parse
+from .context import EvalContext
+from .engine import build
+from .expr import FUNCTIONS, EvalError, ExprError, ExprInfo, analyze, evaluate, parse, run
+from .primitives import FormatError, apply_format
 
-__all__ = ["ExprError", "ExprInfo", "FUNCTIONS", "analyze", "parse"]
+__all__ = [
+    "EvalContext", "EvalError", "ExprError", "ExprInfo", "FUNCTIONS",
+    "FormatError", "analyze", "apply_format", "build", "evaluate", "parse", "run",
+]

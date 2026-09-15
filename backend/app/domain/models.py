@@ -194,3 +194,59 @@ class BuildResult(BaseModel):
     @property
     def warn_count(self) -> int:
         return sum(len(r.issues) - r.error_count for r in self.rows)
+
+
+# ── 배치 (계약 §4~§7) ──────────────────────────────────────────────────
+class BatchFile(BaseModel):
+    file_id: str
+    name: str
+    status: str = "PARSING"     # PARSING | DONE | FAILED
+    error: str = ""
+    row_count: int = 0
+
+
+class BatchRow(BaseModel):
+    """검수 그리드의 한 행.
+
+    `original` 은 **파싱 직후 값**이고 클라이언트가 바꿀 수 없다. 검수 중 올라온
+    값은 `fields` 에만 반영된다. 둘을 나눠 두어야 "무엇이 사람 손을 탔는가"를
+    서버가 판단할 수 있고(`edited`), 위조된 행을 걸러낼 수 있다.
+    """
+
+    row_id: str
+    file_id: str = ""
+    file: str = ""
+    group: str = ""
+    line_no: int = 0
+    original: dict[str, str] = Field(default_factory=dict)
+    fields: dict[str, str] = Field(default_factory=dict)
+    issues: list[RowIssue] = Field(default_factory=list)
+    edited: list[str] = Field(default_factory=list)
+    deleted: bool = False
+
+    @property
+    def error_count(self) -> int:
+        return 0 if self.deleted else sum(1 for i in self.issues if i.severity == "error")
+
+
+class Batch(BaseModel):
+    batch_id: str
+    customer: str
+    status: str = "PARSING"     # PARSING | NEEDS_REVIEW | READY | SENDING | SENT | SEND_FAILED
+    created_at: str = ""
+    files: list[BatchFile] = Field(default_factory=list)
+    rows: list[BatchRow] = Field(default_factory=list)
+    columns: list[str] = Field(default_factory=list)
+    grid: dict[str, object] = Field(default_factory=dict)
+
+    @property
+    def live_rows(self) -> list[BatchRow]:
+        return [r for r in self.rows if not r.deleted]
+
+    def recompute_status(self) -> str:
+        if any(f.status == "PARSING" for f in self.files):
+            return "PARSING"
+        if self.status in {"SENDING", "SENT", "SEND_FAILED"}:
+            return self.status
+        blocked = any(r.error_count for r in self.live_rows)
+        return "NEEDS_REVIEW" if blocked or not self.live_rows else "READY"

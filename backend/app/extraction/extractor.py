@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -44,9 +45,18 @@ class Extractor:
         self._cache_dir = self._settings.llm_cache_dir
         self._fixtures_dir = self._settings.llm_fixtures_dir
 
-    def parse_file(self, path: str | Path, customer_code: str) -> ParseResult:
+    def parse_file(
+        self, path: str | Path, customer_code: str, *, display_name: str | None = None
+    ) -> ParseResult:
+        """`display_name` 은 저장 경로가 원본 파일명과 다를 때 쓴다.
+
+        업로드는 `{file_id}__{원본명}` 으로 저장되는데, 픽스처는 원본명으로 찾고
+        화면도 원본명을 보여줘야 한다. 저장 방식이 재생과 표시를 흔들면 안 된다.
+        """
         master = load_customer(customer_code, self._settings.masters_dir)
         doc = load_document(path)
+        if display_name:
+            doc = replace(doc, filename=display_name)
         self._check_file_type(doc, master)
 
         document, prompt = self._build_request(doc, master)

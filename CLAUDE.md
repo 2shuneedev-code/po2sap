@@ -94,11 +94,13 @@ backend/app/
 ├── domain/       RawPO · SapRow · RowIssue · BuildResult        [완료]
 ├── rules/        규칙엔진 ②~⑦ — engine · expr · decision_table       [완료]
 │                 mapping_rules · matching · primitives · reftable
-├── tests/        pytest 120종 + 픽스처 + 골든 2종               [완료]
+├── tests/        pytest 139종 + 픽스처 + 골든 2종               [완료]
 ├── mapping/      전송 필드 행 생성 (row_builder)                [완료]
 ├── validation/   필수값·길이·checks                             [완료]
+├── storage/      배치 저장 (파싱 원본 스냅샷 + 업로드 원본)      [완료]
 ├── transport/    EAI 전송                                       [미착수]
-└── api/          라우트 — routes_brands.py (브랜드 매핑 콘솔)     [부분]
+└── api/          routes_brands · routes_batches                 [완료]
+                  batch_service.py — 업로드→파싱→행 조립
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
 scripts/          parse_one.py · validate_masters.py. mock_eai_server 미작성
@@ -134,6 +136,8 @@ storage/          런타임 산출물 — Git 제외
 | 변환 실패를 빈값으로 넘기기 | 날짜를 못 읽었는데 `""`로 전송되면 아무도 모른다. `FormatError`를 올려 검증이 잡게 한다 |
 | 가짜 값으로 채운 참조표에 표시 생략 | 우연히 키가 맞으면 조용히 틀린 값이 나간다. 전 행에 `note`를 단다 |
 | 엔진 코드에 전송 필드 이름 나열 | `_base`의 순서가 곧 필드 목록이다. `field_order`를 받아 돈다 |
+| 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
+| 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 
@@ -172,14 +176,17 @@ storage/          런타임 산출물 — Git 제외
 >   `schema_builder.py` · `models.py` 가 거기에 맞춰져 있다.
 > - expr 문법 명세(§4.7) · 파서(`backend/app/rules/expr.py`) · `validate_masters.py`.
 >   **마스터를 고쳤으면 검증기를 돌린다.** YGJP ZSHCO 분기식 오류도 이때 잡혀 수정됐다.
-> - 빌드·테스트 골격 — `pyproject.toml` · `backend/tests/` 73종 · 픽스처 · CI.
+> - **검수→전송 서버측 대조** — 서버가 파싱 직후 값을 스냅샷으로 들고, 요청은
+>   거기에 병합된다. 모르는 `row_id` 는 요청 전체를 거부하고, 모르는 컬럼은 무시하며,
+>   행 삭제는 명시 플래그다(누락 ≠ 삭제). `edited` 는 서버가 원본과 대조해 계산한다.
+>   규약은 계약 §6.1.
+> - 빌드·테스트 골격 — `pyproject.toml` · `backend/tests/` · 픽스처 · CI.
 >   **새 클론에서 `.env`·API 키 없이 `pytest` 가 전 파이프라인을 돌린다.**
 >   캐시 키에서 hints 를 뺐고(규칙 튜닝이 캐시를 깨지 않는다),
 >   픽스처는 `{거래처}__{파일명}` 으로 찾는다(프롬프트가 바뀌어도 재생된다).
 
-**치명 — D2 착수 전 해결 필요**
-
-1. **검수→전송에 서버측 대조가 없다** — 파싱 원본 스냅샷·행 삭제 규약·감사 레코드 스키마 미정의
+**치명 — 없음.** 검수→전송 서버측 대조는 해결됐다 (위 ✅ 참조).
+감사 레코드 스키마는 EAI 전송을 붙일 때 함께 정한다.
 
 **중요**
 

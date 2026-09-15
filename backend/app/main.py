@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import brands_router
+from .api import batches_router, brands_router
 from .config import get_settings
 from .extraction import Extractor
 from .masters import list_customers
@@ -30,6 +30,7 @@ app.add_middleware(
 
 
 app.include_router(brands_router)
+app.include_router(batches_router)
 
 
 # ── 오류 형태 (계약 §0) ────────────────────────────────────────────────

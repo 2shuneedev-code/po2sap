@@ -54,10 +54,12 @@ class AnthropicProvider:
         content = self._build_content(user_prompt, document)
 
         try:
+            # temperature 를 보내지 않는다. 현행 모델(Opus 5 · Sonnet 5 등)은
+            # 샘플링 파라미터를 받지 않고 400 을 낸다. 재현성은 temperature 가 아니라
+            # **응답 캐시**가 보장한다 — 같은 문서는 저장된 응답을 그대로 재생한다.
             resp = self._client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                temperature=0,
                 # 공통 시스템 프롬프트는 캐시 대상 (거래처 힌트는 user 쪽에 둔다)
                 system=[
                     {
@@ -118,12 +120,21 @@ class AnthropicProvider:
         )
 
     def health(self) -> ProviderHealth:
+        """키와 모델 ID 가 유효한지만 본다.
+
+        예전에는 실제 메시지를 보냈다. `/api/health` 는 화면과 모니터링이 주기적으로
+        부르는 자리라 그때마다 과금됐다. 모델 조회는 토큰을 쓰지 않으면서
+        **키·권한·모델 ID 세 가지를 한 번에** 확인해 준다.
+        """
+        model = self._settings.model_id("extract")
         try:
-            self._client.messages.create(
-                model=self._settings.model_id("extract"),
-                max_tokens=8,
-                messages=[{"role": "user", "content": "ping"}],
+            info = self._client.models.retrieve(model)
+            return ProviderHealth(
+                ok=True, provider=self.name,
+                detail=f"연결 정상 · {getattr(info, 'display_name', None) or model}",
             )
-            return ProviderHealth(ok=True, provider=self.name, detail="연결 정상")
         except Exception as exc:  # noqa: BLE001
-            return ProviderHealth(ok=False, provider=self.name, detail=str(exc))
+            return ProviderHealth(
+                ok=False, provider=self.name,
+                detail=f"{exc}  (모델 ID: {model})",
+            )

@@ -135,7 +135,7 @@
 | 항목 | 설정 |
 |---|---|
 | 출력 강제 | **Tool Use** (`extract_purchase_order` 단일 툴, `tool_choice` 고정) |
-| temperature | **0** |
+| 샘플링 | **보내지 않는다.** 현행 모델은 temperature·top_p 를 받지 않고 400 을 낸다. 재현성은 응답 캐시가 보장한다 |
 | 모델 | 역할 별칭(`extract` / `extract_fallback`) → 실제 ID는 `.env` 주입 |
 | 프롬프트 캐싱 | 공통 시스템 프롬프트 + 스키마 캐시, 거래처 힌트만 가변 |
 | 페이지 | `extraction.page_limit` 초과 시 청크 분할 후 라인 병합 |

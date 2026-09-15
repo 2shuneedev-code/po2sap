@@ -25,9 +25,9 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str | None = None
 
-    # 역할 별칭 → 실제 모델 ID
-    llm_model_extract: str = "claude-sonnet-4-5"
-    llm_model_fallback: str = "claude-opus-4-1"
+    # 역할 별칭 → 실제 모델 ID. 사내 계정에서 쓸 수 있는 모델로 .env 에서 바꾼다.
+    llm_model_extract: str = "claude-opus-5"
+    llm_model_fallback: str = "claude-sonnet-5"
 
     llm_max_tokens: int = 16000
     llm_timeout_sec: int = 120

@@ -50,6 +50,28 @@ jobs:
             exit 1
           fi
 
+      # ── 비밀 유출 확인 ───────────────────────────────────────────
+      # 한 번 올라가면 이력에서 지우기 어렵다. 커밋 전에 막는 것이 유일한 방법이다.
+      # 자리표시자(sk-ant-...)는 짧아서 걸리지 않는다.
+      - name: 키·.env 유출 확인
+        run: |
+          fail=0
+
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env 가 추적되고 있습니다. API 키·EAI 주소가 들어 있습니다."
+            fail=1
+          fi
+
+          hits=$(git grep -nI -E 'sk-ant-[A-Za-z0-9_-]{30,}' -- . || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Anthropic API 키로 보이는 값이 추적 파일에 있습니다."
+            echo "$hits"
+            echo "발견된 키는 **즉시 폐기하고 재발급**해야 합니다 — 이력에서 지워도 이미 노출된 것입니다."
+            fail=1
+          fi
+
+          exit $fail
+
   frontend:
     runs-on: ubuntu-latest
     steps:

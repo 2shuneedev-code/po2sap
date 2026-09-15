@@ -113,7 +113,7 @@ backend/app/
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
 scripts/          parse_one.py · check_sample.py · validate_masters.py
                   mock_eai_server.py
-.github/          CI: 마스터 검증 → pytest → ruff → samples/ 유출 확인
+.github/          CI: 마스터 검증 → pytest → ruff → samples/·키 유출 확인
 samples/          실물 발주서 — Git 제외 (대외비)
 storage/          런타임 산출물 — Git 제외
 ```
@@ -128,7 +128,8 @@ storage/          런타임 산출물 — Git 제외
 | 금지 | 이유 |
 |---|---|
 | **`samples/` 커밋** | 실물 발주서·거래처 단가는 대외비. 한 번 올라가면 이력에서 못 지운다. push 전 `git ls-files samples/`가 **2개**(`.gitignore`, `README.md`)인지 확인 |
-| `.env` 커밋 | API 키·EAI URL |
+| `.env` 커밋 | API 키·EAI URL. CI 가 `.env` 추적과 `sk-ant-` 패턴을 검사한다 |
+| 채팅·이슈·커밋에 API 키 붙여넣기 | 기록이 남는 곳에 한 번 들어가면 그 키는 끝이다. **폐기하고 재발급**한다 |
 | 코드에 거래처 이름 하드코딩 | P2 위반 |
 | 전송 필드 개수 하드코딩 | `_base`가 유일한 원천 |
 | 거래처 파일에 36필드 전량 나열 | 프로필과 다른 것만 적는다. 거래처 수만큼 유지 비용이 늘어난다 |

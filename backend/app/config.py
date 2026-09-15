@@ -37,10 +37,21 @@ class Settings(BaseSettings):
     llm_prompt_version: str = "v2"
 
     # ── EAI ────────────────────────────────────────────────
-    eai_endpoint: str = "http://127.0.0.1:9000/api/po2sap/salesorder"
+    # 개발  https://eai-dev.yg1.solutions:5443/po2sap/order
+    # 운영  https://eai-prd... (이관 시 .env 만 교체한다 — 코드는 그대로)
+    # 기본값을 실제 서버로 두지 않는다. .env 를 깜빡한 채 돌렸다가 진짜 오더가
+    # 나가면 되돌릴 수 없다. 비어 있으면 전송 단계가 명시적으로 거부한다.
+    eai_endpoint: str = ""
     eai_auth_mode: str = "none"         # none | apikey | basic
     eai_api_key: str = ""
+    eai_api_key_header: str = "X-API-Key"
+    eai_basic_user: str = ""
+    eai_basic_password: str = ""
     eai_timeout_sec: int = 60
+    eai_retries: int = 3                # 5xx·타임아웃만. 4xx 는 재시도하지 않는다
+    eai_max_rows_per_request: int = 0   # 0 = 무제한
+    eai_verify_tls: bool = True         # 끄지 않는다. 사내 CA 는 아래로 지정
+    eai_ca_bundle: str = ""             # 사내 SSL 검사 장비용 인증서 번들 경로
     payload_root: str = "rows"          # rows | array
 
     # ── 경로 ───────────────────────────────────────────────
@@ -60,6 +71,33 @@ class Settings(BaseSettings):
     def llm_fixtures_dir(self) -> Path:
         """Git 에 커밋되는 재생용 픽스처. 새 클론에서도 mock 이 돈다."""
         return _PROJECT_ROOT / "backend" / "tests" / "fixtures" / "llm_cache"
+
+    def require_eai_endpoint(self) -> str:
+        """전송 직전에 부른다. 형식이 틀리면 **보내기 전에** 막는다.
+
+        평문 HTTP 는 루프백(모의 서버)에서만 허용한다. 사내망이라도 발주 데이터가
+        평문으로 흐르면 안 되고, 요구사항도 HTTPS 다.
+        """
+        from urllib.parse import urlparse
+
+        endpoint = (self.eai_endpoint or "").strip()
+        if not endpoint:
+            raise ValueError(
+                "EAI_ENDPOINT 가 설정되지 않았습니다. .env 에 전송 주소를 넣으세요 "
+                "(개발: https://eai-dev.yg1.solutions:5443/po2sap/order)."
+            )
+
+        parsed = urlparse(endpoint)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError(f"EAI_ENDPOINT 형식이 올바르지 않습니다: {endpoint}")
+        if parsed.scheme == "http" and (parsed.hostname or "") not in {
+            "127.0.0.1", "localhost", "::1"
+        }:
+            raise ValueError(
+                f"EAI_ENDPOINT 는 HTTPS 여야 합니다: {endpoint} "
+                "(평문 http 는 로컬 모의 서버에서만 허용합니다)."
+            )
+        return endpoint
 
     def model_id(self, alias: str) -> str:
         """역할 별칭('extract'/'fallback')을 실제 모델 ID로 해석."""

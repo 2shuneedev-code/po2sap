@@ -58,6 +58,10 @@ python scripts/parse_one.py <발주서> --customer MSC --rows
 # API 서버
 cd backend && uvicorn app.main:app --reload        # → /api/health
 
+# 모의 EAI (전송 구간을 실서버 없이 관통)
+python scripts/mock_eai_server.py
+python scripts/mock_eai_server.py --fail 500       # 재시도 확인
+
 # 마스터 검증 (CI 1단계) — SCHEMA.md §7 의 9종 검사. LLM 호출 없음 = 비용 0
 python scripts/validate_masters.py
 python scripts/validate_masters.py --customer MSC   # 한 곳만
@@ -94,16 +98,16 @@ backend/app/
 ├── domain/       RawPO · SapRow · RowIssue · BuildResult        [완료]
 ├── rules/        규칙엔진 ②~⑦ — engine · expr · decision_table       [완료]
 │                 mapping_rules · matching · primitives · reftable
-├── tests/        pytest 139종 + 픽스처 + 골든 2종               [완료]
+├── tests/        pytest 157종 + 픽스처 + 골든 2종               [완료]
 ├── mapping/      전송 필드 행 생성 (row_builder)                [완료]
 ├── validation/   필수값·길이·checks                             [완료]
-├── storage/      배치 저장 (파싱 원본 스냅샷 + 업로드 원본)      [완료]
-├── transport/    EAI 전송                                       [미착수]
+├── storage/      배치 저장 (파싱 원본 스냅샷) · 감사 로그        [완료]
+├── transport/    EAI 전송 (payload · eai_client)                [완료]
 └── api/          routes_brands · routes_batches                 [완료]
                   batch_service.py — 업로드→파싱→행 조립
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
-scripts/          parse_one.py · validate_masters.py. mock_eai_server 미작성
+scripts/          parse_one.py · validate_masters.py · mock_eai_server.py
 .github/          CI: 마스터 검증 → pytest → ruff → samples/ 유출 확인
 samples/          실물 발주서 — Git 제외 (대외비)
 storage/          런타임 산출물 — Git 제외
@@ -138,6 +142,10 @@ storage/          런타임 산출물 — Git 제외
 | 엔진 코드에 전송 필드 이름 나열 | `_base`의 순서가 곧 필드 목록이다. `field_order`를 받아 돈다 |
 | 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
 | 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |
+| `EAI_ENDPOINT` 기본값을 실서버로 | `.env`를 깜빡한 채 진짜 오더가 나간다. 기본은 빈 값이고 전송이 거부한다 |
+| 평문 http로 전송 | 루프백(모의 서버)에서만 허용. 그 외는 보내기 전에 400 |
+| 4xx를 재시도 | 같은 요청은 또 거부된다. 5xx·타임아웃만 재시도 |
+| 감사 로그에 품번·단가 기록 | 5년 보존 파일이 그대로 대외비가 된다. 오더 키(`BSTKD`)와 해시만 (design §8.1) |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
 
@@ -190,8 +198,8 @@ storage/          런타임 산출물 — Git 제외
 
 **중요**
 
-- CBO 업서트 키가 미확정인데 "중복 전송 무해"를 전제하고 있다 (MSC·YGJP는 `POSEX: const ""`라 행 식별자 없음)
-- `.env.example`·`config.py`의 `EAI_ENDPOINT`가 `http://` — 요구사항은 HTTPS. auth 헤더 규약 미정의
+- **CBO 업서트 키가 미확정인데 "중복 전송 무해"를 전제하고 있다** (MSC·YGJP는 `POSEX: const ""`라 행 식별자 없음). 키가 없으면 재전송이 덮어쓰기가 아니라 **중복 적재**다. 감사 로그가 `send`/`resend`를 구분하므로 사후 추적은 된다
+- **EAI 응답 본문 규격이 백지다.** 판정을 HTTP 상태 코드에만 걸었다 — "200인데 본문에 실패가 적힌" 경우를 못 잡는다 (계약 §7.1)
 - `extractor.py`는 확장자 불일치를 `ValueError`로 차단하는데 문서 3곳은 "차단 안 함"
 - `prompt.py`·`schema_builder.py`가 LLM에게 날짜 변환을 지시한다 (P1 위반)
 - `masters/refs/msc_ref.csv`가 더미 데이터인데 DUMMY 표시가 없다

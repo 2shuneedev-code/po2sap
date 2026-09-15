@@ -228,6 +228,8 @@ Content-Type: application/json; charset=utf-8
 
 | 정책 | 내용 |
 |---|---|
+| 주소 | 개발 `https://eai-dev.yg1.solutions:5443/po2sap/order` · 운영 `https://eai-prd…` **`.env` 만 교체** |
+| 전송 계층 | **HTTPS 강제.** 평문 http 는 루프백(모의 서버)에서만 허용 |
 | 인증 | **없음** (사내망). `EAI_AUTH_MODE=none|apikey|basic` 설정만 유지 |
 | 멱등키 | **없음** — 중복 전송 허용 (SAP에서 덮어씀) |
 | 전송 단위 | **배치 전체 일괄** |
@@ -321,9 +323,33 @@ po2sap/
 |---|---|
 | 배포 | Docker Compose (backend + nginx) / Windows면 uvicorn + NSSM |
 | 시크릿 | `.env` Git 제외 |
-| 로그 | 구조화 JSON. **원문·단가 미기록** |
+| 로그 | 구조화 JSON. **원문·단가 미기록** (감사 레코드는 아래 §8.1) |
 | 보존 | 원본 1년 / 배치 1년 / 감사 JSONL 5년 |
 | 인증 | 1차 사내망(무인증) → 2차 JWT/SSO |
+
+### 8.1 감사 레코드 — `storage/audit/{YYYY-MM}/send.jsonl`
+
+**한 줄 = 전송 시도 1회.** 재시도로 성공해도 시도 횟수가 그대로 남는다.
+
+```json
+{"ts":"2026-09-15T12:03:11+09:00","batch_id":"b_20260915_0001","customer":"MSC",
+ "action":"send","chunk":"1/1","endpoint":"https://eai-dev…/po2sap/order",
+ "auth_mode":"none","verify_tls":true,"row_count":49,
+ "orders":["7988114(ELKHART)","7988114(RENO)"],
+ "payload_sha256":"c9c32c…","attempts":1,"http_status":200,"duration_ms":412,
+ "result":"ok","message":"전송되었습니다.","response_excerpt":"{\"result\":\"OK\"}"}
+```
+
+| 키 | 남기는 이유 |
+|---|---|
+| `action` | `send` / `resend` — 중복 적재 가능성을 사후에 되짚는다 |
+| `orders` | `BSTKD` 목록. **오더를 식별할 키만** 남긴다 |
+| `payload_sha256` | 같은 내용을 보냈는지 대조. 값 자체는 남기지 않는다 |
+| `verify_tls` · `auth_mode` | 어떤 보안 설정으로 나갔는지 |
+| `response_excerpt` | EAI 응답 규격이 확정되지 않아 **원문 발췌를 남긴다.** 규격을 정하는 근거가 된다 |
+
+**품번·품명·단가·금액은 남기지 않는다.** 되짚기에 필요한 것은 오더 키와 해시뿐이고,
+값까지 남기면 5년 보존되는 파일이 그대로 대외비가 된다.
 
 ---
 

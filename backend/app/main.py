@@ -1,24 +1,29 @@
 """FastAPI 진입점.
 
-지금 있는 것: 헬스체크 · 거래처 목록 · 브랜드 매핑 콘솔(api/routes_brands.py).
-업로드/검수/전송 엔드포인트는 D3~D4에서 추가한다.
+헬스체크만 여기 있고, 나머지는 api/ 아래 라우터가 맡는다
+(masters · brands · batches).
 
 계약은 contracts/api-contract.md 가 원천이다. 오류 형태도 거기 §0 을 따른다.
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, Request
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api import batches_router, brands_router
-from .config import get_settings
+from .api import batches_router, brands_router, masters_router
+from .config import Settings, get_settings
 from .extraction import Extractor
 from .masters import list_customers
 
 app = FastAPI(title="PO2SAP", version="0.1.0")
+
+# 라우트가 get_settings() 를 직접 부르면 테스트가 실제 masters/ 를 덮어쓴다.
+Injected = Annotated[Settings, Depends(get_settings)]
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +36,7 @@ app.add_middleware(
 
 app.include_router(brands_router)
 app.include_router(batches_router)
+app.include_router(masters_router)
 
 
 # ── 오류 형태 (계약 §0) ────────────────────────────────────────────────
@@ -59,13 +65,11 @@ def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
 
 
 @app.get("/api/health")
-def health() -> dict:
+def health(settings: Injected) -> dict:
     """마스터 로딩 · LLM 프로바이더 상태를 한 번에 확인한다.
 
     사내 서버 이관 직후 가장 먼저 호출할 엔드포인트.
     """
-    settings = get_settings()
-
     masters_ok, masters_detail = True, ""
     try:
         customers = [c.code for c in list_customers(settings.masters_dir)]
@@ -89,18 +93,3 @@ def health() -> dict:
         },
         "eai_endpoint": settings.eai_endpoint,
     }
-
-
-@app.get("/api/masters/customers")
-def customers() -> list[dict]:
-    """업로드 화면의 거래처 선택 목록."""
-    settings = get_settings()
-    return [
-        {
-            "code": c.code,
-            "name": c.name,
-            "customer_no": c.customer_no,
-            "file_types": c.file_types,
-        }
-        for c in list_customers(settings.masters_dir)
-    ]

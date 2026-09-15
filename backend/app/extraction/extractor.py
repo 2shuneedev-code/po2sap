@@ -14,6 +14,7 @@ from typing import Any
 from ..config import Settings, get_settings
 from ..domain.models import (
     ExtractedValue,
+    GroundingIssue,
     ParseResult,
     POHeader,
     POLine,
@@ -57,13 +58,15 @@ class Extractor:
         doc = load_document(path)
         if display_name:
             doc = replace(doc, filename=display_name)
-        self._check_file_type(doc, master)
+        type_issue = self._check_file_type(doc, master)
 
         document, prompt = self._build_request(doc, master)
         result, cached = self._call(document, prompt, master)
 
         raw = _to_raw_po(result.payload, customer_code=master.code, source_file=doc.filename)
         issues = grounding.verify(raw, doc)
+        if type_issue:
+            issues.insert(0, type_issue)
 
         return ParseResult(
             raw=raw,
@@ -75,13 +78,25 @@ class Extractor:
 
     # ── 내부 ───────────────────────────────────────────────────────────
     @staticmethod
-    def _check_file_type(doc: SourceDoc, master: CustomerMaster) -> None:
+    def _check_file_type(doc: SourceDoc, master: CustomerMaster) -> GroundingIssue | None:
+        """`meta.file_types` 는 **안내용이다. 차단하지 않는다.**
+
+        거래처가 평소와 다른 형식으로 한 번 보내는 일은 실제로 일어난다. 그때
+        업로드 자체를 막으면 사람이 할 수 있는 일이 없어진다 — 읽어보고 안 되면
+        그때 실패해도 늦지 않다. 계약 §1·process.md·NEXT.md 가 정한 방침이다.
+        """
         allowed = {t.lower() for t in master.file_types}
-        if allowed and doc.ext not in allowed:
-            raise ValueError(
-                f"{master.name} 발주서는 {'/'.join(sorted(allowed)).upper()} 형식입니다 "
-                f"(업로드한 파일: .{doc.ext})"
-            )
+        if not allowed or doc.ext in allowed:
+            return None
+        return GroundingIssue(
+            level="warn",
+            field="file",
+            code="UNEXPECTED_FILE_TYPE",
+            message=(
+                f"{master.name} 발주서는 보통 {'/'.join(sorted(allowed)).upper()} 형식인데 "
+                f".{doc.ext} 파일입니다. 판독 결과를 특히 주의해서 확인하세요."
+            ),
+        )
 
     def _build_request(
         self, doc: SourceDoc, master: CustomerMaster

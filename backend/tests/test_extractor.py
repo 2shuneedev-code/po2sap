@@ -101,3 +101,42 @@ def test_malformed_response_is_absorbed():
     )
     assert r.header.po_number.value == "그냥문자열"
     assert len(r.lines) == 1 and len(r.shipments) == 1
+
+
+# ── 파일 형식 (계약 §1 · process.md — "차단하지 않는다") ────────────────
+def test_unexpected_file_type_warns_but_does_not_block(masters_dir, fixtures_dir):
+    """거래처가 평소와 다른 형식으로 한 번 보내는 일은 실제로 일어난다.
+
+    업로드를 막으면 사람이 할 수 있는 일이 없어진다 — 읽어보고 안 되면 그때 실패해도 늦지 않다.
+    """
+    from app.extraction.extractor import Extractor
+    from app.extraction.preprocess import load_document
+
+    doc = load_document(fixtures_dir / "msc" / "PO-SAMPLE-0001.htm")
+
+    issue = Extractor._check_file_type(doc, load_customer("kl", masters_dir))  # KL 은 PDF 기대
+    assert issue is not None
+    assert issue.level == "warn" and issue.code == "UNEXPECTED_FILE_TYPE"
+
+    assert Extractor._check_file_type(doc, load_customer("msc", masters_dir)) is None
+
+
+def test_file_type_warning_reaches_the_result(masters_dir, fixtures_dir, tmp_path):
+    """경고가 파싱 결과에 실려야 검수 화면에서 보인다."""
+    import shutil
+
+    from app.config import Settings
+    from app.extraction import Extractor
+
+    # MSC 픽스처를 KL 로 파싱하면 형식 경고가 나야 한다 (막히지 않고)
+    sample = tmp_path / "PO-SAMPLE-0001.htm"
+    shutil.copy(fixtures_dir / "msc" / "PO-SAMPLE-0001.htm", sample)
+
+    settings = Settings(llm_provider="mock", masters_dir=masters_dir)
+    try:
+        result = Extractor(settings).parse_file(sample, "KL")
+    except Exception as exc:  # noqa: BLE001
+        # 재생할 픽스처가 없어 LLM 단계에서 실패하는 것은 정상 — 형식으로 막히지만 않으면 된다
+        assert "형식입니다" not in str(exc)
+        return
+    assert any(i.code == "UNEXPECTED_FILE_TYPE" for i in result.issues)

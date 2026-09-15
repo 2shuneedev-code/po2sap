@@ -46,6 +46,10 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\A
 pip install -r backend/requirements.txt
 cp .env.example .env
 
+# 실물 사전 점검 — hints 의 라벨이 진짜 문서에 있는지 대조 (LLM 호출 없음 = 무료)
+python scripts/check_sample.py <발주서> --customer MSC
+python scripts/check_sample.py <발주서> --customer MSC --text   # 원문까지
+
 # 전처리만 확인 (LLM 호출 없음 = 무료)
 python scripts/parse_one.py <발주서> --customer MSC --text-only
 
@@ -98,7 +102,7 @@ backend/app/
 ├── domain/       RawPO · SapRow · RowIssue · BuildResult        [완료]
 ├── rules/        규칙엔진 ②~⑦ — engine · expr · decision_table       [완료]
 │                 mapping_rules · matching · primitives · reftable
-├── tests/        pytest 157종 + 픽스처 + 골든 2종               [완료]
+├── tests/        pytest 159종 + 픽스처 + 골든 2종               [완료]
 ├── mapping/      전송 필드 행 생성 (row_builder)                [완료]
 ├── validation/   필수값·길이·checks                             [완료]
 ├── storage/      배치 저장 (파싱 원본 스냅샷) · 감사 로그        [완료]
@@ -107,7 +111,8 @@ backend/app/
                   batch_service.py — 업로드→파싱→행 조립
 
 frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
-scripts/          parse_one.py · validate_masters.py · mock_eai_server.py
+scripts/          parse_one.py · check_sample.py · validate_masters.py
+                  mock_eai_server.py
 .github/          CI: 마스터 검증 → pytest → ruff → samples/ 유출 확인
 samples/          실물 발주서 — Git 제외 (대외비)
 storage/          런타임 산출물 — Git 제외
@@ -148,6 +153,8 @@ storage/          런타임 산출물 — Git 제외
 | 감사 로그에 품번·단가 기록 | 5년 보존 파일이 그대로 대외비가 된다. 오더 키(`BSTKD`)와 해시만 (design §8.1) |
 | 테스트에서 실제 LLM 호출 | 픽스처로 재생한다. `conftest.py` 가 `LLM_PROVIDER=mock` 을 강제한다 |
 | 픽스처를 해시로 주소 지정 | 프롬프트·모델이 바뀌면 전부 미아가 된다. `{거래처}__{파일명}` 을 쓴다 |
+| 예상과 다른 파일 형식을 차단 | 거래처가 한 번씩 다른 형식으로 보낸다. 경고만 띄우고 읽어본다 (계약 §1) |
+| 사전 점검 없이 실물 파싱 | `check_sample.py`로 hints 앵커부터 대조한다. 안 맞으면 API 비용만 나간다 |
 
 ---
 
@@ -200,8 +207,8 @@ storage/          런타임 산출물 — Git 제외
 
 - **CBO 업서트 키가 미확정인데 "중복 전송 무해"를 전제하고 있다** (MSC·YGJP는 `POSEX: const ""`라 행 식별자 없음). 키가 없으면 재전송이 덮어쓰기가 아니라 **중복 적재**다. 감사 로그가 `send`/`resend`를 구분하므로 사후 추적은 된다
 - **EAI 응답 본문 규격이 백지다.** 판정을 HTTP 상태 코드에만 걸었다 — "200인데 본문에 실패가 적힌" 경우를 못 잡는다 (계약 §7.1)
-- `extractor.py`는 확장자 불일치를 `ValueError`로 차단하는데 문서 3곳은 "차단 안 함"
 - `prompt.py`·`schema_builder.py`가 LLM에게 날짜 변환을 지시한다 (P1 위반)
-- `masters/refs/msc_ref.csv`가 더미 데이터인데 DUMMY 표시가 없다
+- **실물 발주서로 한 번도 검증한 적이 없다.** 지금 픽스처는 `hints` 서술을 보고 만든
+  합성 문서라 "hints 가 맞다"는 증거가 못 된다. 절차는 `samples/README.md` §3
 
-**문서 모순 (SSOT 쪽으로 고칠 것)**: `samples/README.md`는 KL=HTM/MSC=PDF로 **거꾸로** 적혀 있다(정답: MSC=HTM, KL=PDF). "33필드" 표기 4곳(정답 36). `master-admin.md:145`의 `AUART=ZOR`(정답 `ZEXP`).
+**문서 모순 (SSOT 쪽으로 고칠 것)**: "33필드" 표기가 `master-admin.md`에 남아 있다(정답 36). `master-admin.md:145`의 `AUART=ZOR`(정답 `ZEXP`). — `samples/README.md`의 MSC/KL 형식 뒤바뀜은 2026-09-15 수정됨.

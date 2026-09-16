@@ -71,6 +71,15 @@ python scripts/validate_masters.py
 python scripts/validate_masters.py --customer MSC   # 한 곳만
 python scripts/validate_masters.py --quiet          # 오류만
 
+# 프론트 (frontend/)
+npm install
+npm run dev          # → http://localhost:5173  (/api 는 :8000 으로 프록시)
+npm run typecheck
+npm run build
+
+# 프론트 실동작 확인 — 백엔드·모의 EAI·vite 를 띄운 뒤. LLM 호출 없음 = 비용 0
+npm run e2e          # 로컬 크로미움이 따로면 CHROME_PATH=... 로 지정
+
 # 테스트 (CI 2단계) — LLM 호출 없음. 픽스처 재생이라 키 불필요
 pytest
 pytest backend/tests/test_masters.py   # 검증기 역테스트만
@@ -107,10 +116,14 @@ backend/app/
 ├── validation/   필수값·길이·checks                             [완료]
 ├── storage/      배치 저장 (파싱 원본 스냅샷) · 감사 로그        [완료]
 ├── transport/    EAI 전송 (payload · eai_client)                [완료]
-└── api/          routes_brands · routes_batches                 [완료]
+└── api/          routes_masters · routes_brands · routes_batches [완료]
                   batch_service.py — 업로드→파싱→행 조립
 
-frontend/         React 18 + TS + Vite + AG Grid                 [미착수 — 디렉터리 없음]
+frontend/         React 18 + TS + Vite + AG Grid                 [완료]
+├── src/api/        계약 타입 + 호출 한 곳 (client.ts)
+├── src/screens/    UploadScreen · ReviewScreen · BrandConsole
+├── src/components/ RulePreview — /preview 응답을 모양 그대로
+└── e2e/            브라우저 실동작 확인 (smoke · brands)
 scripts/          parse_one.py · check_sample.py · validate_masters.py
                   mock_eai_server.py
 .github/          CI: 마스터 검증 → pytest → ruff → samples/·키 유출 확인
@@ -146,6 +159,8 @@ storage/          런타임 산출물 — Git 제외
 | 변환 실패를 빈값으로 넘기기 | 날짜를 못 읽었는데 `""`로 전송되면 아무도 모른다. `FormatError`를 올려 검증이 잡게 한다 |
 | 가짜 값으로 채운 참조표에 표시 생략 | 우연히 키가 맞으면 조용히 틀린 값이 나간다. 전 행에 `note`를 단다 |
 | 엔진 코드에 전송 필드 이름 나열 | `_base`의 순서가 곧 필드 목록이다. `field_order`를 받아 돈다 |
+| 프론트에 거래처별 분기 코드 | `/preview` 응답을 모양 그대로 그린다. `kind` 로 아이콘만 고른다 |
+| 재검증 응답으로 화면 값을 덮어쓰기 | 값의 주인은 프론트다 (계약 §6). 타이핑 중 응답이 오면 입력이 사라진다 |
 | 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
 | 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |
 | `EAI_ENDPOINT` 기본값을 실서버로 | `.env`를 깜빡한 채 진짜 오더가 나간다. 기본은 빈 값이고 전송이 거부한다 |

@@ -39,8 +39,15 @@ def customers_dir(masters_dir: Path) -> Path:
 
 
 def list_customers(masters_dir: Path) -> list[CustomerMaster]:
+    """거래처 파일을 전부 읽는다. `_` 로 시작하는 파일은 거래처가 아니다.
+
+    `_template.yaml` 은 새 거래처를 만들 때 복사하는 서식이다. 그것까지 읽으면
+    화면 거래처 목록에 `XXX` 가 뜨고, 고르면 빈 규칙으로 파싱이 돌아간다.
+    """
     out = []
     for path in sorted(customers_dir(masters_dir).glob("*.yaml")):
+        if path.stem.startswith("_"):
+            continue
         out.append(load_customer(path.stem, masters_dir))
     return out
 

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.local
+*.local.mjs
+e2e/shots/
+*.tsbuildinfo

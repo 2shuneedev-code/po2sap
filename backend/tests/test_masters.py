@@ -312,3 +312,15 @@ def test_note_column_is_reported(validate_masters, masters_dir):
     report = validate_masters.validate_customer("ygjp", base, masters_dir)
     assert report.errors == []
     assert any("brand_keys.csv" in t for t in report.todos)
+
+
+def test_template_file_is_not_a_customer(masters_dir):
+    """`_template.yaml` 은 새 거래처를 만들 때 복사하는 서식이다.
+
+    거래처로 읽히면 화면 목록에 `XXX` 가 뜨고, 고르면 빈 규칙으로 파싱이 돈다.
+    """
+    from app.masters import list_customers
+
+    codes = {c.code for c in list_customers(masters_dir)}
+    assert "XXX" not in codes
+    assert "MSC" in codes

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).parent / "fixtures"
 
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT))          # 스트림릿 화면(app/) 테스트용
 
 # 실수로라도 실제 API 를 때리지 않도록 못을 박는다.
 os.environ.setdefault("LLM_PROVIDER", "mock")

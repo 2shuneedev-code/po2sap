@@ -34,3 +34,6 @@ Thumbs.db
 # ── 실물 발주서 (대외비) ──────────────────────────────────────
 # samples/ 는 samples/.gitignore 에서 원본 전부를 제외한다.
 # 테스트에 필요한 것은 **마스킹 후** backend/tests/fixtures/ 로 옮겨 커밋한다.
+
+# 브라우저 확인 산출물
+ui/e2e/shots/

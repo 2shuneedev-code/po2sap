@@ -1,0 +1,14 @@
+# 사내 업무 화면 — 장식보다 밀도와 가독성.
+[theme]
+primaryColor = "#1f5fd0"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f6f8"
+textColor = "#1b2027"
+font = "sans serif"
+
+[server]
+# 발주서 여러 개를 한 번에 올린다. 계약 §4 의 합계 한도(100MB)와 맞춘다.
+maxUploadSize = 100
+
+[browser]
+gatherUsageStats = false

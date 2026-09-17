@@ -10,5 +10,10 @@ font = "sans serif"
 # 발주서 여러 개를 한 번에 올린다. 계약 §4 의 합계 한도(100MB)와 맞춘다.
 maxUploadSize = 100
 
+# ★ 끄지 말 것. false 면 스트림릿이 첫 실행에 이메일을 물어보고 **입력을 기다리며
+#   멈춘다.** 사내 서버에서 nohup·서비스로 띄우면 화면이 영영 안 뜬다.
+#   대신 로컬에서 브라우저가 자동으로 열리지 않으니, 뜨는 URL 을 직접 연다.
+headless = true
+
 [browser]
 gatherUsageStats = false

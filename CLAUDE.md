@@ -74,6 +74,8 @@ python scripts/validate_masters.py --quiet          # 오류만
 # 화면 (사내 서버에서 이것만 띄우면 된다)
 streamlit run po2sap.py                                    # → http://localhost:8501
 streamlit run po2sap.py --server.address 0.0.0.0 --server.port 8501   # 사내 공개
+# 브라우저는 자동으로 안 열린다 (.streamlit/config.toml 의 headless=true).
+# 끄면 첫 실행에 이메일을 묻고 **입력을 기다리며 멈춘다** — 서버에서 화면이 안 뜬다.
 
 # 화면 실동작 확인 — 스트림릿·모의 EAI 를 띄운 뒤. LLM 호출 없음 = 비용 0
 npm i -D playwright && node ui/e2e/flow.mjs       # 업로드→검수→전송 관통

@@ -11,6 +11,13 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 [tool.setuptools.dynamic]
 dependencies = { file = ["backend/requirements.txt"] }
 
+# 이 저장소는 배포 패키지가 아니라 **그 자리에서 실행하는 앱**이다
+# (`streamlit run po2sap.py`). 루트에 backend/·ui/·masters/·scripts/ 가
+# 나란히 있어 setuptools 자동 탐색이 실패하므로 탐색을 끈다.
+# 개발 도구는 `pip install -r backend/requirements-dev.txt` 로 받는다.
+[tool.setuptools]
+packages = []
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]

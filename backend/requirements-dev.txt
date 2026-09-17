@@ -1,0 +1,5 @@
+# 개발·테스트용. 운영 서버에는 필요 없다.
+-r requirements.txt
+
+pytest>=8.0
+ruff>=0.6

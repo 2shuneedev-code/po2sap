@@ -43,8 +43,8 @@
 ```bash
 # 셋업
 python -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
-cp .env.example .env
+pip install -r backend/requirements-dev.txt         # 운영 서버는 requirements.txt 만
+cp .env.example .env                                # Windows: copy .env.example .env
 
 # 실물 사전 점검 — hints 의 라벨이 진짜 문서에 있는지 대조 (LLM 호출 없음 = 무료)
 python scripts/check_sample.py <발주서> --customer MSC

@@ -15,3 +15,7 @@ tenacity>=9.0.0
 # 화면 (사내 서버에서 streamlit run po2sap.py)
 streamlit>=1.40
 pandas>=2.0
+
+# 거래처 마스터 엑셀 도구 (scripts/master_export.py · master_import.py)
+openpyxl>=3.1
+ruamel.yaml>=0.18

@@ -30,6 +30,7 @@
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
 | 브랜드 매핑 (원문 → 코드) | `masters/refs/brand_keys.csv` | YAML에 `entries`로 다시 두지 않는다 |
+| 거래처 값 (고정값·문서매핑·결정표) | `masters/customers/{code}.yaml` | 엑셀은 **편집 입구**일 뿐 원천이 아니다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |
 | 업무 흐름·화면 정의 | `process.md` §4 | — |
 | 진행 상태·일정·미결 | `NEXT.md` | 쓰지 않는다 |
@@ -66,6 +67,13 @@ cd backend && uvicorn app.main:app --reload        # → /api/health
 python scripts/mock_eai_server.py
 python scripts/mock_eai_server.py --fail 500       # 재시도 확인
 
+# 거래처 마스터 — 현업이 엑셀로 고친다 (LLM 호출 없음 = 비용 0)
+python scripts/master_export.py                    # masters/ → 거래처마스터.xlsx
+python scripts/master_import.py masters/거래처마스터.xlsx --dry-run   # 계획만
+python scripts/master_import.py masters/거래처마스터.xlsx             # 확인 후 반영
+# **항상 export 로 새로 뽑아서 편집한다.** 낡은 엑셀을 가져오면 그 사이 남이
+# 바꾼 것을 덮어쓴다 — 가져오기는 그걸 구분하지 못한다.
+
 # 마스터 검증 (CI 1단계) — SCHEMA.md §7 의 9종 검사. LLM 호출 없음 = 비용 0
 python scripts/validate_masters.py
 python scripts/validate_masters.py --customer MSC   # 한 곳만
@@ -99,9 +107,10 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 ├── _base/          전송 필드 스펙 36개 + 공통 고정값
 ├── profiles/       standard.yaml — 대부분의 거래처가 쓰는 필드 매핑
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
-└── refs/           참조표 CSV
-    ├── brand_master.csv   SAP 원본 430곳/1,207행 (읽기 전용, 재추출로 교체)
-    └── brand_keys.csv     발주서 원문 → 브랜드 코드 (사람이 채운다)
+├── refs/           참조표 CSV
+│   ├── brand_master.csv   SAP 원본 430곳/1,207행 (읽기 전용, 재추출로 교체)
+│   └── brand_keys.csv     발주서 원문 → 브랜드 코드 (사람이 채운다)
+└── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
 
 backend/app/
@@ -169,6 +178,9 @@ storage/          런타임 산출물 — Git 제외
 | 규칙 없는 거래처의 업로드 허용 | 빈 값이 그대로 전송된다. `CatalogEntry.ready` 가 False 면 막는다 |
 | 스트림릿 화면 패키지를 `app/` 로 | `backend/app` 이 이미 `app` 으로 임포트된다. 이름이 겹쳐 테스트가 깨진다 (→ `ui/`) |
 | `st.*(icon=...)` 에 이모지 아닌 글자 | 스트림릿이 예외를 던져 **화면 전체가 트레이스백**이 된다. `test_ui_icons.py` 가 잡는다 |
+| 거래처마스터.xlsx 를 커밋 | 생성물이다. 낡은 사본을 고쳐 가져오는 사고가 나고 바이너리라 diff 도 안 된다 |
+| 낡은 엑셀로 가져오기 | 그 사이 남이 바꾼 것을 덮어쓴다. **매번 `master_export.py` 로 새로 뽑는다** |
+| 마스터 도구 테스트를 실물 `masters/` 에 | `--masters` 로 사본을 가리킨다. 안 그러면 테스트가 규칙을 덮어쓴다 |
 | 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
 | 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |
 | `EAI_ENDPOINT` 기본값을 실서버로 | `.env`를 깜빡한 채 진짜 오더가 나간다. 기본은 빈 값이고 전송이 거부한다 |

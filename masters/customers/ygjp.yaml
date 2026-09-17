@@ -82,25 +82,23 @@ rules:
 
 fields:
   # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
-  KUNNR2:  { from: const, value: "319854" }
+  KUNNR2: {from: const, value: "319854"}
   BSTKD:
     from: expr
     expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
     explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
     required: true
-  ZBRAND:  { from: rule,  rule: brand_code, required: true }
+  ZBRAND: {from: rule, rule: brand_code, required: true}
   ZSHCO:
     from: expr
     expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'
     explain: '브랜드 코드가 471 또는 507 이면 A, 그 외 L'
-  MATNR:   { from: doc,   path: line.item_code, required: true }
-  ZPKRE2:  { from: doc,   path: header.packing_spec }
-  EMPST:   { from: doc,   path: line.remark, fallback: header.remark_default }
-  WAERK:   { from: const, value: "JPY" }
+  MATNR: {from: doc, path: line.item_code, required: true}
+  ZPKRE2: {from: doc, path: header.packing_spec}
+  EMPST: {from: doc, path: line.remark, fallback: header.remark_default}
+  WAERK: {from: const, value: "JPY"}
 
 grid:
   pinned: [BSTKD, MATNR, KWMENG]
-  hidden: [VTWEG, VBELN, VDATU, ZTERM, INCO1, INCO2, ZPKRE1, MAKTX, LGORT,
-           ETDAT, BATCH, VALTY, PRICE, BSTDK_E, POSEX, DELCO, BSTKD_E,
-           AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
-  width:  { MATNR: 150, ZPKRE2: 140, EMPST: 200 }
+  hidden: [VTWEG, VBELN, VDATU, ZTERM, INCO1, INCO2, ZPKRE1, MAKTX, LGORT, ETDAT, BATCH, VALTY, PRICE, BSTDK_E, POSEX, DELCO, BSTKD_E, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
+  width: {MATNR: 150, ZPKRE2: 140, EMPST: 200}

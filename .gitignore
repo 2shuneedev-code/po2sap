@@ -40,3 +40,8 @@ Thumbs.db
 
 # 브라우저 확인 산출물
 ui/e2e/shots/
+
+# 거래처 마스터 엑셀 — `python scripts/master_export.py` 로 뽑는 **생성물**이다.
+# 커밋하면 낡은 사본을 고쳐서 가져오는 일이 생기고, 바이너리라 diff 도 안 된다.
+# 진실은 masters/ 의 YAML·CSV 이고 변경 이력은 그 diff 에 남는다.
+masters/*.xlsx

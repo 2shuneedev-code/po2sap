@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 
 import pytest
@@ -27,9 +28,22 @@ def run(validate_masters, workspace, code="msc"):
 
 
 def _patch(path, old: str, new: str) -> None:
+    """앵커 한 곳을 바꿔 결함을 심는다.
+
+    공백 차이는 무시하고 찾는다 — `master_import.py` 가 YAML 을 다시 쓰면
+    `{ from: const }` 가 `{from: const}` 로 바뀐다. 앵커를 글자 그대로 찾으면
+    서식이 달라졌다는 이유만으로 **검증기 역테스트 8종이 통째로 죽는다.**
+    죽은 이유가 "검증기가 결함을 못 잡아서"가 아닌데도 그렇게 보인다.
+    """
     text = path.read_text(encoding="utf-8")
-    assert text.count(old) == 1, f"앵커가 유일하지 않다: {old!r}"
-    path.write_text(text.replace(old, new), encoding="utf-8")
+    if text.count(old) == 1:
+        path.write_text(text.replace(old, new), encoding="utf-8")
+        return
+
+    pattern = re.compile(r"[ \t]*".join(re.escape(part) for part in old.split()))
+    found = pattern.findall(text)
+    assert len(found) == 1, f"앵커가 유일하지 않다 ({len(found)}건): {old!r}"
+    path.write_text(pattern.sub(lambda _: new, text, count=1), encoding="utf-8")
 
 
 def break_msc(workspace, old: str, new: str) -> None:

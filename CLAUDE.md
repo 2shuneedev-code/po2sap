@@ -67,6 +67,10 @@ cd backend && uvicorn app.main:app --reload        # → /api/health
 python scripts/mock_eai_server.py
 python scripts/mock_eai_server.py --fail 500       # 재시도 확인
 
+# SAP 브랜드 마스터 재추출본 반영 — 깨지는 매핑이 있으면 쓰지 않는다
+python scripts/import_brand_master.py <SAP추출.csv> --dry-run   # 무엇이 달라지는지
+python scripts/import_brand_master.py <SAP추출.csv>             # 확인 후 교체
+
 # 거래처 마스터 — 현업이 엑셀로 고친다 (LLM 호출 없음 = 비용 0)
 python scripts/master_export.py                    # masters/ → 거래처마스터.xlsx
 python scripts/master_import.py masters/거래처마스터.xlsx --dry-run   # 계획만
@@ -108,7 +112,7 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 ├── profiles/       standard.yaml — 대부분의 거래처가 쓰는 필드 매핑
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
 ├── refs/           참조표 CSV
-│   ├── brand_master.csv   SAP 원본 430곳/1,207행 (읽기 전용, 재추출로 교체)
+│   ├── brand_master.csv   SAP 원본 (읽기 전용 — `import_brand_master.py` 로 교체)
 │   └── brand_keys.csv     발주서 원문 → 브랜드 코드 (사람이 채운다)
 └── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
@@ -181,6 +185,8 @@ storage/          런타임 산출물 — Git 제외
 | 거래처마스터.xlsx 를 커밋 | 생성물이다. 낡은 사본을 고쳐 가져오는 사고가 나고 바이너리라 diff 도 안 된다 |
 | 낡은 엑셀로 가져오기 | 그 사이 남이 바꾼 것을 덮어쓴다. **매번 `master_export.py` 로 새로 뽑는다** |
 | 마스터 도구 테스트를 실물 `masters/` 에 | `--masters` 로 사본을 가리킨다. 안 그러면 테스트가 규칙을 덮어쓴다 |
+| `brand_master.csv` 를 손으로 덮어쓰기 | 지금 매핑된 코드가 새 목록에서 빠지면 **다음 발주서에서야** 판정 실패를 안다. `import_brand_master.py` 가 먼저 대조한다 |
+| 테스트에 데이터 개수를 박기 | SAP 재추출로 고객이 430 → 78 이 되면 멀쩡한 테스트가 죽는다. 참조표에서 기대치를 끌어온다 |
 | 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
 | 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |
 | `EAI_ENDPOINT` 기본값을 실서버로 | `.env`를 깜빡한 채 진짜 오더가 나간다. 기본은 빈 값이고 전송이 거부한다 |

@@ -33,6 +33,13 @@ def client(workspace):
     app.dependency_overrides.clear()
 
 
+def master_rows(workspace):
+    """SAP 브랜드 마스터 원본. 테스트가 기대치를 여기서 끌어온다."""
+    path = workspace / "refs" / "brand_master.csv"
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
 def keys_rows(workspace):
     path = workspace / "refs" / "brand_keys.csv"
     with path.open(encoding="utf-8", newline="") as f:
@@ -40,10 +47,13 @@ def keys_rows(workspace):
 
 
 # ── 목록 ───────────────────────────────────────────────────────────────
-def test_lists_every_sap_customer_not_just_configured(client):
+def test_lists_every_sap_customer_not_just_configured(client, workspace):
     """규칙이 없는 고객도 나와야 브랜드를 미리 채워둘 수 있다."""
     body = client.get("/api/brands/customers", params={"limit": 500}).json()
-    assert int(body["total"]) > 400
+    # 참조표에 있는 고객 수를 그대로 기대한다. 숫자를 박아두면 SAP 재추출로
+    # 고객 수가 바뀔 때마다(430 → 78 처럼) 멀쩡한 테스트가 죽는다.
+    expected = len({r["kunnr"] for r in master_rows(workspace)})
+    assert int(body["total"]) == expected
     assert sum(1 for c in body["customers"] if c["code"]) == 3
 
 
@@ -100,8 +110,12 @@ def test_detail_includes_logic_for_configured_customer(client):
     assert any(f["field"] == "BSTKD" for f in logic["fields"])
 
 
-def test_unconfigured_customer_has_brands_but_no_logic(client):
-    body = client.get("/api/brands/customers/2000").json()
+def test_unconfigured_customer_has_brands_but_no_logic(client, workspace):
+    configured = {"100249", "107525", "3200"}
+    kunnr = next(
+        r["kunnr"] for r in master_rows(workspace) if r["kunnr"] not in configured
+    )
+    body = client.get(f"/api/brands/customers/{kunnr}").json()
     assert body["configured"] == "false"
     assert body["logic"] is None
     assert body["brands"], "규칙이 없어도 브랜드는 보여야 한다"

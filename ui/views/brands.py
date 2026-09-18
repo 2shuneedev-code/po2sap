@@ -188,14 +188,14 @@ def _save(kunnr: str, before, edited: pd.DataFrame) -> None:
 
 
 def _logic(entry) -> None:
-    if not entry.ready:
+    if not entry.configured:
         st.info(
-            "이 고객은 아직 **파싱 규칙이 없습니다.** 브랜드 문구는 미리 채워둘 수 있고, "
-            "`masters/customers/` 에 규칙 파일을 추가하면 여기에 나타납니다.",
+            "이 고객은 **전용 규칙이 없어 공용 설정으로 읽습니다.** 아래는 그 공용 "
+            "설정입니다. 문서 양식을 아는 규칙을 만들려면 `masters/customers/` 에 "
+            "파일을 추가하세요 (서식: `_template.yaml`).",
             icon="ℹ️",
         )
-        return
     try:
-        rule_preview(preview_for(entry.code))
+        rule_preview(preview_for(entry.parse_code))
     except (MasterError, ValueError) as exc:
         st.error(f"규칙을 읽지 못했습니다: {exc}")

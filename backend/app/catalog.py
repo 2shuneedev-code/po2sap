@@ -34,9 +34,27 @@ class CatalogEntry:
     mapped_count: int = 0
 
     @property
-    def ready(self) -> bool:
-        """업로드해서 파싱할 수 있는가 — 규칙 파일이 있어야 한다."""
+    def configured(self) -> bool:
+        """이 거래처 전용 규칙 파일(`customers/<code>.yaml`)이 있는가."""
         return bool(self.code)
+
+    @property
+    def ready(self) -> bool:
+        """업로드해서 파싱할 수 있는가.
+
+        전용 규칙이 없어도 **SAP 에 브랜드가 등록된 고객이면** 공용 프로필
+        (`profiles/generic.yaml`)로 읽어낸다 — 브랜드까지는 나온다. 전 거래처
+        테스트 배포가 그래야 가능하다.
+
+        모르는 값(출하처 등)은 채우지 않고 검수 화면에서 빨갛게 막는다.
+        그럴듯한 기본값을 넣으면 사람이 확인 없이 전송한다.
+        """
+        return bool(self.code) or self.brand_count > 0
+
+    @property
+    def parse_code(self) -> str:
+        """파싱에 쓸 거래처 코드. 전용 규칙이 없으면 고객코드 자체를 쓴다."""
+        return self.code or self.kunnr
 
     @property
     def label(self) -> str:
@@ -52,6 +70,8 @@ class CatalogEntry:
             "file_types": self.file_types,
             "brand_count": str(self.brand_count),
             "mapped_count": str(self.mapped_count),
+            "configured": "true" if self.configured else "false",
+            "ready": "true" if self.ready else "false",
         }
 
 

@@ -44,12 +44,14 @@ def render() -> None:
     customer_header(entry)
 
     if not entry.ready:
-        _unconfigured(entry)
+        _no_brands(entry)
         return
+    if not entry.configured:
+        _generic_notice(entry)
 
     # 거래처를 바꾸면 이전 배치를 놓는다 — 다른 거래처 행이 섞이면 안 된다.
-    if st.session_state.get("convert_customer") != entry.code:
-        st.session_state["convert_customer"] = entry.code
+    if st.session_state.get("convert_customer") != entry.parse_code:
+        st.session_state["convert_customer"] = entry.parse_code
         st.session_state.pop("batch_id", None)
 
     _rules_section(entry)
@@ -59,21 +61,26 @@ def render() -> None:
 
 
 # ── 규칙 미설정 거래처 ────────────────────────────────────────────────
-def _unconfigured(entry) -> None:
-    st.warning(
-        "이 거래처는 **파싱 규칙이 아직 없습니다.** 발주서를 올려도 어떤 값을 "
-        "어디서 읽을지 정해진 게 없어, 빈 값이 그대로 전송될 수 있습니다.",
-        icon="🚧",
+def _no_brands(entry) -> None:
+    """SAP 브랜드 마스터에도 없는 고객 — 읽어낼 근거가 하나도 없다."""
+    st.error(
+        "이 고객은 **SAP 브랜드 마스터에 등록된 브랜드가 없습니다.** 브랜드를 "
+        "판정할 근거가 없어 발주서를 읽어도 전송할 수 없습니다. SAP 쪽 등록을 "
+        "먼저 확인하세요.",
+        icon="🚫",
     )
-    st.markdown(
-        f"""
-**지금 할 수 있는 것**
 
-1. **브랜드 매핑** 탭에서 이 거래처의 발주서 원문 문구 → 브랜드 코드를 채워둡니다.
-   (`{entry.mapped_count}/{entry.brand_count}` 매핑됨) — 규칙을 만들 때 그대로 쓰입니다.
-2. 규칙 파일 `masters/customers/{entry.kunnr}.yaml` 을 추가하면
-   여기서 바로 업로드할 수 있게 됩니다. 서식은 `masters/customers/_template.yaml`.
-"""
+
+def _generic_notice(entry) -> None:
+    """전용 규칙 없이 공용 프로필로 읽는 거래처 — 감추지 않고 알린다."""
+    st.warning(
+        "**전용 규칙이 없는 거래처입니다.** 공용 설정으로 읽으므로 "
+        "브랜드·발주번호·품번·수량까지는 뽑아내지만, **출하처 같은 값은 "
+        "비어 있고 검수 화면이 빨갛게 막습니다.** 읽어낸 값을 반드시 확인하세요."
+        + (f"\n\n브랜드 매핑이 `{entry.mapped_count}/{entry.brand_count}` 건입니다 — "
+           "발주서 문구가 아직 등록되지 않았다면 **브랜드 매핑** 탭에서 먼저 채우세요."
+           if entry.mapped_count < entry.brand_count else ""),
+        icon="🚧",
     )
 
 
@@ -81,7 +88,7 @@ def _unconfigured(entry) -> None:
 def _rules_section(entry) -> None:
     with st.expander("이 거래처에 자동 적용되는 값", expanded=False):
         try:
-            rule_preview(preview_for(entry.code))
+            rule_preview(preview_for(entry.parse_code))
         except (MasterError, ValueError) as exc:
             st.error(f"규칙을 읽지 못했습니다: {exc}")
 
@@ -92,9 +99,9 @@ def _upload_section(entry) -> Batch | None:
     st.markdown("#### 발주서 업로드")
 
     uploads = st.file_uploader(
-        f"{entry.code} 발주서 — 여러 개 동시 가능",
+        f"{entry.name} 발주서 — 여러 개 동시 가능",
         accept_multiple_files=True,
-        key=f"up_{entry.code}",
+        key=f"up_{entry.parse_code}",
     )
 
     # file_types 는 **안내용**이다. 다른 형식이어도 막지 않고 경고만 한다 (계약 §1).
@@ -110,7 +117,7 @@ def _upload_section(entry) -> Batch | None:
         with st.status("발주서를 읽는 중…", expanded=True) as status:
             try:
                 st.write(f"{len(uploads)}개 파일 저장")
-                batch = start_batch(entry.code, uploads)
+                batch = start_batch(entry.parse_code, uploads)
                 for f in batch.files:
                     if f.status == "DONE":
                         st.write(f"✔ {f.name} — {f.row_count}행")

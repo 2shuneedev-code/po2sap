@@ -61,14 +61,14 @@ def _load_yaml(path_str: str, mtime: float) -> dict[str, Any]:
     return data
 
 
+# 전용 규칙이 없는 거래처가 쓰는 공용 프로필. 브랜드까지는 뽑아낸다.
+GENERIC_EXTENDS = ["_base/sap_defaults", "profiles/standard", "profiles/generic"]
+
+
 def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
     path = customers_dir(masters_dir) / f"{code.lower()}.yaml"
     if not path.exists():
-        available = [p.stem for p in customers_dir(masters_dir).glob("*.yaml")]
-        raise MasterError(
-            f"거래처 설정을 찾을 수 없습니다: {code} "
-            f"(사용 가능: {', '.join(available) or '없음'})"
-        )
+        return _generic_customer(code, masters_dir)
 
     data = _load_yaml(str(path), path.stat().st_mtime)
     data = _apply_extends(data, masters_dir)
@@ -82,6 +82,61 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
         name=str(meta.get("name") or meta["code"]),
         customer_no=str(meta.get("customer_no") or ""),
         file_types=[str(t).lower() for t in (meta.get("file_types") or [])],
+        extraction=data.get("extraction") or {},
+        split=data.get("split") or {},
+        tables=data.get("tables") or {},
+        rules=data.get("rules") or {},
+        fields=data.get("fields") or {},
+        grid=data.get("grid") or {},
+        raw=data,
+    )
+
+
+def _generic_customer(code: str, masters_dir: Path) -> CustomerMaster:
+    """전용 YAML 이 없는 거래처를 **공용 프로필로** 세운다.
+
+    SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 규칙 없이도 발주서를
+    올려 브랜드까지 뽑아볼 수 있어야 한다 — 전 거래처 테스트 배포가 그래야
+    가능하다. 브랜드 마스터에도 없는 코드는 그대로 오류다.
+
+    `generic` 표시를 달아 화면이 "이 거래처는 전용 규칙이 없다"를 감추지 못하게 한다.
+    """
+    from .brands import load_master  # 순환 임포트 방지 — 호출 시점에 가져온다
+
+    kunnr = str(code).strip()
+    try:
+        brands = [b for b in load_master(masters_dir) if b.kunnr == kunnr]
+    except Exception:                        # noqa: BLE001 — 참조표가 없으면 없는 대로
+        brands = []
+
+    if not brands:
+        available = [p.stem for p in customers_dir(masters_dir).glob("*.yaml")
+                     if not p.stem.startswith("_")]
+        raise MasterError(
+            f"거래처 설정을 찾을 수 없습니다: {code} "
+            f"(규칙 있음: {', '.join(available) or '없음'} · "
+            f"브랜드 마스터에도 이 고객코드가 없습니다)"
+        )
+
+    name = next((b.customer_name for b in brands if b.customer_name), kunnr)
+    data = _apply_extends({
+        "meta": {
+            "code": kunnr,
+            "name": name,
+            "customer_no": kunnr,
+            "status": "active",
+            "file_types": [],        # 안내용일 뿐이라 비워 둔다 (계약 §1)
+            "generic": True,
+        },
+        "extends": GENERIC_EXTENDS,
+    }, masters_dir)
+
+    meta = data["meta"]
+    return CustomerMaster(
+        code=kunnr,
+        name=str(meta.get("name") or kunnr),
+        customer_no=kunnr,
+        file_types=[],
         extraction=data.get("extraction") or {},
         split=data.get("split") or {},
         tables=data.get("tables") or {},

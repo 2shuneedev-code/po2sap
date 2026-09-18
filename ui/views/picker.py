@@ -64,7 +64,8 @@ def customer_picker(key: str, *, ready_first: bool = False) -> CatalogEntry | No
 
 
 def _entry_button(row: CatalogEntry, state_key: str, *, active: bool) -> None:
-    mark = "✅" if row.ready else "·"
+    # ✅ 전용 규칙 있음 · 🟡 공용 설정으로 읽음 · · 브랜드가 없어 못 읽음
+    mark = "✅" if row.configured else ("🟡" if row.ready else "·")
     label = f"{mark} {row.name}"
     st.button(
         label,
@@ -72,7 +73,7 @@ def _entry_button(row: CatalogEntry, state_key: str, *, active: bool) -> None:
         use_container_width=True,
         type="primary" if active else "tertiary",
         help=f"{row.kunnr}"
-             + (f" · {row.code}" if row.code else " · 규칙 미설정")
+             + (f" · {row.code}" if row.code else " · 전용 규칙 없음 (공용 설정으로 읽음)")
              + f" · 브랜드 {row.mapped_count}/{row.brand_count}",
         on_click=lambda k=row.kunnr: st.session_state.__setitem__(state_key, k),
     )
@@ -82,8 +83,7 @@ def customer_header(entry: CatalogEntry) -> None:
     """선택된 고객의 머리말. 규칙 설정 여부를 숨기지 않는다."""
     st.subheader(entry.name, anchor=False)
     bits = [f"고객코드 `{entry.kunnr}`"]
-    if entry.code:
-        bits.append(f"거래처 **{entry.code}**")
+    bits.append(f"거래처 **{entry.code}**" if entry.code else "전용 규칙 없음 (공용 설정)")
     if entry.sap_name and entry.sap_name != entry.name:
         bits.append(f"SAP 명 {entry.sap_name}")
     if entry.file_types:

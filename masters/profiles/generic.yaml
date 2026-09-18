@@ -1,0 +1,87 @@
+# ═══════════════════════════════════════════════════════════════
+#  공용 프로필 — **전용 규칙 파일이 없는 거래처**가 쓰는 최소 설정
+#
+#  SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 YAML 이 없어도 발주서를
+#  올려서 **브랜드까지는** 뽑아볼 수 있게 한다. 전 거래처 테스트 배포용이다.
+#
+#  ★ 여기서 정하는 값은 **발주서 종류를 모른 채 세운 일반론**이다. 그래서
+#    모르는 값은 채우지 않고 `required: true` 로 둬서 **검수 화면에서 빨갛게
+#    막는다.** 그럴듯한 기본값을 넣으면 사람이 확인 없이 전송하고, 틀린 출하처로
+#    오더가 나간다 — 그게 이 파일에서 가장 조심할 점이다.
+#
+#  거래처 전용 파일(`customers/<code>.yaml`)이 생기면 이 프로필은 쓰이지 않는다.
+#  스키마: masters/SCHEMA.md
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+extraction:
+  input: text
+  page_limit: 30
+  hints: |
+    일반 발주서(Purchase Order)다. 이 거래처의 문서 양식은 알려진 바가 없으니
+    **문서에 적힌 그대로** 읽는다. 라벨이 애매하면 confidence 를 낮게 준다.
+
+    [헤더]
+      "Purchase Order No." / "PO No." / "발주번호" 류 → po_number
+      "Ship To" / "Deliver To" / "납품처" 블록 전체   → ship_to_text (원문 그대로)
+      "Bill To" / "청구처" 블록 전체                  → bill_to_text
+      브랜드·마킹 관련 문구가 있으면 **원문 그대로**  → brand_text
+        (예: "BRAND: XXX", "Marking", "OEM", 상표명이 적힌 줄)
+        ※ 코드로 바꾸지 말 것. 판정은 참조표가 한다.
+
+    [품목표]
+      한 줄 = 한 품목. 컬럼 머리글을 보고 맞춰 넣는다.
+        품번/Part No./Item Code/Material  → item_code
+        고객 품번/Your Ref/Customer P/N   → our_item
+        품명/Description                  → description
+        수량/Qty/Quantity                 → quantity
+        단위/UOM/Unit                     → unit
+        단가/Unit Price/Price             → unit_price
+          ※ 합계금액(Amount/Extended/Total)과 혼동하지 말 것
+      페이지마다 머리글이 반복되면 머리글을 품목으로 넣지 말 것.
+      합계 줄("Total", "소계")도 품목이 아니다.
+
+    [주의]
+      찾지 못한 값은 비워 둔다. 지어내지 말 것.
+      비어 있으면 검수 화면이 빨갛게 표시하고 사람이 채운다.
+
+split:
+  by: none
+
+rules:
+  # 브랜드 판정 — 참조표의 **이 고객(kunnr) 행만** 본다.
+  # 거래처 이름이 한 곳도 등장하지 않는다 (P2). 전 고객이 같은 규칙을 쓴다.
+  brand_code:
+    kind: csv_map
+    label: "브랜드 판별"
+    description: |
+      발주서 원문을 참조표 refs/brand_keys.csv 의 이 고객 행과 대조한다.
+      매핑은 화면의 **브랜드 매핑** 탭에서 채운다.
+    source: header.brand_text
+    table_file: refs/brand_keys.csv
+    filter_column: kunnr
+    key_column: text
+    mode_column: match
+    value_column: zbrand
+    case_insensitive: true
+    value_check:
+      table_file: refs/brand_master.csv
+      value_column: zbrand
+      filter_column: kunnr
+    on_no_match:
+      action: error
+      message: "브랜드를 인식하지 못했습니다: {brand_text} — 브랜드 매핑 탭에서 이 문구를 등록하세요"
+
+fields:
+  # ── 발주서에서 그대로 읽는 값 ─────────────────────────────────
+  BSTKD:   { from: doc,  path: header.po_number, required: true }
+  MATNR:   { from: doc,  path: line.item_code,   required: true }
+
+  # ── 참조표가 정하는 값 ───────────────────────────────────────
+  ZBRAND:  { from: rule, rule: brand_code, required: true }
+
+  # ── 모르는 값 — 비워 두고 **검수에서 막는다** ─────────────────
+  # 그럴듯한 기본값(예: 출하처 = 판매처)을 넣으면 사람이 확인 없이 전송하고
+  # 틀린 출하처로 오더가 나간다. 빈 값 + required 라야 빨갛게 걸린다.
+  KUNNR2:  { from: const, value: "", required: true,
+             todo: "출하처 코드 — 검수 화면에서 입력하거나 거래처 규칙을 만드세요" }

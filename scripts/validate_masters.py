@@ -13,6 +13,7 @@ CI 1단계이자 거래처 추가 절차(§5-6)의 관문이다. LLM 을 호출�
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import re
 import sys
@@ -598,6 +599,28 @@ def customer_codes(masters_dir: Path = MASTERS) -> list[str]:
     )
 
 
+def generic_sample(masters_dir: Path = MASTERS) -> str | None:
+    """공용 프로필로 읽히는 거래처 하나. 그 프로필을 검사하기 위한 대표다."""
+    try:
+        from app.masters.brands import load_master
+    except Exception:                          # noqa: BLE001
+        return None
+    have_rules = {
+        (p.stem.upper()) for p in (masters_dir / "customers").glob("*.yaml")
+    }
+    configured_no = set()
+    for code in customer_codes(masters_dir):
+        with contextlib.suppress(Exception):
+            configured_no.add(load_customer(code, masters_dir).customer_no)
+    try:
+        for brand in load_master(masters_dir):
+            if brand.kunnr not in configured_no and brand.kunnr.upper() not in have_rules:
+                return brand.kunnr
+    except Exception:                          # noqa: BLE001
+        return None
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="마스터 YAML 검증 (SCHEMA.md §7)")
     ap.add_argument("--customer", "-c", help="이 거래처만 검사")
@@ -609,13 +632,17 @@ def main() -> int:
         print("[실패] _base/sap_defaults.yaml 에 field_specs 가 없습니다", file=sys.stderr)
         return 1
 
-    codes = (
-        [args.customer]
-        if args.customer
-        else customer_codes()
-    )
+    codes = [args.customer] if args.customer else customer_codes()
 
-    print(f"전송 필드 {len(base_fields)}개 기준 · 거래처 {len(codes)}곳\n")
+    # 전용 규칙이 없는 거래처는 `profiles/generic.yaml` 로 읽힌다 — 지금 대부분이
+    # 그쪽이다. 그 프로필이 깨지면 그 거래처 전부가 한꺼번에 멈추므로, 대표로
+    # 한 곳을 골라 같은 검사를 돌린다.
+    generic = None if args.customer else generic_sample()
+    if generic:
+        codes = [*codes, generic]
+
+    print(f"전송 필드 {len(base_fields)}개 기준 · 거래처 {len(codes)}곳"
+          + (f" (마지막 {generic} 은 공용 프로필 대표)" if generic else "") + "\n")
 
     reports = [validate_customer(code, base_fields) for code in codes]
     errors = warnings = todos = 0

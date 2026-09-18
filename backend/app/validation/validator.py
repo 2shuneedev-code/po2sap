@@ -24,11 +24,23 @@ def validate_row(
         if not isinstance(spec, dict):
             continue
 
-        if spec.get("required") and not value:
+        # required: true  → 🔴 전송 차단
+        # required: warn  → 🟡 표시만. 값을 옮기는 게 이 프로그램의 본업이라,
+        #                   비었다고 무조건 막지는 않는다. 거래처 규칙이 확정되면
+        #                   그 거래처 파일에서 true 로 올린다.
+        required = spec.get("required")
+        if required and not value:
+            warn_only = str(required).lower() == "warn"
             label = str((field_specs.get(name) or {}).get("label") or name)
             issues.append(RowIssue(
-                field=name, severity="error", code="REQUIRED_MISSING",
-                message=f"{label}({name}) 은 필수입니다. 값을 입력하세요.",
+                field=name,
+                severity="warn" if warn_only else "error",
+                code="REQUIRED_MISSING",
+                message=(
+                    f"{label}({name}) 이 비어 있습니다. 확인하세요."
+                    if warn_only
+                    else f"{label}({name}) 은 필수입니다. 값을 입력하세요."
+                ),
             ))
 
         max_len = (field_specs.get(name) or {}).get("max_len")

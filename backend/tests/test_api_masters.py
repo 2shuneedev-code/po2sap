@@ -112,10 +112,16 @@ def test_rule_cards_come_from_yaml_not_from_code(client, workspace):
     assert "출하처 분기(수정됨)" in labels
 
 
-def test_brand_map_shows_only_this_customers_rows(client):
-    """거래처를 고르면 그 거래처 브랜드만 보인다 — 참조표는 전 고객 공용이다."""
-    msc = client.get("/api/masters/customers/MSC/preview").json()
-    ygjp = client.get("/api/masters/customers/YGJP/preview").json()
+def test_brand_map_shows_only_this_customers_rows(client, workspace):
+    """거래처를 고르면 **그 거래처 행만** 보인다 — 참조표는 전 고객 공용이다.
+
+    문구 자체는 겹칠 수 있다 ("OEM BRAND" 는 여러 고객에게 있다). 겹치는지가
+    아니라 **kunnr 로 갈리는지**가 요점이다.
+    """
+    import csv
+
+    with (workspace / "refs" / "brand_keys.csv").open(encoding="utf-8-sig", newline="") as f:
+        keys = list(csv.DictReader(f))
 
     def brand_rows(body):
         for rule in body["rules"]:
@@ -123,9 +129,12 @@ def test_brand_map_shows_only_this_customers_rows(client):
                 return {r[0] for r in rule["rows"]}
         return set()
 
-    assert brand_rows(msc)
-    assert brand_rows(ygjp)
-    assert not brand_rows(msc) & brand_rows(ygjp)
+    for code, kunnr in (("MSC", "100249"), ("YGJP", "3200")):
+        body = client.get(f"/api/masters/customers/{code}/preview").json()
+        shown = brand_rows(body)
+        mine = {k["text"] for k in keys if k["kunnr"] == kunnr}
+        assert shown, f"{code} 브랜드 표가 비었다"
+        assert shown == mine, f"{code} 화면에 다른 고객 행이 섞였다"
 
 
 def test_todos_surface_unconfirmed_values(client):

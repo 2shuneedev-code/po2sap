@@ -92,14 +92,37 @@ def test_counts_are_strings(client):
 
 
 # ── 상세 ───────────────────────────────────────────────────────────────
-def test_detail_joins_sap_codes_with_human_keys(client):
+def test_detail_joins_sap_codes_with_human_keys(client, workspace):
     body = client.get(f"/api/brands/customers/{MSC}").json()
     assert body["code"] == "MSC" and body["configured"] == "true"
 
     mapped = {b["zbrand"]: [k["text"] for k in b["keys"]] for b in body["brands"] if b["keys"]}
-    assert mapped == {"38": ["HERTEL"], "127": ["INTERSTATE"],
-                      "205": ["ACCUPRO"], "428": ["CLASS C"]}
-    assert any(b["status"] == "unmapped" for b in body["brands"])
+
+    # 기대치를 참조표에서 끌어온다. 초벌 시드(seed_brand_keys.py)로 매핑이
+    # 늘어나도 죽지 않아야 한다 — 검사하려는 건 **코드와 문구가 이어졌는가**다.
+    expected = {}
+    for row in keys_rows(workspace):
+        if row["kunnr"] == MSC:
+            expected.setdefault(row["zbrand"], []).append(row["text"])
+    assert mapped == expected
+
+    # 사람이 채운 것은 그대로 남아 있어야 한다
+    assert mapped["38"] == ["HERTEL"]
+
+
+def test_unmapped_brands_are_still_listed(client):
+    """매핑이 없는 코드도 목록에 나와야 현업이 무엇을 채울지 안다.
+
+    데이터에 미매핑이 남아 있기를 기대하지 않는다 — 초벌 시드가 다 채우면
+    그건 정상이다. 하나를 비워 놓고 그게 보이는지만 본다.
+    """
+    r = client.put(f"/api/brands/customers/{MSC}/38", json={"keys": []})
+    assert r.status_code == 200
+
+    body = client.get(f"/api/brands/customers/{MSC}").json()
+    empty = [b for b in body["brands"] if b["zbrand"] == "38"]
+    assert empty and empty[0]["status"] == "unmapped"
+    assert empty[0]["keys"] == []
 
 
 def test_detail_includes_logic_for_configured_customer(client):

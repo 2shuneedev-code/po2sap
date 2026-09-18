@@ -4,10 +4,12 @@
 #  SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 YAML 이 없어도 발주서를
 #  올려서 **브랜드까지는** 뽑아볼 수 있게 한다. 전 거래처 테스트 배포용이다.
 #
-#  ★ 여기서 정하는 값은 **발주서 종류를 모른 채 세운 일반론**이다. 그래서
-#    모르는 값은 채우지 않고 `required: true` 로 둬서 **검수 화면에서 빨갛게
-#    막는다.** 그럴듯한 기본값을 넣으면 사람이 확인 없이 전송하고, 틀린 출하처로
-#    오더가 나간다 — 그게 이 파일에서 가장 조심할 점이다.
+#  ★ **막지 않는다.** 이 프로그램의 본업은 발주서 내용을 표로 옮기는 것이다.
+#    모르는 값은 비워 두고 `required: warn` 으로 **노랗게 표시만** 한다.
+#    거래처 규칙이 확정되면 그 거래처 파일에서 `true` 로 올려 차단하면 된다.
+#
+#  ★ 다만 **추측해서 채우지는 않는다.** 출하처를 판매처로 넣는 식은 그럴듯해서
+#    사람이 확인 없이 넘긴다. 비워 두면 최소한 빈 칸이 보인다.
 #
 #  거래처 전용 파일(`customers/<code>.yaml`)이 생기면 이 프로필은 쓰이지 않는다.
 #  스키마: masters/SCHEMA.md
@@ -69,19 +71,22 @@ rules:
       value_column: zbrand
       filter_column: kunnr
     on_no_match:
-      action: error
+      action: warn
       message: "브랜드를 인식하지 못했습니다: {brand_text} — 브랜드 매핑 탭에서 이 문구를 등록하세요"
 
 fields:
+  # 전부 `required: warn` 이다 — 비어 있으면 노랗게 보이지만 전송을 막지 않는다.
+  # 이 거래처의 규칙이 확정되면 `customers/<code>.yaml` 에서 true 로 올린다.
+
   # ── 발주서에서 그대로 읽는 값 ─────────────────────────────────
-  BSTKD:   { from: doc,  path: header.po_number, required: true }
-  MATNR:   { from: doc,  path: line.item_code,   required: true }
+  BSTKD:   { from: doc,  path: header.po_number, required: warn }
+  MATNR:   { from: doc,  path: line.item_code,   required: warn }
+  KWMENG:  { from: doc,  path: line.quantity, format: integer, required: warn }
 
   # ── 참조표가 정하는 값 ───────────────────────────────────────
-  ZBRAND:  { from: rule, rule: brand_code, required: true }
+  ZBRAND:  { from: rule, rule: brand_code, required: warn }
 
-  # ── 모르는 값 — 비워 두고 **검수에서 막는다** ─────────────────
-  # 그럴듯한 기본값(예: 출하처 = 판매처)을 넣으면 사람이 확인 없이 전송하고
-  # 틀린 출하처로 오더가 나간다. 빈 값 + required 라야 빨갛게 걸린다.
-  KUNNR2:  { from: const, value: "", required: true,
+  # ── 모르는 값 — 비워 두되 막지는 않는다 ──────────────────────
+  # 추측해서 채우지 않는 이유는 위 머리말 참고.
+  KUNNR2:  { from: const, value: "", required: warn,
              todo: "출하처 코드 — 검수 화면에서 입력하거나 거래처 규칙을 만드세요" }

@@ -4,9 +4,12 @@ SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 YAML 없�
 **브랜드·발주번호·품번·수량**이 나와야 한다. 전 거래처 테스트 배포가 그래야
 가능하다.
 
-동시에 **모르는 값이 조용히 나가면 안 된다.** 출하처처럼 문서를 봐도 알 수 없는
-값은 비어 있고 검수가 빨갛게 막아야 한다. 그럴듯한 기본값(출하처 = 판매처)을
-넣으면 사람이 확인 없이 전송하고 틀린 곳으로 오더가 간다.
+**막지는 않는다.** 이 프로그램의 본업은 발주서 내용을 표로 옮기는 것이다.
+모르는 값은 노랗게 표시만 하고 전송을 막지 않는다 — 거래처 규칙이 확정되면
+그 거래처 파일에서 `required: true` 로 올려 막으면 된다.
+
+다만 **추측해서 채우지는 않는다.** 출하처를 판매처로 넣는 식은 그럴듯해서
+사람이 확인 없이 넘긴다. 비워 두면 최소한 빈 칸이 보인다.
 """
 
 from __future__ import annotations
@@ -112,23 +115,38 @@ def test_customer_number_fills_sold_to(mapped):
 
 
 # ── 모르는 값은 막는가 ───────────────────────────────────────────────
-def test_ship_to_is_blank_and_blocks_sending(mapped):
-    """★ 출하처를 추측해 채우면 틀린 곳으로 오더가 나간다. 비우고 막는다."""
+def test_ship_to_is_blank_but_does_not_block(mapped):
+    """★ 모르는 출하처를 추측해 채우지 않는다. 다만 막지도 않는다.
+
+    추측값은 그럴듯해서 사람이 확인 없이 넘긴다. 빈 칸은 최소한 눈에 띈다.
+    """
     _, result = rows_for(mapped)
 
     for row in result.rows:
         assert row.fields["KUNNR2"] == "", "모르는 출하처를 채워 넣으면 안 된다"
-        blocking = [i for i in row.issues if i.severity == "error" and i.field == "KUNNR2"]
-        assert blocking, "빈 출하처가 검수를 막지 않으면 조용히 전송된다"
+        assert any(i.field == "KUNNR2" and i.severity == "warn" for i in row.issues), \
+            "빈 출하처가 아무 표시도 없으면 조용히 나간다"
+        assert not [i for i in row.issues if i.severity == "error"], \
+            "값을 옮기는 것이 본업이다 — 빈 출하처로 전송을 막지 않는다"
 
 
-def test_unmapped_brand_text_is_an_error(workspace):
-    """매핑되지 않은 문구는 오류다 — 빈 브랜드로 전송되면 안 된다."""
+def test_unmapped_brand_text_warns_without_blocking(workspace):
+    """매핑 안 된 문구는 노랗게 알리되 막지 않는다 — 나머지 값은 다 나와야 한다."""
     _, result = rows_for(workspace, brand_text="듣도 보도 못한 브랜드")
-    assert all(
-        any(i.severity == "error" and i.field == "ZBRAND" for i in row.issues)
-        for row in result.rows
-    )
+
+    for row in result.rows:
+        assert any(i.field == "ZBRAND" for i in row.issues), "미매칭을 숨기면 안 된다"
+        assert not [i for i in row.issues if i.severity == "error"]
+        assert row.fields["MATNR"], "브랜드를 몰라도 품번은 나와야 한다"
+
+
+def test_brand_resolves_from_the_sap_brand_name(workspace):
+    """★ SAP 브랜드명이 그대로 매핑 문구로 쓰인다 (seed_brand_keys.py 초벌).
+
+    현업이 78곳 300건을 손으로 치지 않아도 브랜드가 나오는 근거다.
+    """
+    _, result = rows_for(workspace, brand_text="OTELO BRAND")
+    assert all(r.fields["ZBRAND"] == ZBRAND for r in result.rows)
 
 
 def test_brand_not_registered_for_this_customer_is_refused(workspace):
@@ -152,4 +170,5 @@ def test_mapped_count_is_visible(mapped):
     path = mapped / "refs" / "brand_keys.csv"
     with path.open(encoding="utf-8-sig", newline="") as f:
         rows = [r for r in csv.DictReader(f) if r["kunnr"] == KUNNR]
-    assert len(rows) == 1
+    assert rows, '초벌 시드로 이 고객의 매핑이 채워져 있어야 한다'
+    assert any(r['zbrand'] == ZBRAND for r in rows)

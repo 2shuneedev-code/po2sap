@@ -3,6 +3,9 @@ kunnr,zbrand,match,text,note
 100249,127,contains,INTERSTATE,
 100249,205,contains,ACCUPRO,
 100249,428,contains,CLASS C,
+100249,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100249,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100249,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 3200,1,equals,YG BRAND,
 3200,142,equals,YAMAKATSU BRAND,
 3200,181,equals,YSK BRAND,
@@ -27,3 +30,301 @@ kunnr,zbrand,match,text,note
 3200,481,equals,YG BRAND (CHUO KOKI),
 3200,482,equals,YG BRAND (IBIDEN),
 3200,507,equals,NEW CENTURY BRAND(COMINIX),
+3200,112,contains,TANAKAZEN BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,166,contains,IWASE SANGYO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,192,contains,JIMK BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,39,contains,HF BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3200,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100161,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100161,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100161,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100161,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100161,512,contains,NEUTRAL BRAND (2025NEW),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,437,contains,FORFINE BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,473,contains,NERIOX BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100163,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100166,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100166,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100166,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100166,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100171,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100171,103,contains,SHERWOOD BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100171,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100171,401,contains,SWISSTECH BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100171,49,contains,KENNEDY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,25,contains,ELMER BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,475,contains,OEM(DRESS SIZE),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,498,contains,TOPMAX BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,524,contains,ALUSMART,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100178,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,21,contains,CORAI NEUTRAL,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,430,contains,STD BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100187,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100192,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100192,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100192,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100192,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100194,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100194,21,contains,CORAI NEUTRAL,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100194,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100194,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100203,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,21,contains,CORAI NEUTRAL,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,221,contains,ISCAR OLD YOURCODE,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,462,contains,OEM(USD) BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100208,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,28,contains,F-BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,47,contains,I-BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100212,95,contains,R-BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100217,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100218,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100218,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,212,contains,PREMIER HP BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,213,contains,PRO CUT II BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,214,contains,RAPIDKUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,215,contains,PRO CUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100233,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100235,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100235,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,111,contains,T&O BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,159,contains,ASTRA BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,160,contains,ASTRAFLY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,161,contains,VADIUM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,162,contains,RECORVIT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,163,contains,FANOCARB BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,164,contains,SUPERCEED BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,165,contains,XMAX BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,86,contains,OTELO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100251,87,contains,OTMT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100252,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100252,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100252,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100252,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100254,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100254,106,contains,SOWA BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100254,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100254,521,contains,GS TOOLING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100254,8,contains,ACCUPRO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100264,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100264,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100264,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100264,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100264,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100265,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100265,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100269,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100269,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100282,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,238,contains,MONOTARO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,464,contains,MONOTARO(HITACHINAKA),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100293,468,contains,OTOKOMAE,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100296,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+100296,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+102934,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,231,contains,KKK BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,300,contains,KOR-YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,406,contains,KOR-NC BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103101,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103177,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103177,88,contains,PAN AM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103577,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103631,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103658,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103658,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103658,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,432,contains,ELTECH BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+103970,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104198,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104198,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104237,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104271,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104271,432,contains,ELTECH BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104628,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104628,458,contains,GÜHRING BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104675,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104675,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104699,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104699,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104930,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104930,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104930,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104992,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104992,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104992,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104998,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+104998,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105012,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105119,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105320,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105420,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105420,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105423,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105561,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105864,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105864,476,contains,SAKUSAKU BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+105871,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106268,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106268,233,contains,WAVE CUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106359,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106666,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106666,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106666,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106975,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+106975,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107525,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107525,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107546,16,contains,BORDO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107546,486,contains,BORDO BRAND(PACKAGE),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107546,503,contains,BORDO BRAND(CLAMSELL&SET),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107546,508,contains,GOLIATH BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107790,509,contains,RECOIL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107790,9,contains,ALCOA BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107868,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107868,247,contains,YG BRAND(DHL),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107868,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107905,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107940,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+107940,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108216,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108243,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108276,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108465,518,contains,UTEC BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108465,519,contains,VICTORY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108471,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108509,223,contains,OEM(BOEING),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108545,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+108588,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,131,contains,PREMIER BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,300,contains,KOR-YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,406,contains,KOR-NC BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+2500,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3000,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3000,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3000,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3000,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,128,contains,KOTA MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,131,contains,PREMIER BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,140,contains,OEM_NT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,180,contains,KCT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,231,contains,KKK BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,250,contains,DAIWA SHOKAI,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,27,contains,EUROPA BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,406,contains,KOR-NC BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+3400,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4300,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4300,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4300,472,contains,YG(YG-1POLAND),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4300,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4300,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,129,contains,OEM BRAND(21),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,149,contains,OEM BRAND(37),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,150,contains,OEM BRAND(47),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,152,contains,OEM BRAND(75고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,155,contains,OEM BRAND(3090고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,158,contains,OEM BRAND(90고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,167,contains,OEM BRAND(92고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,170,contains,OEM BRAND(48),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,177,contains,OEM BRAND(BLANK)(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,191,contains,OEM BRAND(31),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,194,contains,OEM BRAND(24),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,203,contains,OEM BRAND(23),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,216,contains,OEM BRAND(26),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,433,contains,OEM BRAND(96고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,440,contains,OEM BRAND(81),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,500,contains,OEM BRAND(78고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,62,contains,OEM BRAND(2),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,63,contains,OEM BRAND(3),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,64,contains,OEM BRAND(4),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,65,contains,OEM BRAND(5),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,66,contains,OEM BRAND(6),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,67,contains,OEM BRAND(7),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,68,contains,OEM BRAND(8),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,69,contains,OEM BRAND(89고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,70,contains,"OEM BRAND(2680,80고객)",자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,71,contains,OEM BRAND(11),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,72,contains,OEM BRAND(12),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,73,contains,OEM BRAND(13),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,74,contains,OEM BRAND(2687고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,75,contains,OEM BRAND(85고객),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,76,contains,OEM BRAND(BLANK),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,77,contains,OEM BRAND(17),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,78,contains,OEM BRAND(18),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,79,contains,OEM BRAND(89고객(추가)),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4600,80,contains,OEM BRAND(20),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4800,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+4800,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+5000,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+5000,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+5000,522,contains,DT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,223,contains,OEM(BOEING),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,224,contains,OEM(NORTHROP),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,233,contains,WAVE CUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,488,contains,MINICUT(PRATT&WHITNEY),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,496,contains,GULFSTREAM,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,499,contains,LOCKHEED MARTIN,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+6500,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,10,contains,ANDRAF BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,107,contains,SPEED CUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,123,contains,NEW CENTURY BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,125,contains,FVM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,126,contains,INDACO,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,232,contains,YG(EMBRAER),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,3,contains,NEUTRAL BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,505,contains,YG BRAND(EXCO),자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,58,contains,NO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+7100,94,contains,QUALICUT BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+8000,1,contains,YG BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
+8000,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요

@@ -96,31 +96,109 @@ storage/                    런타임 산출물 — Git 제외
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
+pip install -r backend\requirements-dev.txt   # 운영 서버는 requirements.txt 만
 copy .env.example .env
 
-# 전처리만 확인 (LLM 호출 없음 = 무료)
-python scripts\parse_one.py <발주서> --customer MSC --text-only
-
-# API 서버
-cd backend && uvicorn app.main:app --reload   # → /api/health
+pytest                                        # 키 없이 전 파이프라인이 돈다
+streamlit run po2sap.py                       # → http://localhost:8501
 ```
 
-`.env` 의 `LLM_PROVIDER=mock` 이면 **API 키 없이 · 비용 0 · 오프라인**으로
-저장된 응답을 재생한다 (프론트 개발 · CI 용).
+브라우저는 자동으로 열리지 않는다 (`.streamlit/config.toml` 의 `headless=true`).
+끄면 첫 실행에 이메일을 묻고 **입력을 기다리며 멈춘다** — 서버에서 화면이 안 뜬다.
 
-사내 서버 이관 시 **코드는 그대로 두고 `.env` 만 교체**한다.
-이관 후 `/api/health` 확인 → 골든 테스트 전량 실행.
+사내 공개: `streamlit run po2sap.py --server.address 0.0.0.0 --server.port 8501`
+
+---
+
+## Claude API 주소 · 키 설정
+
+`.env` 하나로 끝난다. **코드는 환경마다 같다.**
+
+### 어느 모드로 쓸지
+
+| `LLM_PROVIDER` | 언제 | 필요한 것 |
+|---|---|---|
+| `mock` | 개발 · CI · 데모 | **없음.** 저장된 응답을 재생한다 (비용 0, 오프라인) |
+| `anthropic` | Claude API 를 직접 부를 때 | `LLM_API_KEY` |
+| `gateway` | 사내 LLM 게이트웨이를 거칠 때 | `LLM_API_KEY` + `LLM_BASE_URL` |
+
+`anthropic` 과 `gateway` 는 **같은 코드**를 쓴다. 주소만 다르다.
+
+### 직접 호출
+
+```ini
+LLM_PROVIDER=anthropic
+LLM_API_KEY=sk-ant-...
+LLM_BASE_URL=                      # 비우면 https://api.anthropic.com
+```
+
+### 사내 게이트웨이
+
+Anthropic 호환 엔드포인트를 전제한다.
+
+```ini
+LLM_PROVIDER=gateway
+LLM_API_KEY=사내에서-발급받은-키
+LLM_BASE_URL=https://llm-gw.yg1.solutions
+```
+
+> 끝에 `/v1` 을 붙이지 않는다 — SDK 가 붙인다. `.../v1` 로 적으면 `/v1/v1/messages`
+> 로 요청이 나가 404 가 난다.
+
+### 사내 프록시 · SSL 검사 장비
+
+```ini
+LLM_PROXY=http://proxy.사내:8080
+LLM_CA_BUNDLE=C:\certs\사내CA.pem
+```
+
+> ⚠ **`.env` 에 `HTTPS_PROXY` 를 적는 것으로는 안 된다.** `.env` 는 설정 객체로만
+> 읽히고 `os.environ` 으로 나가지 않아서 HTTP 클라이언트가 그 값을 영영 못 본다.
+> 위 두 키를 써야 실제로 전달된다. `LLM_CA_BUNDLE` 경로가 없으면 시작할 때
+> 오류를 낸다 — 인증서 없이 조용히 검증을 건너뛰지 않는다.
+
+### 모델
+
+```ini
+LLM_MODEL_EXTRACT=claude-opus-5     # 추출 본선
+LLM_MODEL_FALLBACK=claude-sonnet-5  # 예비
+```
+
+사내 계정이 쓸 수 있는 모델로 맞춘다. **모델을 바꾸면 추출 정확도가 달라지므로
+골든 테스트를 전량 다시 돌린다.**
+
+### 확인
+
+```powershell
+python -c "from backend.app.config import get_settings as g; s=g(); print(s.llm_provider, s.llm_base_url or '(기본)', s.llm_model_extract)"
+```
+
+화면 좌하단 **설정 확인** 패널에도 프로바이더·모델·EAI 주소가 그대로 뜬다.
+키·권한·모델 ID 는 `/api/health` 가 모델 조회로 확인한다 (메시지를 보내지 않으므로 비용 0).
+
+### 비용 없이 실물로 한 번 돌려보기
+
+```powershell
+# 1) 사전 점검 — hints 의 라벨이 진짜 문서에 있는지 대조 (LLM 호출 없음)
+python scripts\check_sample.py <발주서> --customer MSC
+
+# 2) 맞으면 LLM_PROVIDER=anthropic 으로 1회 파싱
+#    결과가 storage\llm_cache\ 에 남는다
+python scripts\parse_one.py <발주서> --customer MSC --rows
+
+# 3) 다시 LLM_PROVIDER=mock 으로 되돌리면 같은 파일을 무료로 재생한다
+```
 
 ---
 
 ## 진행 상황
 
-- [x] 설계 — 규칙 아키텍처 · API 계약 · 거래처 3곳 YAML · **문서 정리**
+- [x] 설계 — 규칙 아키텍처 · API 계약 · 거래처 YAML · 문서 정리
 - [x] D1 전처리 · Claude 추출 · 환각 차단 · 마스터 로더 · CLI
-- [ ] **D2 규칙엔진 · 행 생성 · 검증**  ← 백엔드 트랙
-- [ ] **D3 프론트엔드 (거래처 선택 · 규칙 카드 · 통합 그리드)**  ← 프론트 트랙 (병렬)
-- [ ] D4 EAI 전송 · 모의 서버 · 결과 모달
-- [ ] D5 KL/YGJP 실물 검증 · 데모
+- [x] D2 규칙엔진 · 행 생성 · 검증
+- [x] D3 화면 (스트림릿) — P/O 변환 · 브랜드 매핑
+- [x] D4 EAI 전송 · 모의 서버 · 감사 로그
+- [x] 마스터 도구 — 거래처 엑셀 · SAP 브랜드 마스터 · 매핑 초벌
+- [ ] **D5 실물 발주서 검증** ← 남은 것. 절차는 `samples/README.md` §3
 
 상세는 [`NEXT.md`](./NEXT.md).

@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 16000
     llm_timeout_sec: int = 120
     llm_max_concurrency: int = 4
+
+    # 사내망 프록시 · SSL 검사 장비. **`.env` 에 `HTTPS_PROXY` 를 적는 것으로는
+    # 안 된다** — pydantic-settings 는 `.env` 를 이 객체로만 읽고 `os.environ`
+    # 으로 내보내지 않아서, HTTP 클라이언트가 그 값을 영영 못 본다.
+    # 여기 선언해야 클라이언트에 실제로 전달된다 (anthropic_direct.py).
+    llm_proxy: str = ""                 # 예: http://proxy.사내:8080
+    llm_ca_bundle: str = ""             # 사내 CA 인증서 번들(.pem) 경로
     # 캐시 키에 들어간다. **Tool 스키마(schema_builder)나 SYSTEM_PROMPT 를 고치면 올린다.**
     # 안 올리면 구 스키마로 받은 캐시가 그대로 재생돼 값이 조용히 빈다.
     llm_prompt_version: str = "v2"

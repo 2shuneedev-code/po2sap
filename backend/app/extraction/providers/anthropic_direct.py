@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import base64
+import ssl
+from pathlib import Path
 from typing import Any
 
 from ...config import Settings
@@ -13,6 +15,47 @@ from .base import DocumentInput, LLMError, ProviderHealth, ToolCallResult
 
 # PDF 원본을 그대로 넘길 때의 상한 (대략치, 초과 시 텍스트 경로 권장)
 _MAX_PDF_BYTES = 30 * 1024 * 1024
+
+
+def _http_client(settings: Settings):
+    """사내망 프록시 · SSL 검사 장비를 쓰는 경우의 HTTP 클라이언트.
+
+    둘 다 없으면 `None` 을 돌려 SDK 기본 클라이언트를 그대로 쓴다.
+
+    **`.env` 에 `HTTPS_PROXY` 를 적는 것으로는 안 된다.** pydantic-settings 는
+    `.env` 를 Settings 객체로만 읽고 `os.environ` 으로 내보내지 않아서, httpx 가
+    그 값을 영영 보지 못한다. 사내 이관에서 원인 모를 TLS/타임아웃으로 막히는
+    자리라 설정을 명시적으로 받아 여기서 넘긴다.
+    """
+    if not (settings.llm_proxy or settings.llm_ca_bundle):
+        return None
+
+    try:
+        from anthropic import DefaultHttpxClient
+    except ImportError as exc:  # pragma: no cover
+        raise LLMError("anthropic 패키지가 설치되지 않았습니다") from exc
+
+    options: dict[str, Any] = {}
+    if settings.llm_proxy:
+        options["proxy"] = settings.llm_proxy
+    if settings.llm_ca_bundle:
+        bundle = Path(settings.llm_ca_bundle)
+        if not bundle.exists():
+            raise LLMError(
+                f"LLM_CA_BUNDLE 파일이 없습니다: {bundle}\n"
+                "사내 CA 인증서(.pem) 경로를 확인하세요."
+            )
+        # `verify=<경로 문자열>` 은 httpx2 에서 폐기됐다 — SSL 컨텍스트를 만들어 넘긴다.
+        try:
+            options["verify"] = ssl.create_default_context(cafile=str(bundle))
+        except ssl.SSLError as exc:
+            # 파일은 있는데 인증서가 아닌 경우. 원본 SSLError 만 올라가면
+            # "왜 안 되지" 로 몇 시간이 간다.
+            raise LLMError(
+                f"LLM_CA_BUNDLE 을 인증서로 읽지 못했습니다: {bundle}\n"
+                f"PEM 형식(.pem/.crt) 인지 확인하세요 — {exc}"
+            ) from exc
+    return DefaultHttpxClient(**options)
 
 
 class AnthropicProvider:
@@ -34,8 +77,14 @@ class AnthropicProvider:
             "api_key": settings.llm_api_key,
             "timeout": float(settings.llm_timeout_sec),
         }
+        # 사내 게이트웨이든 Anthropic 직접이든 코드는 같다. 주소만 다르다.
         if settings.llm_base_url:
             kwargs["base_url"] = settings.llm_base_url
+
+        http_client = _http_client(settings)
+        if http_client is not None:
+            kwargs["http_client"] = http_client
+
         self._client = Anthropic(**kwargs)
 
     # ── 호출 ───────────────────────────────────────────────────────────

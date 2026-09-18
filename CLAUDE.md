@@ -208,6 +208,8 @@ storage/          런타임 산출물 — Git 제외
 | 사전 점검 없이 실물 파싱 | `check_sample.py`로 hints 앵커부터 대조한다. 안 맞으면 API 비용만 나간다 |
 | `temperature`·`top_p` 전송 | 현행 모델은 샘플링 파라미터를 받지 않고 400 을 낸다. 재현성은 응답 캐시가 보장한다 |
 | `/api/health`에서 실제 메시지 전송 | 화면·모니터링이 주기적으로 부른다. 모델 조회로 키·권한·모델 ID 를 확인한다 |
+| 사내 프록시·CA 를 `.env` 의 `HTTPS_PROXY` 로 | `.env` 는 Settings 로만 읽히고 `os.environ` 에 안 나간다 — HTTP 클라이언트가 영영 못 본다. `LLM_PROXY` · `LLM_CA_BUNDLE` 을 쓴다 |
+| `LLM_BASE_URL` 끝에 `/v1` 붙이기 | SDK 가 붙인다. `/v1/v1/messages` 로 나가 404 가 난다 |
 
 ---
 

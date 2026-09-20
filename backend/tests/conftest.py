@@ -24,6 +24,27 @@ os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.pop("LLM_API_KEY", None)
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _ignore_local_env_file():
+    """테스트가 개발자의 `.env` 를 읽지 않게 한다.
+
+    `Settings` 는 `_PROJECT_ROOT/.env` 를 읽는다. 그대로 두면 **내 체크아웃에
+    `.env` 가 없어서 통과하고, `.env` 가 있는 사람 환경에서는 깨진다** — CI 는
+    초록인데 사용자만 빨간, 가장 찾기 어려운 부류다 (2026-09-20 에 실제로 그랬다:
+    `.env.example` 의 `LLM_BASE_URL=` 이 `None` 이 아니라 `""` 로 들어왔다).
+
+    테스트는 기본값과 명시적으로 넘긴 값만 본다.
+    """
+    from app.config import Settings
+
+    original = Settings.model_config.get("env_file")
+    Settings.model_config["env_file"] = None
+    try:
+        yield
+    finally:
+        Settings.model_config["env_file"] = original
+
+
 @pytest.fixture(scope="session")
 def root() -> Path:
     return ROOT

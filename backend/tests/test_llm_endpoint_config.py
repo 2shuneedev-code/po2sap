@@ -56,8 +56,13 @@ def test_missing_ca_bundle_fails_loudly(tmp_path):
 
 # ── 주소 ─────────────────────────────────────────────────────────────
 def test_base_url_defaults_to_empty():
-    """비우면 SDK 기본 주소(api.anthropic.com)를 쓴다."""
-    assert Settings(llm_provider="mock").llm_base_url is None
+    """비우면 SDK 기본 주소(api.anthropic.com)를 쓴다.
+
+    `.env` 에 `LLM_BASE_URL=` 로 **빈 문자열**이 오는 경우도 같다 —
+    `None` 인지가 아니라 **거짓값인지**를 본다. 코드도 `if settings.llm_base_url:`
+    으로 판단한다.
+    """
+    assert not Settings(llm_provider="mock").llm_base_url
 
 
 def test_gateway_and_anthropic_share_one_provider():

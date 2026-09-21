@@ -44,12 +44,28 @@ def test_splits_into_one_order_per_shipment(result):
     assert [s.receiving_loc.value for s in raw.shipments] == ["ELK", "HAR"]
 
 
-def test_summary_table_is_not_an_order(result):
-    """상단 요약표는 합계 대조용 — 오더 품목이 되면 수량이 두 배가 된다."""
+def test_summary_table_is_not_extracted(result):
+    """상단 요약표는 품목으로 추출하지 않는다 (SCHEMA §2.1-2) — 합계만 totals 로 받는다.
+
+    품목이 되면 수량이 두 배가 되고, 출력 토큰의 절반을 쓸데없이 먹는다.
+    """
     raw = result.raw
-    assert len(raw.lines) == 2
+    assert raw.lines == []
     assert len(raw.all_lines) == 2
     assert [ln.item_code.value for ln in raw.all_lines] == ["YG-EM0600", "YG-DR0800"]
+    assert raw.totals.total_qty == "25"
+
+
+def test_every_value_is_anchored(result):
+    """읽은 값마다 원문 줄 번호(src)가 있고, 페이지는 그 번호에서 계산돼 있다."""
+    raw = result.raw
+    assert raw.header.po_number.src is not None
+    assert raw.header.po_number.page == 1
+    for shipment in raw.shipments:
+        assert shipment.src is not None and shipment.src_end >= shipment.src
+        for line in shipment.lines:
+            assert line.src is not None
+            assert line.quantity.src == line.src and line.quantity.confidence is not None
 
 
 def test_item_columns_are_not_swapped(result):

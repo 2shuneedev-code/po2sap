@@ -1,9 +1,11 @@
 """업로드 파일 전처리: PDF/HTM → 정규화 텍스트.
 
-두 가지 목적이 있다.
+세 가지 목적이 있다.
   1) LLM 입력 생성
-  2) **근거(evidence) 검증용 원문 확보** — LLM이 만들어낸 값이 실제 원문에
-     있는지 대조하려면, 우리 손에 원문 텍스트가 있어야 한다.
+  2) **줄 번호 앵커(`src`)의 기준 제공** — 전 줄에 문서 통번호를 붙여 보내고,
+     모델이 돌려준 번호로 그 줄의 원문을 다시 꺼낸다 (design.md §3.3.5).
+  3) **근거 검증용 원문 확보** — LLM이 만들어낸 값이 실제 원문에 있는지 대조하려면,
+     우리 손에 원문 텍스트가 있어야 한다 (design.md §3.4).
 
 PDF에 텍스트 레이어가 없으면(스캔본) 텍스트 경로로는 처리할 수 없으므로
 document(이미지) 경로로 전환하도록 kind 를 표시한다.
@@ -12,7 +14,9 @@ document(이미지) 경로로 전환하도록 kind 를 표시한다.
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 
 # 텍스트 레이어 유무 판정 기준 (페이지당 평균 문자 수)
@@ -35,12 +39,64 @@ class SourceDoc:
     def page_count(self) -> int:
         return len(self.pages)
 
-    def numbered_text(self) -> str:
-        """페이지 번호를 붙인 LLM 입력용 텍스트."""
-        chunks = []
+    # ── 줄 번호 (design.md §3.3.5) ─────────────────────────────────────
+    # 번호와 줄은 1:1 이다. 페이지 머리글(`===== PAGE k =====`)도 한 줄을 차지하고,
+    # 빈 줄도 한 줄이다. 그래야 번호만 보고 `line_at` · `page_of` 로 되짚을 수 있다.
+    # `pages` 를 바꾸면 이 캐시는 낡는다 — 로드 후 고치지 않는 값으로 다룬다.
+    @cached_property
+    def _numbered(self) -> tuple[list[str], list[int]]:
+        lines: list[str] = []
+        starts: list[int] = []          # 각 페이지 머리글의 0-기준 줄 위치
         for idx, page in enumerate(self.pages, start=1):
-            chunks.append(f"===== PAGE {idx} =====\n{page}")
-        return "\n\n".join(chunks)
+            starts.append(len(lines))
+            lines.append(f"===== PAGE {idx} =====")
+            lines.extend(page.split("\n"))
+        return lines, starts
+
+    @property
+    def doc_lines(self) -> list[str]:
+        """번호를 뗀 문서 줄 목록. `doc_lines[n - 1]` 이 n 번 줄이다."""
+        return self._numbered[0]
+
+    @property
+    def line_count(self) -> int:
+        return len(self.doc_lines)
+
+    def line_at(self, n: int) -> str | None:
+        """n 번 줄(1-기준)의 내용. 범위 밖이면 None."""
+        if 1 <= n <= self.line_count:
+            return self.doc_lines[n - 1]
+        return None
+
+    def slice_text(self, start: int, end: int) -> str:
+        """start~end 줄(양끝 포함)의 원문. **번호를 붙이지 않는다.**
+
+        앵커 대조용이다. 범위는 문서 안으로 잘라 준다.
+        """
+        lo, hi = max(start, 1), min(end, self.line_count)
+        return "\n".join(self.doc_lines[lo - 1:hi]) if lo <= hi else ""
+
+    def numbered_text(self, start: int | None = None, end: int | None = None) -> str:
+        """`L000123| 내용` 형식의 LLM 입력용 텍스트.
+
+        start·end 를 주면 그 구간(양끝 포함)만 돌려주되 **번호는 문서 통번호 그대로**다.
+        슬라이스는 번호를 다시 매기지 않는다 — OUTLINE 이 말한 412 와 LINES 청크가
+        말한 412 가 같은 줄이어야 한다.
+        """
+        lo = 1 if start is None else max(start, 1)
+        hi = self.line_count if end is None else min(end, self.line_count)
+        return "\n".join(
+            f"L{n:06d}| {self.doc_lines[n - 1]}" for n in range(lo, hi + 1)
+        )
+
+    def page_of(self, n: int) -> int | None:
+        """n 번 줄이 속한 페이지(1-기준). 범위 밖이면 None.
+
+        페이지는 모델에게 묻지 않고 `src` 로부터 코드가 역산한다 (SCHEMA.md §3.2).
+        """
+        if not 1 <= n <= self.line_count:
+            return None
+        return bisect_right(self._numbered[1], n - 1)
 
 
 def normalize_ws(text: str) -> str:

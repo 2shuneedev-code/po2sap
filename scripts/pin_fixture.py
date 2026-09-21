@@ -123,8 +123,12 @@ def main() -> int:
         for name, field in list(header.items())[:12]:
             value = field.get("value") if isinstance(field, dict) else field
             print(f"    {name:<16} {value}")
-    lines = (data.get("payload") or {}).get("lines") or []
-    print(f"\n  품목 {len(lines)}건")
+    payload = data.get("payload") or {}
+    # 분할 문서는 품목이 shipments[].lines 에 있다 (상단 요약표는 품목으로 받지 않는다)
+    count = len(payload.get("lines") or []) + sum(
+        len(s.get("lines") or []) for s in payload.get("shipments") or [] if isinstance(s, dict)
+    )
+    print(f"\n  품목 {count}건")
 
     if args.dry_run:
         print("\n  --dry-run 이라 쓰지 않았습니다.")

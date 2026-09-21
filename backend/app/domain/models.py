@@ -12,14 +12,17 @@ from pydantic import BaseModel, Field
 
 
 class ExtractedValue(BaseModel):
-    """LLM이 추출한 값 1개 + 근거.
+    """LLM이 추출한 값 1개 + 근거 앵커.
 
-    evidence 는 원문에서 그대로 복사한 문자열이어야 하며,
-    grounding 검증에서 실제 원문에 존재하는지 대조한다(환각 차단).
+    근거는 원문 인용이 아니라 **줄 번호**(`src`~`src_end`, 문서 통번호 1-기준)다.
+    grounding 이 그 줄의 원문에서 `value` 를 실제로 찾는다 (design.md §3.4).
+
+    `page` 는 모델이 준 값이 아니다. `src` 로부터 코드가 채운다 (SCHEMA.md §3.2).
     """
 
     value: str | None = None
-    evidence: str | None = None
+    src: int | None = None
+    src_end: int | None = None
     page: int | None = None
     confidence: float | None = None
 
@@ -59,6 +62,8 @@ class POLine(BaseModel):
     """
 
     line_no: int
+    src: int | None = None          # 이 품목이 있는 원문 줄 (줄 단위 앵커 1개, SCHEMA §3.2-나)
+    src_end: int | None = None      # 여러 줄에 걸칠 때의 마지막 줄
     posex: ExtractedValue = Field(default_factory=_ev)
     our_item: ExtractedValue = Field(default_factory=_ev)
     item_code: ExtractedValue = Field(default_factory=_ev)
@@ -81,6 +86,8 @@ class POShipment(BaseModel):
     블록마다 별도 오더가 생기고 BSTKD·KUNNR2 가 달라진다 (SCHEMA.md §2.1).
     """
 
+    src: int | None = None          # 이 블록의 시작 줄 (품목표 포함 구간, design §3.3.2)
+    src_end: int | None = None      # 이 블록의 끝 줄 — 청크 경계가 된다
     shipment_no: ExtractedValue = Field(default_factory=_ev)
     receiving_loc: ExtractedValue = Field(default_factory=_ev)
     ship_to_text: ExtractedValue = Field(default_factory=_ev)
@@ -101,8 +108,9 @@ class RawPO(BaseModel):
     """추출 결과 1문서.
 
     `shipments` 가 비어 있지 않으면 **오더 단위는 shipment** 이고, 이때 `lines` 는
-    문서 상단 요약표다(합계 대조용, 오더 생성에 쓰지 않는다). `shipments` 가 비어
-    있으면 `lines` 가 곧 그 문서 1건짜리 오더의 품목이다. — SCHEMA.md §2.1
+    비어 있다 — 문서 상단 요약표는 품목으로 추출하지 않는다(합계는 `totals` 로만 받는다).
+    `shipments` 가 비어 있으면 `lines` 가 곧 그 문서 1건짜리 오더의 품목이다.
+    — SCHEMA.md §2.1
     """
 
     customer_code: str
@@ -125,10 +133,25 @@ class RawPO(BaseModel):
         return list(self.lines)
 
 
+class IssueCode:
+    """`GroundingIssue.code` 의 값. 문자열 그대로 API·화면에 나간다."""
+
+    # 앵커 대조 (design.md §3.4)
+    EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"   # 🔴 src 없음·범위 밖·값이 그 줄에 없음
+    EVIDENCE_WEAK = "EVIDENCE_WEAK"             # 🟡 그 줄에 비슷하게만 있음
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    TOTAL_MISMATCH = "TOTAL_MISMATCH"
+    NO_LINES = "NO_LINES"
+    # 청크 분할·병합 (design.md §3.3.4) — 발행은 다음 단계의 오케스트레이터가 한다
+    CHUNK_FAILED = "CHUNK_FAILED"               # 🔴 그 구간을 못 읽음 → 전송 차단
+    EMPTY_CHUNK = "EMPTY_CHUNK"                 # 🟡 구간에서 품목 0건
+    DUPLICATE_LINE = "DUPLICATE_LINE"           # 🟡 인접 청크에서 같은 src 가 두 번
+
+
 class GroundingIssue(BaseModel):
     level: str          # "error" | "warn"
     field: str          # "header.po_number" | "lines[2].quantity"
-    code: str           # EVIDENCE_NOT_FOUND | LOW_CONFIDENCE | TOTAL_MISMATCH
+    code: str           # IssueCode 의 값
     message: str
 
 

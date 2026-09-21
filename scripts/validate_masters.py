@@ -33,7 +33,11 @@ from _console import use_utf8  # noqa: E402
 use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
 
 from app.extraction.extractor import splits_by_shipment  # noqa: E402
-from app.extraction.schema_builder import build_tool_schema  # noqa: E402
+from app.extraction.schema_builder import (  # noqa: E402
+    ANCHOR_KEYS,
+    build_lines_schema,
+    build_outline_schema,
+)
 from app.masters.loader import MasterError, load_customer  # noqa: E402
 from app.rules import expr as expr_mod  # noqa: E402
 
@@ -87,20 +91,24 @@ class Report:
 def valid_paths(master: Any) -> set[str]:
     """이 거래처에서 참조 가능한 컨텍스트 경로 전부 (SCHEMA.md §3)."""
     extra_fields = master.extraction.get("extra_fields") or []
-    schema = build_tool_schema(extra_fields, include_shipments=splits_by_shipment(master))
-    props = schema["properties"]
+    outline = build_outline_schema(extra_fields, include_shipments=splits_by_shipment(master))
+    props = outline["properties"]
+    line_props = build_lines_schema(extra_fields)["properties"]["lines"]["items"]["properties"]
 
     # meta.* 는 문서가 아니라 마스터에 적힌 값이다 (SCHEMA §3).
     out: set[str] = {"meta.code", "meta.customer_no", "meta.name"}
     for key in props["header"]["properties"]:
         if key != "extra":
             out.add(f"header.{key}")
-    for key in props["lines"]["items"]["properties"]:
-        if key != "extra":
+    # 품목의 src·src_end·confidence 는 표준 키가 아니라 앵커 포장이다 (SCHEMA §3.2).
+    # line_no 는 추출이 받지 않지만 병합 후 엔진이 매기는 표준 키다 (§2.1-6).
+    out.add("line.line_no")
+    for key in line_props:
+        if key != "extra" and key not in ANCHOR_KEYS:
             out.add(f"line.{key}")
     if "shipments" in props:
         for key in props["shipments"]["items"]["properties"]:
-            if key != "lines":
+            if key not in ANCHOR_KEYS:
                 out.add(f"shipment.{key}")
     for f in extra_fields:
         out.add(f"header.extra.{f['name']}")

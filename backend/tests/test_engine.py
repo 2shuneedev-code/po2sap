@@ -81,7 +81,7 @@ def test_matches_golden(msc_result, fixtures_dir):
 
 # ── 설정만 바꿔 확인하는 것들 ──────────────────────────────────────────
 def ev(value):
-    return EV(value=value, evidence=value, page=1, confidence=0.99)
+    return EV(value=value, src=1, page=1, confidence=0.99)
 
 
 def raw_po(*, lines, header=None, shipments=None, totals=None, customer="MSC"):

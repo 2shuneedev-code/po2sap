@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     llm_ca_bundle: str = ""             # 사내 CA 인증서 번들(.pem) 경로
     # 캐시 키에 들어간다. **Tool 스키마(schema_builder)나 SYSTEM_PROMPT 를 고치면 올린다.**
     # 안 올리면 구 스키마로 받은 캐시가 그대로 재생돼 값이 조용히 빈다.
-    llm_prompt_version: str = "v2"
+    llm_prompt_version: str = "v3"
 
     # ── 마스터 편집 잠금 ───────────────────────────────────
     # 브랜드 매핑은 **서버 디스크의 masters/ 파일을 고친다.** 한 사람이 고치면

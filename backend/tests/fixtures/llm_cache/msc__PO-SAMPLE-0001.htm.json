@@ -1,458 +1,125 @@
 {
-  "_comment": "합성 픽스처. 실제 Claude 응답이 아니라 손으로 작성한 기대 출력이다. backend/tests/fixtures/msc/PO-SAMPLE-0001.htm 에 대응한다. 해시가 아니라 {거래처}__{파일명} 으로 찾으므로 프롬프트·모델이 바뀌어도 계속 재생된다.",
+  "_comment": "합성 픽스처. 실제 Claude 응답이 아니라 손으로 작성한 기대 출력이다. backend/tests/fixtures/msc/PO-SAMPLE-0001.htm 에 대응한다. 해시가 아니라 {거래처}__{파일명} 으로 찾으므로 프롬프트·모델이 바뀌어도 계속 재생된다. 모양은 문서 단위의 **병합된 페이로드**다 (header · shipments[].lines · totals) — src 는 이 문서를 numbered_text() 로 만들었을 때의 줄 번호다. 상단 요약표는 품목으로 추출하지 않으므로 최상위 lines 가 없다 (SCHEMA §2.1-2). 문서(.htm)를 고치면 src 가 어긋난다 — 줄 번호를 다시 대조할 것.",
   "payload": {
     "header": {
       "po_number": {
         "value": "PO-SAMPLE-0001",
-        "evidence": "Purchase Order #PO-SAMPLE-0001",
-        "page": 1,
+        "src": 4,
         "confidence": 0.97
       },
       "po_date": {
         "value": "2026-02-17",
-        "evidence": "Date of Order | 2/17/26",
-        "page": 1,
+        "src": 5,
         "confidence": 0.92
       },
       "requested_date": {
         "value": "2026-03-10",
-        "evidence": "Ship on Or Before | 3/10/26",
-        "page": 1,
+        "src": 6,
         "confidence": 0.92
       },
       "brand_text": {
         "value": "HERTEL (GP END MILLS) (APO)",
-        "evidence": "HERTEL (GP END MILLS) (APO)",
-        "page": 1,
+        "src": 11,
         "confidence": 0.97
       },
       "order_text": {
         "value": "ORDERED FROM HERTEL (GP END MILLS) (APO)",
-        "evidence": "ORDERED FROM\nHERTEL (GP END MILLS) (APO)",
-        "page": 1,
+        "src": 10,
+        "src_end": 11,
         "confidence": 0.97
       },
       "ship_to_text": {
         "value": "Check complete attachment for shipping instructions",
-        "evidence": "Check complete attachment for shipping instructions",
-        "page": 1,
+        "src": 13,
         "confidence": 0.97
       },
       "bill_to_text": {
         "value": "SID TOOL CO INC ACCOUNTS PAYABLE",
-        "evidence": "SID TOOL CO INC ACCOUNTS PAYABLE",
-        "page": 1,
+        "src": 16,
         "confidence": 0.97
       },
       "currency_text": {
         "value": "United States Dollars",
-        "evidence": "P.O Priced In | United States Dollars",
-        "page": 1,
+        "src": 7,
         "confidence": 0.97
       },
       "incoterms_text": {
         "value": "FCA",
-        "evidence": "Terms of Delivery | FCA",
-        "page": 1,
+        "src": 8,
         "confidence": 0.97
       },
       "payment_terms_text": {
         "value": "NET 30",
-        "evidence": "Terms of Payment | NET 30",
-        "page": 1,
+        "src": 9,
         "confidence": 0.97
-      },
-      "packing_spec": {
-        "value": null,
-        "evidence": null,
-        "page": null,
-        "confidence": null
-      },
-      "remark_default": {
-        "value": null,
-        "evidence": null,
-        "page": null,
-        "confidence": null
       }
     },
-    "lines": [
-      {
-        "line_no": 1,
-        "posex": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "our_item": {
-          "value": "09876543",
-          "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "item_code": {
-          "value": "YG-EM0600",
-          "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "description": {
-          "value": "END MILL 6MM 4FL",
-          "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "quantity": {
-          "value": "10",
-          "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "unit": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "unit_price": {
-          "value": "12.50",
-          "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "net_value": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "delivery_date": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "ship_to_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "brand_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "remark": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        }
-      },
-      {
-        "line_no": 2,
-        "posex": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "our_item": {
-          "value": "09876544",
-          "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS | 8.75",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "item_code": {
-          "value": "YG-DR0800",
-          "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS | 8.75",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "description": {
-          "value": "DRILL 8MM HSS",
-          "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS | 8.75",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "quantity": {
-          "value": "15",
-          "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS | 8.75",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "unit": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "unit_price": {
-          "value": "8.75",
-          "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS | 8.75",
-          "page": 1,
-          "confidence": 0.97
-        },
-        "net_value": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "delivery_date": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "ship_to_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "brand_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "remark": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        }
-      }
-    ],
     "shipments": [
       {
+        "src": 23,
+        "src_end": 29,
         "shipment_no": {
           "value": "001",
-          "evidence": "Shipment No.......: 001",
-          "page": 1,
+          "src": 24,
           "confidence": 0.97
         },
         "receiving_loc": {
           "value": "ELK",
-          "evidence": "Receiving Loc.....: ELK",
-          "page": 1,
+          "src": 25,
           "confidence": 0.97
         },
         "ship_to_text": {
           "value": "SID TOOL - ELKHART WAREHOUSE\n1000 INDUSTRIAL PKWY, ELKHART, IN 46514",
-          "evidence": "SID TOOL - ELKHART WAREHOUSE\n1000 INDUSTRIAL PKWY, ELKHART, IN 46514",
-          "page": 1,
+          "src": 26,
+          "src_end": 27,
           "confidence": 0.97
-        },
-        "ship_by_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "remark": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
         },
         "lines": [
           {
-            "line_no": 1,
-            "posex": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "our_item": {
-              "value": "09876543",
-              "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "item_code": {
-              "value": "YG-EM0600",
-              "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "description": {
-              "value": "END MILL 6MM 4FL",
-              "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "quantity": {
-              "value": "10",
-              "evidence": "10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "unit": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "unit_price": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "net_value": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "delivery_date": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "ship_to_text": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "brand_text": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "remark": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            }
+            "src": 29,
+            "confidence": 0.97,
+            "our_item": "09876543",
+            "item_code": "YG-EM0600",
+            "description": "END MILL 6MM 4FL",
+            "quantity": "10"
           }
         ]
       },
       {
+        "src": 30,
+        "src_end": 36,
         "shipment_no": {
           "value": "002",
-          "evidence": "Shipment No.......: 002",
-          "page": 1,
+          "src": 31,
           "confidence": 0.97
         },
         "receiving_loc": {
           "value": "HAR",
-          "evidence": "Receiving Loc.....: HAR",
-          "page": 1,
+          "src": 32,
           "confidence": 0.97
         },
         "ship_to_text": {
           "value": "SID TOOL Harrisburg Warehouse\n250 COMMERCE DR, HARRISBURG, PA 17110",
-          "evidence": "SID TOOL Harrisburg Warehouse\n250 COMMERCE DR, HARRISBURG, PA 17110",
-          "page": 1,
+          "src": 33,
+          "src_end": 34,
           "confidence": 0.97
-        },
-        "ship_by_text": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
-        },
-        "remark": {
-          "value": null,
-          "evidence": null,
-          "page": null,
-          "confidence": null
         },
         "lines": [
           {
-            "line_no": 1,
-            "posex": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "our_item": {
-              "value": "09876544",
-              "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "item_code": {
-              "value": "YG-DR0800",
-              "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "description": {
-              "value": "DRILL 8MM HSS",
-              "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "quantity": {
-              "value": "15",
-              "evidence": "15 | 09876544 | YG-DR0800 | DRILL 8MM HSS",
-              "page": 1,
-              "confidence": 0.97
-            },
-            "unit": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "unit_price": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "net_value": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "delivery_date": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "ship_to_text": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "brand_text": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            },
-            "remark": {
-              "value": null,
-              "evidence": null,
-              "page": null,
-              "confidence": null
-            }
+            "src": 36,
+            "confidence": 0.97,
+            "our_item": "09876544",
+            "item_code": "YG-DR0800",
+            "description": "DRILL 8MM HSS",
+            "quantity": "15"
           }
         ]
       }
     ],
     "totals": {
       "line_count": 2,
-      "total_qty": "25",
-      "total_amount": null
-    },
-    "notes": []
+      "total_qty": "25"
+    }
   },
   "model": "fixture",
   "provider": "fixture"

@@ -91,6 +91,12 @@ python scripts/validate_masters.py
 python scripts/validate_masters.py --customer MSC   # 한 곳만
 python scripts/validate_masters.py --quiet          # 오류만
 
+# 사내 서버 — 더블클릭 런처 (윈도우). cp949 + CRLF 로 저장돼 있다
+#   setup.bat        최초 1회: 가상환경 + 라이브러리 + .env
+#   check.bat        API 연결 · 마스터 검증 (비용 0)
+#   run.bat [포트]   화면 실행 (0.0.0.0:8501, 사내 공개)
+#   run-mock-eai.bat 모의 EAI (시험용)
+
 # 화면 (사내 서버에서 이것만 띄우면 된다)
 streamlit run po2sap.py                                    # → http://localhost:8501
 streamlit run po2sap.py --server.address 0.0.0.0 --server.port 8501   # 사내 공개
@@ -218,6 +224,7 @@ storage/          런타임 산출물 — Git 제외
 | 화면·엔진이 `pull` · `reset` · `checkout` 실행 | 합칠 것이 있으면 사람이 판단할 일이다. 조용히 되돌리는 것이 가장 나쁘다. `gitsync` 는 `add`·`commit`·`push` 만 한다 |
 | 마스터 저장 경로에서 사본 생략 | 되돌리기 버튼이 없는 값이다. 운영 경로(화면·API)는 `storage_dir` 을 넘겨 덮어쓰기 전 사본을 남긴다 |
 | 테스트에서 `storage_dir` 방치 | 마스터 사본이 **실물 `storage/`** 에 쌓인다. `conftest` 가 `STORAGE_DIR` 을 임시 경로로 박는다 |
+| `.bat` 을 UTF-8 로 저장 | 한국어 윈도우 cmd 가 한글을 깨뜨린다. 안내문이 깨지면 없는 것만 못하다. cp949 + CRLF — `test_launchers.py` 가 잡는다 |
 | `git ls-files` 결과와 디스크 경로를 그대로 비교 | 윈도우는 `a\b.py`, git 은 `a/b.py`. `as_posix()` 로 맞춘다 |
 
 ---

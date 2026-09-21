@@ -1,826 +1,552 @@
-# 구조 단순화 설계 — 템플릿 주도 필드 · 브랜드/출하 마스터 · KUNNR 기본값
+# 구조 단순화 설계 v2 — 기본 2층 구조 · 템플릿 주도 매핑
 
-> 요구사항 원본: `NEXT.md` §2-A (2026-09-21 지시) · 미결 목록: `NEXT.md` §2-B
-> 이 문서는 **설계안**이다. 코드는 developer 가 §12 순서로 구현한다.
-> 작성 2026-09-21 · architect
+> 작성 2026-09-21 · architect · **v1(같은 날 오전)을 전면 교체한다.**
+> 근거: `NEXT.md` **§2-C**(2·3차 지시). §2-C 가 §2-A·§2-B 와 v1 보다 **위**다.
+> 버린 것은 §6 에 모았다 — 남은 사람이 v1 을 보고 헷갈리지 않게.
 >
-> ### 이 문서의 범위
-> `NEXT.md` §2-A 의 네 가지(① 고객–브랜드 · ② 고객–출하 마스터 · ③ 엑셀 템플릿 ·
-> ④ KUNNR 기본값)를 어떻게 구현할지, 그리고 §2-B 다섯 가지 미결의 **결론**.
+> 핵심 한 줄: **규칙엔진은 "모든 필드를 채우는 장치"가 아니라 "예외를 처리하는 장치"다.**
 >
-> 기존 문서를 고쳐야 하는 부분은 **§10(design.md) · §11(CLAUDE.md · SCHEMA.md · 계약)**
-> 에 "이렇게 고친다"는 문장으로 모아 두었다. 이 문서가 SSOT 가 되는 주제는 없다 —
-> 반영이 끝나면 각 SSOT 문서가 진실이고 이 문서는 **결정 근거 기록**으로 남는다.
+> ⚠ **`SALES ORDER` 템플릿 실물은 아직 없다.** 템플릿 관련 설계는 전부 "올라오면
+> 이렇게 동작한다"이고, **올라오기 전 동작(= `_base` 폴백)이 곧 지금 동작**이다.
+> 개발은 템플릿을 기다리지 않는다(§3.4).
 
 ---
 
 ## 0. 결정 요약
 
-번호는 `design.md` §0 의 D1~D11 에 이어 붙인다 (§10 에서 그대로 옮긴다).
+번호는 `design.md` §0 의 D1~D11 에 이어 붙인다.
 
-| # | 결정 | 한 줄 요약 |
-|---|---|---|
-| **D12** | **전송 필드의 목록·순서는 엑셀 템플릿 2행이 정한다** | `_base/sap_defaults.yaml` 은 **규격(label·max_len·type)** 만 맡는다 |
-| **D13** | **템플릿은 직접 읽는다** (가져오기 스크립트 없음) | 현업이 고치면 다음 요청에 반영. 단 **읽기 실패는 절대 화면을 멈추지 않는다** |
-| **D14** | 템플릿 위치 `masters/templates/SALES ORDER.xlsx` · **Git 추적** | 입력물이다. 생성물인 `masters/거래처마스터.xlsx` 와 성격이 반대다 |
-| **D15** | **브랜드 판정의 기본은 "그 고객의 브랜드 수"** | 1건이면 자동 채움, 2건 이상이면 공란 + 드롭다운. **문구 대조(`csv_map`)는 예외** |
-| **D16** | "1개" 기준 = **`brand_master.csv` 의 그 `kunnr` 행 수** | 매핑(`brand_keys.csv`) 진척도가 아니라 **SAP 이 허용한 선택지** 수다 |
-| **D17** | **고객–VSART–ZSHCO 는 참조표 1:1:1** (`refs/shipping.csv`) | 행이 없으면 **공란**. 추측해 채우지 않는다 |
-| **D18** | **KUNNR1 = KUNNR2 = KUNNR3 = 고객코드가 기본** | 조건이 있는 거래처(MSC 출하처 분기 등)만 덮어쓴다 |
-| **D19** | 전송 필드 36 → 약 15 **축소는 템플릿 편집으로 현업이 한다** | 코드·YAML 을 고치지 않는다. §7 은 **후보 제안일 뿐 확정이 아니다** |
+| # | 결정 |
+|---|---|
+| **D12** | **전송 필드의 목록·순서는 템플릿 2행**이 정한다. `_base` 는 **규격**(label·max_len·type·required)만 맡는다 |
+| **D13** | **템플릿 1행(설명)·2행(필드명)이 곧 Claude 추출 스키마**가 된다 |
+| **D14** | **선언이 없는 필드 = Claude 가 채운다.** `FIELD_NOT_DECLARED` 🔴 를 **폐지**한다 |
+| **D15** | **값의 출처는 2층**이다 — [1층] 마스터·기본값·Claude(전 거래처 공통) / [2층] 거래처 예외. §1 |
+| **D16** | 엔진 소관 필드는 Claude 스키마에서 뺀다. 목록을 **코드에 박지 않는다** — `fields` 선언이 있는 필드가 곧 뺄 필드(§3.2) |
+| **D17** | 브랜드는 **그 고객의 브랜드 수**로 판정. 1건=자동 · 2건 이상=공란+드롭다운. "1개"의 기준은 **`brand_master.csv` 의 그 `kunnr` 행 수** |
+| **D18** | **고객–VSART–ZSHCO 는 참조표 1:1:1**(`refs/shipping.csv`). 행이 없으면 **공란**(수기) |
+| **D19** | **KUNNR1 = KUNNR2 = KUNNR3 = 고객코드가 기본** |
+| **D20** | **템플릿 서명을 LLM 캐시 키에 넣는다.** 낡은 모양의 응답을 조용히 재생하지 않는다(§3.3) |
 
-**뒤집는 기존 결정 두 개** (왜 바꾸는지는 §4.1 · §6.1 에 적었다):
+**뒤집는 기존 결정**
 
 | 뒤집는 것 | 어디에 있었나 | 왜 |
 |---|---|---|
-| 브랜드는 `csv_map`(원문 문구 대조)이 기본이고 안 맞으면 막힌다 | `profiles/generic.yaml` · `customers/{msc,ygjp}.yaml` | 78곳 × 원문 문구를 사람이 다 채울 때까지 아무것도 못 한다. 실제로 301건이 "자동 초벌"로 채워져 있고 그건 확인된 값이 아니다 |
-| 공용 프로필은 모르는 값을 **비워 둔다** — "출하처를 판매처로 넣는 식" 금지 | `CLAUDE.md` §5 · `profiles/generic.yaml` 머리말 | 사장님 지시(§2-A ④). KUNNR **한정**으로 예외를 연다. 그 밖의 필드에 대한 금지는 그대로 유지한다 |
+| Claude 는 **원문 값만** 추출한다 (매핑은 전부 엔진) | `CLAUDE.md` §1 P1 | 필드 매칭을 Claude 가 한다. 교체문은 **§2** |
+| 전송 필드 **전량**이 거래처 YAML 에 선언돼 있어야 한다 | `SCHEMA.md` §4.6 · `row_builder.py:40` | D14 |
+| 브랜드는 `csv_map` 문구 대조가 기본 | `profiles/generic.yaml` · `msc/ygjp.yaml` | 자동 초벌 301건은 확인 안 된 값이다. 후보 수 판정이 기본이 된다 |
+| 공용 프로필은 모르는 값을 **비워 둔다** | `CLAUDE.md` §5 | **KUNNR1/2/3 한정**으로 푼다. 나머지 필드는 금지 그대로 |
 
 ---
 
-## 1. 무엇이 어떻게 달라지나 (한 장)
+## 1. 값은 어디서 오는가 — 기본 / 예외 2층 ★
+
+### 1.1 [1층] 기본 — 전 거래처 공통. **거래처별 선언이 없다**
+
+| 필드 | 출처 | 어떻게 |
+|---|---|---|
+| `VSART` · `ZSHCO` | **마스터 CSV** | `refs/shipping.csv` 를 고객코드로 조회 (고객 1 : VSART 1 : ZSHCO 1). 행이 없으면 **공란**(검수 화면에서 수기) |
+| `ZBRAND` | **마스터 CSV** | `refs/brand_master.csv` 의 그 고객 행이 1건이면 기본값, 2건 이상이면 **공란 + 드롭다운** |
+| `KUNNR1` · `KUNNR2` · `KUNNR3` | **기본값** | 셋 다 고객코드(`meta.customer_no`) |
+| `AUART` · `VKORG` · `VTWEG` | **공통 고정값** | `_base/sap_defaults.yaml` 의 `sap_defaults`. 선언 없이 적용된다(§4.2) |
+| `BSTKD` · `POSEX` | **Claude** | 발주서에서 읽어 해당 칸에 넣는다 |
+| **그 밖의 모든 필드** | **Claude** | 템플릿 1행(설명)·2행(필드명)을 보고 매칭 |
+
+> 1층에는 **거래처 이름이 한 번도 등장하지 않는다**(P2). 고객마다 달라지는 것은
+> 참조표를 거는 키(`meta.customer_no`) 하나뿐이다.
+
+### 1.2 [2층] 예외 — 고객별로 **하나씩 붙여나간다**
+
+처음부터 다 만들지 않는다. 필요한 곳에만 `customers/<code>.yaml` 에 적는다.
+현재 유일한 본격 사례가 **MSC** 다.
+
+| MSC 의 예외 | 스키마 | 1층 대비 |
+|---|---|---|
+| 발주서 1부가 출하처 수만큼 오더로 쪼개진다 | `split: {by: shipment}` | 1층에 없는 동작 |
+| 출하지에 따라 `KUNNR2` 가 달라진다 | `tables.ship_to_routing` (결정표) | 1층의 "고객코드" 기본값을 **덮어쓴다** |
+| 출하지에 따라 브랜드가 결정된다 | 같은 결정표의 `then` 에 `ZBRAND` 를 얹는다 | 1층의 **마스터 기본값을 덮어쓴다** |
+| 포장비고가 출하지 + 참조표로 조합된다 | `rules.ref_codes` + `fields.ZPKRE2` | 1층에 없는 동작 |
+
+> ⚠ **확인 필요**: 지시에는 "MSC 는 **출하지에 따라 브랜드가 결정된다**"고 되어 있으나
+> 현행 `masters/customers/msc.yaml` 은 브랜드를 **ORDERED FROM 문구**로 가린다
+> (`rules.brand_code` → `brand_keys.csv`). 둘은 다른 규칙이다. 어느 쪽이 운영
+> 사실인지 확인 전까지 **현행(문구 판정)을 유지**하고, 결정표로 옮기는 것은
+> 확인 후에 한다 → §9-1 `todo:`. 어느 쪽이든 **표현 방법은 §1.3 으로 같다.**
+
+### 1.3 2층이 1층을 덮어쓰는 규약 ★
+
+값 하나가 정해지는 순서. **처음 값이 나오는 곳에서 멈춘다.**
+
+| 순위 | 어디 | 예 |
+|---|---|---|
+| 1 | **거래처 예외 선언** — `customers/<code>.yaml` 의 `fields`(+ `tables`·`rules`) | MSC `KUNNR2: {from: table, table: ship_to_routing}` |
+| 2 | **1층 선언** — `profiles/standard.yaml` 의 `fields` | `KUNNR2: {from: expr, expr: 'meta.customer_no'}` |
+| 3 | **공통 고정값** — `_base.sap_defaults` (선언 불필요) | `AUART = "ZEXP"` |
+| 4 | **Claude 가 템플릿 칸에 채운 값** (`row.<필드>`) | `MATNR` · `KWMENG` · `BSTKD` · `POSEX` … |
+| 5 | 공란 | |
+
+**규약 셋**
+
+1. **병합은 항목 단위 교체**다(SCHEMA §1). 거래처가 `KUNNR2` 를 선언하면 1층 선언은
+   **통째로** 대체된다. 일부만 덮어쓸 수 없다 — 필요한 키를 전부 다시 적는다.
+2. **예외를 붙이는 순간 그 필드는 Claude 의 스키마에서 빠진다**(D16). 선언이 있다는 것은
+   "이 칸은 엔진이 정한다"는 뜻이고, 그래야 두 출처가 충돌하지 않는다.
+3. 반대로 **1층 선언을 걷어내고 Claude 에게 맡기려면 `{from: llm}`** 을 명시한다
+   (병합이 항목 단위 교체라 "지움"을 표현할 방법이 필요하다).
+
+```yaml
+# customers/<code>.yaml — 이 거래처만 출하조건을 발주서에서 읽게 한다
+fields:
+  ZSHCO: { from: llm }
+```
+
+### 1.4 흐름 한 장
 
 ```
-            [지금]                              [바뀐 뒤]
-
-필드 목록   _base/sap_defaults.yaml (36)   →   SALES ORDER.xlsx 2행 (현업이 정함)
-필드 규격   _base/sap_defaults.yaml         →   그대로 (_base 가 계속 원천)
-브랜드      brand_keys.csv 문구 대조        →   brand_master.csv 후보 수로 판정
-            (안 맞으면 🔴/🟡)                     1건=자동 · N건=드롭다운
-                                                문구 대조는 **예외 규칙**으로 얹는다
-VSART/ZSHCO 거래처 YAML 고정값              →   refs/shipping.csv (1:1:1), 없으면 공란
-KUNNR2      공란 + todo                     →   고객코드(기본) · 조건 있으면 덮어씀
+masters/templates/SALES ORDER.xlsx
+  1행  오더유형  판매조직  …  자재번호   수량     PO품목번호
+  2행  AUART     VKORG     …  MATNR     KWMENG   POSEX
+                                └──────── Claude 스키마의 rows[] 속성 ────────┘
+                                          (선언이 있는 필드는 여기서 빠진다)
+발주서 ──→ Claude ──→ rows[]  {MATNR:{value,evidence,…}, KWMENG:{…}, POSEX:{…}, …}
+                      doc     {po_number, po_date, ship_to_text, …}  ← 2층 규칙의 입력
+                                │
+                                ▼
+                      [1층] shipping.csv · brand_master.csv · 고객코드 · 공통 고정값
+                                │
+                                ▼
+                      [2층] 거래처 예외 (있는 곳만) — 결정표 · split · 조합식
+                                │
+                                ▼
+                      전송 행 = 템플릿 2행 순서 그대로 → 검수(P5) → JSON → HTTPS → EAI
 ```
 
-**엔진 코드는 거의 바뀌지 않는다.** 이미 `field_order = list(field_specs)` 로 돌고 있어서
-(`backend/app/rules/engine.py:74`), 로더가 `field_specs` 를 템플릿 순서로 갈아끼우면
-행 생성·검증·그리드·전송 페이로드가 **전부 따라온다.** 새로 만드는 코드는
-① 템플릿 리더 ② 규칙 `kind: csv_choice` ③ 드롭다운 후보 전달 통로, 이 셋뿐이다.
+**엔진 코드는 거의 그대로다.** 이미 `field_order = list(field_specs)` 로 돌고 있어
+(`rules/engine.py:74`) 로더가 `field_specs` 를 템플릿 순서로 갈아끼우면 행 생성·검증·
+그리드·전송이 전부 따라온다. 새로 만드는 것은 ① 템플릿 리더 ② 템플릿 기반 추출 스키마
+③ `from: llm` 기본 동작 ④ `csv_choice`(브랜드 후보), 넷이다.
 
 ---
 
-## 2. SSOT 충돌 해소 ★ (`NEXT.md` §2-B 1)
+## 2. `CLAUDE.md` §1 P1 교체문 ★
 
-### 2.1 책임 분리
-
-| 주제 | 유일한 원천 | 누가 읽나 | 없거나 어긋나면 |
-|---|---|---|---|
-| 전송 필드 **목록과 순서** | `masters/templates/SALES ORDER.xlsx` **2행** | 로더가 읽어 `field_specs` 를 재구성 | `_base` 순서로 폴백 + 배너(§3.4) |
-| 전송 필드 **규격** — `label` · `sheet` · `max_len` · `type` | `masters/_base/sap_defaults.yaml` `field_specs` | 화면 헤더 · 길이 검증 · 계약 §3 | 규격 없는 필드는 **이름만으로** 통과(§3.5) |
-| 전 거래처 **공통 고정값** (AUART·VKORG·VTWEG·LGORT·ZTERM) | `masters/_base/sap_defaults.yaml` `sap_defaults` | `fields.*.from: base` | 변경 없음 |
-| 필드별 **값을 어떻게 채우는가** | `profiles/*.yaml` + `customers/*.yaml` 의 `fields` | 규칙엔진 ⑥ FIELDS | 변경 없음 |
-
-> 한 문장으로: **템플릿은 "무엇을 어떤 순서로 보낼지", `_base` 는 "그 필드가 어떤 규격인지",
-> 거래처 YAML 은 "그 값을 어떻게 채울지"를 각각 맡는다.** 셋은 겹치지 않는다.
-
-### 2.2 유효 필드 목록 = 교집합 규칙
-
-로더가 계산하는 결과를 **유효 필드 목록(effective field list)** 이라 부른다.
-이후 `columns` · 그리드 · 검증 · 전송 페이로드는 **전부 이 목록**을 쓴다.
-
-| 경우 | 유효 목록에 | 규격 | 값 매핑 | 알림 |
-|---|---|---|---|---|
-| 템플릿 ○ · `_base` ○ | **들어간다** (템플릿 순서) | `_base` 것 | 거래처 YAML | — |
-| 템플릿 ○ · `_base` ✗ | **들어간다** | `label` = 필드명, `max_len` 없음 | **없으면 로더가 `{from: const, value: ""}` 를 끼운다** | 🟡 배치 노트 1건 + `validate_masters` 경고 |
-| 템플릿 ✗ · `_base` ○ | **빠진다** (전송 안 함) | — | 선언이 남아 있어도 무해 | `validate_masters` 리포트("미사용 선언") |
-| 템플릿을 못 읽음 | `_base` 36개 전량 | `_base` | 그대로 | 🟡 화면 배너 + `/api/health` |
-
-**템플릿에만 있는 필드에 `{from: const, value: ""}` 를 자동으로 끼우는 이유**:
-끼우지 않으면 `row_builder` 가 행마다 `FIELD_NOT_DECLARED` 🔴 를 달고
-(`backend/app/mapping/row_builder.py:40`) **전송이 통째로 막힌다.** 현업이 템플릿에
-열 하나를 추가한 순간 업무가 서는 것은 이 시스템의 본업(발주서를 표로 옮기기)에
-반한다. 빈 값으로 보내고 **배치 노트로 한 번** 알린다.
-
-또한 자동 선언에는 `required` 를 달지 않는다 — `required: warn` 을 달면 49행짜리
-배치에서 같은 경고가 49개 쌓여 진짜 경고가 묻힌다. 알림은 **배치당 1건**이다.
-
-### 2.3 `CLAUDE.md` §2 표를 이렇게 고친다 (문장 그대로)
-
-현재 첫 행:
+### 2.1 표의 P1 행 — **이 문장 그대로** 교체한다
 
 ```
-| 전송 필드 목록·개수·max_len | `masters/_base/sap_defaults.yaml` | "전송 필드 전량"이라고만 쓴다 |
+| P1 | **배치는 Claude, 코드는 규칙엔진** | Claude 는 ① 문서의 **원문 값**을 읽고 ② 그 값이 **템플릿의 어느 칸**에 들어가는지까지 정한다 (1행=설명 · 2행=SAP 필드명을 주므로 자연어 매칭이다). **그러나 값을 만들어내지 않는다** — SAP 코드 결정(`ZBRAND`·`VSART`·`ZSHCO`·`KUNNR1/2/3` 과 거래처 예외가 정하는 필드), 참조표 조회, 날짜·수량 **형식 변환**은 규칙엔진 몫이고, 그 필드들은 **애초에 Claude 의 출력 스키마에 없다**. 모든 값에는 원문 evidence 가 붙는다 |
 ```
 
-**아래 두 행으로 교체한다.**
+### 2.2 표 아래 인용문 — 교체한다
 
 ```
-| 전송 필드 **목록·순서** | `masters/templates/SALES ORDER.xlsx` **2행** | "전송 필드 전량"이라고만 쓴다. 개수를 세지 않는다 |
-| 전송 필드 **규격** (label·sheet·max_len·type) | `masters/_base/sap_defaults.yaml` 의 `field_specs` | 규격만 적는다. **어떤 필드를 보낼지는 템플릿이 정한다** |
+> P1을 어기면 재현성과 감사가 무너진다. **"HARRISBURG" 를 읽고 그것이
+> `SHIP-TO PARTY` 칸의 근거라고 보는 데까지가 LLM 이고, `KUNNR2=319677` 을
+> 정하는 건 결정표다.** 경계는 말이 아니라 **출력 스키마가 지킨다** — 엔진이
+> 정하는 필드는 스키마에 자리가 없어 Claude 가 값을 넣을 방법 자체가 없다.
+>
+> **여전히 금지**
+> · `hints` · 템플릿 1행에 **변환 지시**를 쓰는 것 ("ELKHART 면 100249", "YYYYMMDD 로 바꿔라")
+> · 엔진이 정하는 필드를 LLM 출력으로 채우는 것 (스키마에서 빼고, 들어와도 버린다)
+> · evidence 없는 값을 근거 있는 값처럼 다루는 것
+> · **템플릿 1행에 업무 규칙을 적는 것.** 1행은 "이 칸이 무엇인가"를 설명하는
+>   자리이지 "언제 무엇을 넣어라"를 지시하는 자리가 아니다
 ```
 
-그리고 같은 표에 **아래 두 행을 새로 넣는다.**
+### 2.3 왜 이 경계인가 (근거 — 문서에는 옮기지 않는다)
 
-```
-| 고객별 브랜드 후보 (SAP 등록분) | `masters/refs/brand_master.csv` | 읽기 전용. `import_brand_master.py` 로만 교체한다 |
-| 고객별 운송수단·출하조건 (VSART·ZSHCO) | `masters/refs/shipping.csv` | 1 고객 = 1 행. 행이 없으면 **공란**이다 |
-```
+칸 배치를 LLM 에 맡겨도 안전한 이유는 **틀려도 사람이 즉시 알아본다**는 데 있다 —
+수량 칸에 단가가 들어가 있으면 그리드에서 보인다. 코드 결정은 반대다: `KUNNR2` 에
+`319678` 이 들어 있으면 맞는지 틀린지 화면으로 알 수 없고, 틀리면 **SAP 오더가 조용히
+잘못 생성된다.** 그래서 코드는 끝까지 데이터(마스터)가 정한다.
 
-§2 표 바로 아래 굵은 문장도 교체한다.
-
-```
-현재: **전송 필드 개수를 코드에 하드코딩하지 않는다.** 현재 36개지만 34가 되어도 코드·화면은 그대로 동작해야 한다.
-
-교체: **전송 필드 개수를 코드에 하드코딩하지 않는다.** 목록과 순서는 `SALES ORDER` 템플릿 2행이 정하고, 코드는 그 순서를 받아 돈다. 36이 15가 되어도 코드·화면·전송은 그대로 동작해야 한다. 템플릿을 읽지 못하면 `_base` 순서로 폴백하되 **조용히 넘어가지 않는다** (화면 배너 · `/api/health`).
-```
-
-§5 금지 목록에는 **세 행을 추가한다.**
-
-```
-| 전송 필드 목록을 `_base` 에서 세기 | 목록은 템플릿 2행이 정한다. `_base` 는 규격만 맡는다 |
-| 템플릿 읽기 실패에 예외를 올리기 | 엑셀 한 칸 때문에 화면 전체가 트레이스백이 된다. `_base` 로 폴백하고 배너로 알린다 |
-| 템플릿에만 있는 필드에 🔴 를 달기 | 현업이 열 하나 추가한 순간 전송이 막힌다. 빈 값으로 보내고 배치 노트 1건으로 알린다 |
-```
-
-§5 의 기존 행 하나는 **문구를 고친다** (§6.1 참조).
-
-```
-현재: | 공용 프로필이 모르는 값을 **추측해 채우기** | 출하처를 판매처로 넣는 식. 그럴듯하면 사람이 확인 없이 넘긴다. **비워 두고 `required: warn`** — 빈 칸은 눈에 띈다 |
-
-교체: | 공용 프로필이 모르는 값을 **추측해 채우기** | 그럴듯하면 사람이 확인 없이 넘긴다. **비워 두고 `required: warn`** — 빈 칸은 눈에 띈다. **단 KUNNR1/2/3 은 예외다**: 셋 다 고객코드가 기본값이고(2026-09-21 지시), 다른 거래처는 조건을 건다 |
-```
-
-§3 명령어에는 한 줄 추가한다.
-
-```bash
-# 전송 필드 템플릿 점검 — 2행에서 무엇을 읽었는지 · _base 와 무엇이 다른지 (LLM 호출 없음 = 비용 0)
-python scripts/check_template.py
-```
+> ⚠ 1층이 "그 밖의 모든 필드"를 Claude 에게 맡기므로, **코드성 필드**(`ZTERM`
+> `INCO1` `AUGRU` `VKAUS` 등)에 문서 원문이 그대로 들어갈 수 있다("NET 30" → 4자리
+> 코드 자리). 안전망은 ① `max_len` 검증 ② 검수 화면 ③ SAP 거부, 셋이다.
+> 그 열을 안 쓰면 **현업이 템플릿에서 빼는 것**이 정답이고, 써야 하면 **2층 예외로
+> 매핑표를 붙인다**(§5). 이 위험을 `check_template.py` 가 목록으로 띄운다.
 
 ---
 
-## 3. 템플릿 읽기 설계 (`NEXT.md` §2-B 2·3)
+## 3. 템플릿을 Claude 에게 어떻게 넘기나 ★
 
-### 3.1 위치와 Git
+### 3.1 템플릿 읽기
 
 | 항목 | 값 |
 |---|---|
-| 경로 | `masters/templates/SALES ORDER.xlsx` |
-| Git | **추적한다.** 입력물이고, 이것이 바뀌면 전송 내용이 바뀌므로 이력이 남아야 한다 |
-| 덮어쓰기 | 현업이 파일 그대로 교체. 화면의 Git 동기화(`gitsync`)가 `add`·`commit`·`push` 한다 |
-| `.env` 재정의 | `FIELD_TEMPLATE=` (절대/상대 경로) · `FIELD_TEMPLATE_SHEET=` (기본: 첫 시트) |
+| 경로 | `masters/templates/SALES ORDER.xlsx` · **Git 추적**(생성물이 아니라 입력물이다) |
+| `.env` 재정의 | `FIELD_TEMPLATE=` · `FIELD_TEMPLATE_SHEET=` (기본: 첫 시트) |
+| 읽는 곳 | **1행 = 설명** · **2행 = SAP 필드명**. 3행 이하는 보지 않는다 |
+| 열 범위 | A열부터 오른쪽. **빈 칸 5칸 연속**이면 종료(잔여 서식·병합 때문에 used range 를 믿지 않는다) |
+| 필드명 정규화 | `strip` → 공백·개행 제거 → 대문자. `[A-Z][A-Z0-9_]*` 만 인정. 중복은 **첫 번째만** + 경고 |
+| 캐시 | `(경로, mtime, size)` — 로더의 `_load_yaml` 과 같은 방식. 서버 재시작 불필요 |
+| 실패 | **예외를 올리지 않는다.** `TemplateStatus{ok, source, path, reason, fields, descriptions}` 를 항상 돌려준다 |
 
-`.gitignore` 의 `masters/*.xlsx` 는 **`masters/` 직속 파일만** 가린다 —
-`masters/templates/SALES ORDER.xlsx` 는 추적된다. 다만 나중에 누가 패턴을
-`masters/**/*.xlsx` 로 넓힐 수 있으니 `.gitignore` 에 의도를 한 줄 남긴다.
+`source` 는 `template` | `memory`(이 프로세스가 앞서 읽어 둔 목록) | `base`.
+`template` 이 아니면 **항상 배너**를 띄운다 — 조용히 낡은 목록을 쓰는 것이 가장 나쁘다.
+노출 지점: `GET /api/masters/fields` · `GET /api/health` · 화면 상단 배너 ·
+`scripts/check_template.py` · `validate_masters.py`.
 
-```
-# 거래처 마스터 엑셀 — 생성물이다 (masters/ 직속만 가린다)
-masters/*.xlsx
-# ↑ masters/templates/ 는 **입력물**이다. 전송 필드 목록의 원천이므로 추적한다.
-```
+### 3.2 추출 스키마의 모양 (`schema_builder.py`)
 
-> ⚠ 커밋 전 확인: 템플릿에 거래처 실데이터(단가·품번)가 남은 시트가 있으면 지우고
-> 헤더만 남긴다. `samples/` 가 대외비인 이유와 같다.
-
-### 3.2 무엇을 읽나
-
-| 항목 | 규약 |
-|---|---|
-| 시트 | `FIELD_TEMPLATE_SHEET` 가 있으면 그 이름, 없으면 **첫 시트** |
-| 행 | **2행** 고정 (1행은 사람이 보는 설명행 — 읽지 않는다) |
-| 열 범위 | A열부터 오른쪽으로. **빈 칸 5칸 연속**이면 거기서 끝 (병합·잔여 서식 때문에 used range 를 믿지 않는다) |
-| 정규화 | `strip()` → 내부 공백·개행 제거 → **대문자**. `SALES ORDER TYPE` 같은 1행 라벨이 섞여 들어오는 것을 막기 위해 `[A-Z][A-Z0-9_]*` 패턴만 필드명으로 인정한다 |
-| 빈 칸 | 건너뛴다 (끝으로 치지 않는다 — 위 5칸 규칙으로만 종료) |
-| 중복 이름 | **첫 번째만** 채택하고 경고. 뒤쪽은 어차피 같은 키로 덮어써져 의미가 없다 |
-| 순서 | **읽은 순서가 곧 전송 순서**다. 열 위치가 아니라 이름으로 움직이되, 순서는 왼→오른쪽 그대로 |
-
-### 3.3 캐시
-
-`backend/app/masters/loader.py` 의 `_load_yaml` 과 같은 방식 — **`(경로, mtime, size)` 를
-캐시 키로 삼는다.** 현업이 파일을 고치면 다음 요청에서 자동으로 다시 읽고,
-고치지 않았으면 openpyxl 을 다시 돌리지 않는다. 서버 재시작이 필요 없다.
-
-### 3.4 읽기 실패 시 동작 ★ — 화면은 절대 멎지 않는다
-
-리더는 **예외를 올리지 않는다.** 언제나 아래 구조를 돌려준다.
+지금은 **고정 표준 키**(`_HEADER_FIELDS` 12 · `_LINE_FIELDS` 13) + `extra_fields` 다.
+바뀐 뒤는 **두 블록**이다.
 
 ```
-TemplateStatus
-  ok: bool
-  source: "template" | "memory" | "base"      # 무엇을 썼는지
-  path: str
-  reason: str          # ok=false 일 때 사람이 읽을 한국어 한 문장
-  fields: list[str]    # 유효 필드 목록 (항상 비어 있지 않다)
-```
-
-| 상황 | `source` | 동작 |
-|---|---|---|
-| 정상 | `template` | 2행 목록 사용 |
-| 파일 없음 | `base` | `_base` 순서 사용 + 배너 |
-| 열기 실패 (손상·암호·xls 구형) | `base` 또는 `memory` | 이전에 성공한 목록이 **이 프로세스 메모리에 있으면** 그것을 유지, 없으면 `_base` |
-| 잠김(현업이 엑셀로 열어둠, `PermissionError`) | `memory` → `base` | 위와 같다. `~$*.xlsx` 임시 파일은 아예 보지 않는다 |
-| 2행이 비었거나 인식된 필드 0개 | `base` | `_base` + 배너 ("2행에서 필드명을 찾지 못했습니다") |
-
-**`memory` 폴백을 두는 이유**: 검수 도중 현업이 템플릿을 엑셀로 열면 그 순간
-컬럼 수가 36으로 튀어 그리드가 통째로 바뀐다. 이미 읽어 둔 목록을 유지하는 편이
-덜 놀랍다. 단 `source` 가 `template` 이 아니면 **항상 배너를 띄운다** — 조용히
-낡은 목록을 쓰는 것이 가장 나쁘다.
-
-### 3.5 노출 지점 (조용히 넘어가지 않기)
-
-| 어디 | 무엇을 |
-|---|---|
-| `GET /api/masters/fields` | 응답에 `"template": { "ok": "true", "source": "template", "path": "...", "reason": "" }` |
-| `GET /api/health` | `"template"` 블록 동일. 모니터링·`check.bat` 이 본다 |
-| 스트림릿 화면 상단 | `ok=false` 면 `st.warning(icon="⚠️")` 배너 한 줄 |
-| `scripts/check_template.py` | 2행에서 읽은 목록 · `_base` 와의 차집합 양방향 · 중복 · 폴백 사유 |
-| `scripts/validate_masters.py` | 검사 12~14 (§3.6) |
-
-### 3.6 검증 추가 (`masters/SCHEMA.md` §7 에 등재)
-
-| # | 검사 | 실패 시 |
-|---|---|---|
-| 12 | 템플릿을 읽었는가 (`source == "template"`) | **경고** — 오류로 올리면 템플릿 없는 CI 가 전부 죽는다 |
-| 13 | 템플릿에만 있고 `_base` 에 규격이 없는 필드 | 경고 + 목록 |
-| 14 | `_base` 에만 있고 템플릿에 없는 필드(= 안 보내는 필드) | 리포트 + 목록 |
-| 15 | 유효 필드 목록이 거래처 파일(병합 결과)에 **전부 선언**됐는가 | **오류** — 기존 검사 1을 유효 목록 기준으로 바꾼 것 |
-
-> 검사 1 은 `_base` 36개를 기준으로 삼았다. 이제 기준이 유효 목록이므로 **검사 1 의
-> 문구를 "유효 필드 목록"으로 고치고** 검사 15 는 따로 두지 않는다 (§11.2).
-
----
-
-## 4. 브랜드 판정 단순화 (`NEXT.md` §2-A ① · §2-B 4)
-
-### 4.1 왜 바꾸나
-
-지금 구조는 **원문 문구 → 코드** 대조(`csv_map`)가 유일한 경로다. 그 표를 사람이
-채우기 전에는 브랜드가 안 나오고, MSC·YGJP 외에는 `seed_brand_keys.py` 가
-**SAP 브랜드명을 그대로 문구로 박은 자동 초벌 301건**이 들어가 있다. 이건
-확인된 값이 아니고(`ACCUPRO BRAND` vs 실제 `ACCUPRO`), 우연히 걸리면
-**조용히 틀린 코드가 전송된다.**
-
-사장님 지시의 핵심은 판정 근거를 바꾸는 것이다 — **"그 고객이 SAP 에서 쓸 수 있는
-브랜드가 몇 개인가"** 가 기본이고, 문구 대조는 그걸로 안 되는 곳의 예외다.
-78곳 중 브랜드가 1개인 고객은 그 자리에서 끝나고, 여러 개인 고객은 사람이 고른다.
-**추측이 끼어들 자리가 없다.**
-
-### 4.2 "1개"의 기준 — `brand_master.csv` 의 그 `kunnr` 행 수 ★
-
-| 후보 | 채택 | 이유 |
-|---|---|---|
-| `brand_master.csv` 의 `kunnr` 행 수 | ✅ | SAP 이 **그 고객에게 허용한 선택지**가 곧 후보다. 사람 작업과 무관하게 정해져 있다 |
-| `brand_keys.csv` 의 매핑된 행 수 | ✗ | 사람이 어디까지 채웠는지를 뜻할 뿐이다. 4개짜리 고객에서 1개만 채워졌을 때 그 1개가 자동으로 박히면 **틀린 값을 확인 없이 넘긴다** |
-
-### 4.3 스키마 — 새 규칙 `kind: csv_choice`
-
-거래처 이름은 어디에도 없다(P2). 전 고객이 **같은 선언**을 쓰고, 다른 것은
-`filter_column` 이 보는 `meta.customer_no` 뿐이다.
-
-```yaml
-rules:
-  brand_pick:
-    kind: csv_choice
-    label: "브랜드 후보"
-    description: |
-      SAP 브랜드 마스터에서 이 고객에게 등록된 브랜드를 후보로 삼는다.
-      후보가 1건이면 그 값이 기본값이고, 2건 이상이면 공란 + 검수 화면 드롭다운이다.
-    table_file: refs/brand_master.csv
-    filter_column: kunnr          # meta.customer_no 와 같은 행만 후보
-    value_column: zbrand
-    label_column: zbrant          # 드롭다운에 함께 보일 이름
-    when_single: auto             # auto(기본) = 후보 1건이면 채운다 | empty = 안 채운다
-    when_multi: empty             # empty(기본) = 공란 | error
-    on_no_candidates:
-      action: warn                # 브랜드가 0건인 고객 — 업로드는 catalog 가 이미 막는다
-      message: "이 고객에게 등록된 브랜드가 없습니다"
-```
-
-| 키 | 필수 | 내용 |
-|---|---|---|
-| `table_file` | ✅ | 후보 목록이 든 CSV (`masters/` 기준 상대경로) |
-| `filter_column` | ✅ | 이 컬럼이 `meta.customer_no` 와 같은 행만 후보다 |
-| `value_column` | ✅ | 후보 값(코드) |
-| `label_column` | | 드롭다운 표시용 이름. 없으면 값만 보여준다 |
-| `when_single` | | `auto`(기본) · `empty` |
-| `when_multi` | | `empty`(기본) · `error` |
-| `on_no_candidates` | | `{action: warn\|error\|empty, message}` · 기본 `warn` |
-
-**반환**: 값(문자열) + **후보 목록**. 후보 목록은 컨텍스트 경로로 참조하지 않는다
-(값이 아니라 화면 재료다). 필드와는 아래 `choices_from` 으로 잇는다.
-
-### 4.4 필드 옵션 `choices_from` (신규)
-
-```yaml
-fields:
-  ZBRAND:
-    from: rule
-    rule: brand_pick
-    choices_from: brand_pick      # 이 필드의 드롭다운 후보를 대는 규칙
-    required: warn
+extract_purchase_order(input_schema)
+├─ doc        ← 2층 규칙의 입력으로 쓰이는 원문만 남긴다 (축소)
+│    po_number, po_date, ship_to_text, brand_text, packing_spec, remark_default
+├─ shipments[]  ← split.by != none 일 때만 (지금은 MSC 한 곳)
+│    shipment_no, receiving_loc, ship_to_text, ship_by_text, remark, rows[]
+├─ rows[]     ← ★ **속성 이름이 템플릿 2행 그대로**
+│    _line_no : integer            (발주서에 나타난 순서. 스냅샷 대조 기준)
+│    our_item : 거래처 품번          (참조표 조회 키 — 전송 칸이 아니다)
+│    MATNR · KWMENG · POSEX · BSTKD · MAKTX · PRICE …
+│        각각 {value, evidence, page, confidence}
+├─ totals { line_count, total_qty, total_amount }
+└─ notes[]
 ```
 
 | 항목 | 규약 |
 |---|---|
-| 영향 범위 | **화면뿐이다.** 전송 값은 `from` 이 정한 그대로 |
-| 검증 | 최종 값이 비어 있지 않은데 후보에 **없으면** 🟡 `NOT_IN_CHOICES`. 🔴 로 올리지 않는다 — 사람이 고른 값이 최종 진실이다(P5) |
-| 후보 수집 | 오더 단위마다 평가하되 **배치 단위로 합집합**을 만들어 계약 §5 의 `choices` 로 내린다 |
+| 속성 이름 | 템플릿 **2행** 문자열 그대로(정규화 후) |
+| 속성 `description` | 템플릿 **1행**. 비었으면 `_base.field_specs[name].label` + `sheet`. 둘 다 없으면 필드명 자체 + 🟡(`check_template` 이 "설명 없는 칸"으로 띄운다) |
+| 값 봉투 | `{value, evidence, page, confidence}` — **바꾸지 않는다.** 환각 차단(`grounding.py`)의 전제다 |
+| 헤더/라인 구분 | 두지 않는다. **템플릿은 행 단위 양식**이고 헤더성 값은 행마다 반복된다. 판단을 Claude 에게 떠넘기지 않는다 |
+| 빈 칸 | 못 찾으면 `value: null`. 지어내지 않는다 (시스템 프롬프트 1번 그대로) |
+| 거래처 고유 원문 | `extraction.extra_fields` 로 계속 선언 가능. **다만 이제 "엔진 입력 전용"** 이다 (전송 칸은 템플릿이 만든다) |
 
-> 후보가 행마다 달라지는 경우(결정표가 후보를 가르는 식)는 지금 없다 —
-> `filter_column` 이 고객코드라 배치 안에서 상수다. 행마다 달라야 할 요구가
-> 생기면 그때 행 단위 `_choices` 를 계약에 추가한다. `todo:` 로 남긴다.
+**엔진이 정하는 필드를 빼는 방법 — 목록을 박지 않는다**
 
-### 4.5 예외(별도 로직)는 규칙을 하나 **얹는다**
-
-MSC 처럼 원문 문구로 가려야 하는 곳은 기존 `csv_map` 을 **이름만 바꿔** 남기고,
-필드에서 둘을 잇는다. 규칙끼리는 서로 참조할 수 없지만(SCHEMA §2), **필드의
-`expr` 은 규칙 결과 여러 개를 조합할 수 있다.**
-
-```yaml
-# customers/msc.yaml
-rules:
-  brand_by_text:                  # ← 기존 brand_code 를 이름만 바꾼 것
-    kind: csv_map
-    source: header.brand_text
-    table_file: refs/brand_keys.csv
-    filter_column: kunnr
-    key_column: text
-    mode_column: match
-    value_column: zbrand
-    case_insensitive: true
-    value_check: { table_file: refs/brand_master.csv, value_column: zbrand, filter_column: kunnr }
-    on_no_match: { action: empty }      # ★ error 아님 — 못 맞히면 후보 쪽으로 넘긴다
-
-fields:
-  ZBRAND:
-    from: expr
-    expr: 'coalesce(brand_by_text, brand_pick)'
-    choices_from: brand_pick
-    explain: "발주서 문구로 먼저 가리고, 못 가리면 이 고객의 브랜드 후보로 채웁니다"
-    required: true
+```
+llm_field_names = [ f for f in effective_field_list if f not in merged_master.fields ]
 ```
 
-| 거래처 | 브랜드 판정 |
-|---|---|
-| 전용 규칙 없는 곳(75곳) · 공용 프로필 | `brand_pick` 만 — 1건이면 자동, N건이면 드롭다운 |
-| MSC · YGJP | `brand_by_text` → 실패 시 `brand_pick` |
-| KL | `{from: const, value: "2"}` 그대로 (브랜드 고정. 후보 판정도 필요 없다) |
+병합된 마스터에 `fields` 선언이 있는 필드 = 엔진이 정하는 필드 = 스키마에서 제외.
+코드에 필드 이름도 거래처 이름도 등장하지 않는다(P2 · §5 금지 "엔진 코드에 전송 필드
+이름 나열"). 거래처가 예외를 하나 붙이면 **그 거래처의 스키마에서만** 그 칸이 빠진다.
+그래도 응답에 섞여 오면 **버리고 배치 노트 1건**(행마다 경고하지 않는다).
 
-**`on_no_match: {action: empty}` 로 내리는 이유**: 지금은 `error` 라 문구를 못 맞히면
-행이 🔴 가 되어 전송이 막힌다. 이제 뒤에 후보 경로가 있으므로 **막을 이유가 없다.**
-후보로도 못 채우면 `required` 가 걸러준다.
+### 3.3 캐시 키와 픽스처에 미치는 영향 ★★
 
-### 4.6 공통 규칙을 **프로필로 올린다** (스키마 변경)
+지금 런타임 캐시 키는 `sha256(문서 ‖ prompt_version ‖ customer ‖ model)` 이고
+(`providers/cache.py:30`) **추출 스키마는 키에 없다.** 스키마가 바뀌면 사람이
+`LLM_PROMPT_VERSION` 을 올려 무효화하는 수동 방식이다. 템플릿을 현업이 아무 때나
+고치는 구조에서 이대로 두면 **낡은 모양의 응답이 조용히 재생된다** — 열을 추가해도
+그 칸이 영원히 비어 나오고 아무도 이유를 모른다.
 
-`brand_pick` 과 §5 의 `shipping` 은 전 거래처가 똑같이 쓴다. 78개 파일에 복사할 수
-없으므로 `profiles/standard.yaml` 에 올린다. 지금 SCHEMA §1.1 은 프로필에
-`fields` 와 `grid` 만 허용한다 — **`rules` 를 허용하도록 고친다**(§11.2).
+**결정(D20)**: 캐시 키에 **템플릿 서명**을 한 부분으로 추가한다.
 
-```yaml
-# profiles/standard.yaml (발췌)
-rules:
-  brand_pick:  { kind: csv_choice, ... }     # §4.3
-  shipping:    { kind: lookup,     ... }     # §5.2
-
-fields:
-  ZBRAND: { from: rule, rule: brand_pick, choices_from: brand_pick, required: warn }
+```
+template_sig = sha256( "\x00".join(llm_field_names) )[:16]      # 이름 + 순서만
+cache_key    = sha256( 문서 ‖ prompt_version ‖ customer ‖ model ‖ template_sig )
 ```
 
-병합은 항목 단위 교체(SCHEMA §1)라, 거래처가 `rules.brand_by_text` 를 더해도
-프로필의 `brand_pick` 은 그대로 남는다. 안전하다.
+| 무엇 | 키에 | 왜 |
+|---|---|---|
+| 필드 **이름과 순서** | ✅ | 출력 **모양**이 바뀐다. 재생하면 칸이 비거나 남는다 — 틀린 결과다 |
+| 1행 **설명 문구** | ❌ | 모양이 아니라 **프롬프트 품질**이다. `hints` 를 키에서 뺀 것과 같은 이유 — 문구 한 글자 고칠 때마다 전 문서 재파싱이 유료면 아무도 문구를 못 고친다(`cache.py` 머리말) |
 
-### 4.7 `brand_keys.csv` 와 브랜드 매핑 화면은 **그대로 둔다**
+- 마스터에서 **필드 선언을 추가·삭제해도 캐시가 갈린다**(`llm_field_names` 가 달라진다).
+  의도한 동작이다 — 스키마 모양이 실제로 바뀐다.
+- 설명만 고치고 다시 뽑고 싶으면 기존 수단 그대로 `LLM_PROMPT_VERSION` 을 올린다.
+- 캐시 파일에 `template_sig` 와 **설명 서명**(`desc_sig`)을 함께 적어 둔다.
+  `check_template.py` 가 "이 캐시는 예전 설명으로 뽑혔습니다"를 보여줄 수 있다.
+- 서명이 갈리면 옛 캐시 항목은 고아가 된다. **지우지 않는다**(되돌릴 근거다).
+  용량이 문제가 되면 그때 정리 스크립트를 만든다 → `todo:`.
 
-| 항목 | 새 위치 |
+**픽스처는 키가 아니라 이름(`{거래처}__{파일명}`)으로 찾는다.** 그래서 템플릿이 바뀌어도
+**픽스처는 그대로 재생된다** — 장점이자 이번 변경의 함정이다. 낡은 템플릿으로 박은
+픽스처가 현재 모양과 다른 채 조용히 재생된다.
+
+| 조치 | 내용 |
 |---|---|
-| `refs/brand_keys.csv` | **예외 거래처 전용**이 된다. 기본 경로에서 빠진다 |
-| `/api/brands/*` · 브랜드 매핑 탭 | 유지. 예외 거래처의 문구를 채우는 화면이다 |
-| 자동 초벌 301건 | **기본 경로에서 빠지므로 위험이 내려간다.** `validate_masters` 의 TODO 리포트는 **`csv_map` 을 실제로 쓰는 거래처의 행만** 띄우도록 좁힌다 — 나머지는 아무 데도 쓰이지 않는 행에 대한 경고라 노이즈다 |
-| `seed_brand_keys.py` | **기본 실행에서 뺀다.** 예외 거래처를 만들 때만 쓴다 |
-| `catalog.CatalogEntry.ready` | 그대로 — 브랜드가 0건인 고객은 업로드를 막는다. 이제 `ready` 는 "후보가 있다"와 정확히 같은 뜻이 된다 |
+| 서명 기록 | `pin_fixture.py` 가 `{"template": {"sig": …, "fields": [...]}}` 를 같이 적는다 |
+| 재생 시 **모양 보정** | 픽스처에만 있는 키 → 버린다 · 현재 템플릿에만 있는 키 → 빈 값. **예외를 올리지 않는다**(시연 중에 죽으면 안 된다) |
+| 어긋나면 알린다 | 배치 노트 1건 + `pytest` 경고. 행마다 달지 않는다 |
+| 시연 전 | 템플릿을 바꿨으면 `pin_fixture.py` 를 다시 돌린다. `check_template.py` 가 "픽스처 N건이 현재 템플릿과 다릅니다"로 알려준다 |
+| 골든 테스트 | 기대 컬럼을 **유효 필드 목록에서 끌어온다**. 이름·개수를 박지 않는다 (`test_engine.py:40` · `test_send.py:126` · `test_api_masters.py:46` 이 해당) |
 
-### 4.8 화면 (드롭다운)
+### 3.4 템플릿이 없을 때 = **지금 동작**
 
-- `choices` 에 있는 컬럼은 `st.column_config.SelectboxColumn(options=[...])`.
-- **`options` 에는 빈 문자열과 "현재 값"을 반드시 포함한다.** 목록에 없는 값이 셀에
-  들어 있으면 스트림릿이 예외를 던져 화면 전체가 트레이스백이 된다 (같은 부류의
-  사고를 `test_ui_icons.py` 가 막고 있다 — 여기도 테스트를 둔다).
-- 표시는 `"205 · ACCUPRO BRAND"`, 저장은 코드만. 변환은 화면에서 한다.
-- ⚠ **드롭다운 컬럼은 붙여넣기가 막힐 수 있다.** §8.2 의 확인 결과에 따라
-  `SelectboxColumn` / `TextColumn + help 에 후보 나열` 중 하나로 확정한다.
-  화면이 `choices` 를 어떻게 그릴지는 화면의 판단이고, **계약은 후보 목록만 내린다.**
+| 상황 | 유효 필드 목록 | 설명 문구 | 알림 |
+|---|---|---|---|
+| 템플릿 있음 | 2행 순서 | 1행 | — |
+| 파일 없음 / 못 읽음 / 2행에서 0개 | `_base.field_specs` 순서 | `_base` 의 `label` + `sheet` | 🟡 배너 + `/api/health` |
+
+**폴백이 현행 동작과 같으므로** 템플릿이 올라오기 전에 전 구간을 만들고 테스트할 수 있다.
+테스트는 실물이 아니라 `backend/tests/fixtures/templates/` 의 작은 xlsx 를 쓴다
+(실물 `masters/` 를 건드리지 않는다 — `--masters` 사본 규약과 같다).
 
 ---
 
-## 5. 고객–운송수단–출하조건 마스터 (`NEXT.md` §2-A ②)
+## 4. 마스터 파일이 얼마나 비는가
 
-### 5.1 CSV 스키마 — `masters/refs/shipping.csv`
+### 4.1 원칙 한 줄
 
-```csv
-kunnr,vsart,zshco,note
-100249,04,A,MSC — 기존 운영 확인분
-107525,04,,KL — ZSHCO 미확정 (공란으로 둔다)
-3200,04,,YGJP — ZSHCO 는 브랜드 조건 분기라 거래처 YAML 이 정한다
-```
+> **선언은 예외를 적는 자리다.** 선언이 없으면 Claude 가 채운다(D14).
+> `row_builder.build_row` 의 `FIELD_NOT_DECLARED` 🔴 를 **없애고**, 선언이 없는 필드는
+> `row.<필드명>`(없으면 `""`)을 쓴다. 이 한 줄이 YAML 수십 줄을 지운다.
 
-| 컬럼 | 내용 |
-|---|---|
-| `kunnr` | 고객코드. **1 고객 = 1 행 (1:1:1)** |
-| `vsart` | 운송수단 (SAP `VSART`) |
-| `zshco` | 출하조건 (SAP `ZSHCO`) |
-| `note` | 자유 메모. 값이 있으면 `validate_masters` 리포트에 뜬다 (SCHEMA §1 의 `note` 규약과 동일) |
+### 4.2 `profiles/standard.yaml` — **36 선언 → 6 선언 + 2 규칙**
 
-**값이 없으면 공란이다. 비슷한 고객 것을 베껴 넣지 않는다.** 위 3행은 추측이 아니라
-현행 YAML 에 이미 확정값으로 적혀 있던 것을 옮긴 것이다(MSC `ZSHCO: "A"`,
-전 거래처 `VSART: "04"`). KL 의 ZSHCO 는 지금도 `todo:` 이므로 **빈 칸 그대로** 둔다.
-
-> `04`·`A` 의 앞자리 0 과 대소문자를 보존해야 하므로 CSV 는 전부 문자열로 읽는다
-> (`reftable` 이 이미 그렇게 동작한다).
-
-### 5.2 규칙 — 기존 `kind: lookup` 을 그대로 쓴다
-
-새 `kind` 가 필요 없다. `profiles/standard.yaml` 에 한 번만 올린다.
+1층을 코드가 아니라 **데이터로** 적되, 한 곳에 여섯 줄이면 끝난다.
+(코드에 필드 이름을 나열하는 것은 `CLAUDE.md` §5 금지다.)
 
 ```yaml
+version: 2
+
 rules:
-  shipping:
+  shipping:                        # 고객 1 : VSART 1 : ZSHCO 1
     kind: lookup
-    label: "운송수단 · 출하조건"
-    description: "고객코드로 refs/shipping.csv 를 조회한다. 행이 없으면 공란이다."
     table_file: refs/shipping.csv
-    optional: true                 # 파일이 없어도 정상 동작한다
+    optional: true                 # 파일이 없어도 정상 동작
     key: meta.customer_no
     key_column: kunnr
     return: [vsart, zshco]
-    on_no_match: { action: empty }   # ★ 공란. 경고도 띄우지 않는다 — 대부분의 고객이 여기다
+    on_no_match: { action: empty } # 공란. 경고도 띄우지 않는다 — 대부분이 여기다
+
+  brand_pick:                      # ★ 신규 kind: csv_choice
+    kind: csv_choice
+    table_file: refs/brand_master.csv
+    filter_column: kunnr           # meta.customer_no 와 같은 행만 후보
+    value_column: zbrand
+    label_column: zbrant           # 드롭다운에 함께 보일 이름
+    when_single: auto              # 1건이면 채운다
+    when_multi: empty              # 2건 이상이면 공란 + 드롭다운
+    on_no_candidates: { action: warn, message: "이 고객에게 등록된 브랜드가 없습니다" }
 
 fields:
-  VSART: { from: expr, expr: 'shipping.vsart', required: warn,
-           explain: "고객–운송수단 마스터(refs/shipping.csv)에서 가져옵니다" }
-  ZSHCO: { from: expr, expr: 'shipping.zshco', required: warn,
-           explain: "고객–출하조건 마스터(refs/shipping.csv)에서 가져옵니다" }
+  KUNNR1: { from: expr, expr: 'meta.customer_no', required: true }
+  KUNNR2: { from: expr, expr: 'meta.customer_no', required: warn,
+            explain: "기본은 판매처와 같습니다. 출하처가 다른 거래처는 예외가 덮어씁니다" }
+  KUNNR3: { from: expr, expr: 'meta.customer_no', required: true }
+  VSART:  { from: expr, expr: 'shipping.vsart', required: warn,
+            explain: "고객–운송수단 마스터(refs/shipping.csv)" }
+  ZSHCO:  { from: expr, expr: 'shipping.zshco', required: warn,
+            explain: "고객–출하조건 마스터(refs/shipping.csv)" }
+  ZBRAND: { from: rule, rule: brand_pick, choices_from: brand_pick, required: warn }
+
+grid:
+  pinned: [BSTKD, MATNR, KWMENG]
+  # hidden 은 두지 않는다 — 안 쓰는 열은 템플릿에서 뺀다
 ```
 
-| 지금 | 바뀐 뒤 |
-|---|---|
-| `standard.yaml` `VSART: {from: const, value: "04"}` — 전 거래처 04 로 **박혀 있다** | 마스터 조회. 행이 없으면 공란 |
-| `standard.yaml` `ZSHCO: {from: const, value: "", todo: ...}` | 마스터 조회 |
-| `msc.yaml` `ZSHCO: {from: const, value: "A"}` | **삭제** — `shipping.csv` 100249 행이 대신한다 |
-| `kl.yaml` `ZSHCO: {from: const, value: "", todo:}` | **삭제** — 마스터의 빈 칸이 곧 공란이다 |
-| `ygjp.yaml` `ZSHCO: {from: expr, expr: 'if(in(brand_code,...))'}` | **유지**(예외). `brand_code` → `brand_by_text`/`ZBRAND` 참조로 이름만 맞춘다 |
+**지워지는 것**: `const ""` 21줄 전량 · `KWMENG`(doc) · `MATNR` · `ZPKRE2` · `EMPST` ·
+`BSTKD`(→ Claude) · `POSEX`(→ Claude) · `AUART`/`VKORG`/`VTWEG`(→ §4.3) ·
+`grid.hidden` 22개 나열.
 
-**우선순위**: 거래처 YAML 의 명시 선언 > `shipping.csv` > 공란.
-병합이 거래처 우선이라 자동으로 그렇게 된다 — 규칙을 따로 만들 필요가 없다.
+`KUNNR2` 를 `warn` 으로 두는 이유: 값은 항상 채워지지만 **검수자가 지웠을 때 막지
+않기 위해서다.** 그 판단은 사람 몫이고(P5), 대신 노랗게 보인다.
 
-### 5.3 검증 추가
+### 4.3 `_base/sap_defaults.yaml` — 선언 없이 적용
 
-| # | 검사 | 실패 시 |
+`sap_defaults` 에 키가 있으면 **선언 없이** 그 값이 쓰인다(해결 순서 3위, §1.3).
+`AUART`·`VKORG`·`VTWEG` 세 줄의 `{from: base}` 선언이 사라진다.
+
+- **빈 문자열도 정해진 값으로 본다.** `LGORT: ""` · `ZTERM: ""` 는 "비워서 보낸다"이다.
+  그 칸을 Claude 에게 맡기려면 **`sap_defaults` 에서 그 키를 빼면 된다** (데이터 한 줄).
+- `field_specs` 에 **`required: true|warn` 를 규격의 일부로** 받는다. 선언이 사라진
+  필드(`MATNR` 등)의 `required` 가 갈 곳이다. 기본은 `warn` — **막지 않는다**가 원칙이다.
+- `_base` 는 **36개를 그대로 둔다.** 줄이는 것은 현업이 템플릿에서 한다(§6-1).
+
+### 4.4 `masters/refs/shipping.csv` (신규)
+
+```csv
+kunnr,vsart,zshco,note
+100249,04,A,기존 운영 확인분 (msc.yaml 에서 이관)
+107525,04,,ZSHCO 미확정 — 공란으로 둔다 (todo)
+3200,04,,ZSHCO 는 브랜드 조건 분기라 거래처 예외가 정한다
+```
+
+위 세 행은 추측이 아니라 **현행 YAML 에 확정값으로 적혀 있던 것을 옮긴 것**이다
+(MSC `ZSHCO: "A"`, 전 거래처 `VSART: "04"`). KL 의 `ZSHCO` 는 지금도 `todo:` 이므로
+**빈 칸 그대로** 둔다 — 비슷한 고객 것을 베껴 넣지 않는다.
+검증: 같은 `kunnr` 중복 → **오류**(어느 행이 이길지 알 수 없다) · 둘 다 빈 행 → 리포트.
+값 자체의 유효성(SAP 에 등록된 `VSART` 인가)은 코드 마스터를 받은 적이 없어 검사하지 않는다 → `todo:`.
+
+### 4.5 `profiles/generic.yaml` — 거의 빈다
+
+`fields`(BSTKD·MATNR·KWMENG·KUNNR2) **전부 삭제** · `rules.brand_code`(csv_map)
+**삭제**(1층의 `brand_pick` 을 그대로 쓴다). `extraction.hints` 는 **유지**하되
+품목표 컬럼 안내는 덜어낸다 — 이제 템플릿 1행이 그 일을 한다. 머리말의
+"추측해서 채우지 않는다"에 **"단 `KUNNR1/2/3` 은 예외다(기본값=고객코드, 2026-09-21)"** 한 줄.
+
+### 4.6 `customers/*.yaml` — 조건이 있는 것만
+
+| 파일 | 남는 것 | 지우는 것 |
 |---|---|---|
-| 16 | `shipping.csv` 에 같은 `kunnr` 가 두 번 나오는가 (1:1:1 위반) | **오류** — 어느 행이 이길지 알 수 없다 |
-| 17 | `vsart`·`zshco` 가 둘 다 빈 행 | 리포트 (지워도 되는 행이다) |
+| `msc.yaml` | `meta` · `hints` · **`split`** · **`tables.ship_to_routing`** · `rules.brand_by_text`(※§1.2 확인 전까지) · `rules.ref_codes` · `fields`: `KUNNR2` `BSTKD`(도시 붙이기) `ZBRAND` `ZPKRE2` · `checks` | `ZSHCO`(→마스터) · `MATNR`(→Claude) · `grid.hidden` 대부분 |
+| `kl.yaml` | `meta` · `hints` · `rules.pack_remark`(브랜드 원문→`WGT`/`KMT`) · `fields`: `ZBRAND: const "2"` `ZPKRE2` `EMPST` | `KUNNR2`(→고객코드 기본) · `ZSHCO`(→마스터) · `MATNR: const ""`(→Claude) · `POSEX`(→Claude) · `BSTKD`(→Claude) |
+| `ygjp.yaml` | `meta` · `hints` · `rules.brand_by_text` · `fields`: `KUNNR2: "319854"`(고객코드 3200 과 다르다=조건) `BSTKD`(`01-YYYYMMDD-ID` 조합) `ZBRAND` `ZSHCO`(브랜드 471/507 분기) `ZPKRE2` `EMPST` `WAERK: "JPY"` | `MATNR`(→Claude) · `grid.hidden` 대부분 |
 
-> 값 자체의 유효성(SAP 에 등록된 VSART 인가)은 **검사하지 않는다.** 브랜드와 달리
-> 코드 마스터를 받은 적이 없다. 받으면 `value_check` 와 같은 방식을 붙인다 — `todo:`.
+### 4.7 컨텍스트 네임스페이스에 한 줄 — `row.*`
 
-### 5.4 관리 화면
+선언이 사라진 값을 규칙·검증이 참조해야 할 때가 있다(MSC 의
+`checks.shipment_total_match` 는 수량 합계를 본다). **Claude 가 템플릿 칸에 채운 값**은
+`row.<필드명>` 으로 참조한다 (`row.KWMENG` · `row.MATNR`). `line.*` 은 **엔진 입력용
+축소 표준 키**로 남는다. MSC 의 `checks` 는 `line.quantity` → `row.KWMENG` 로 바뀐다.
 
-브랜드 매핑 탭과 **같은 모양의 표 하나**를 추가하는 것이 자연스럽다 —
-고객 한 줄, `VSART`·`ZSHCO` 두 칸. 다만 지금 당장 필요한지는 현업 판단이다.
-**이번 범위에 넣지 않는다** (`SCHEMA.md` §6.1 의 도입 기준을 그대로 적용).
-당분간 CSV 를 직접 고치고 Git 이력으로 남긴다. → `todo: 현업 편집 빈도 확인 후 결정`
+### 4.8 `POSEX` 가 Claude 로 간 결과 — 짚고 넘어갈 것 ★
 
----
+`POSEX` 는 1층에서 **Claude 가 발주서에서 읽어** 채운다. 발주서에 품목번호가 인쇄돼
+있지 않으면 **빈 칸**이 된다.
 
-## 6. KUNNR1 · KUNNR2 · KUNNR3 (`NEXT.md` §2-A ④)
-
-### 6.1 무엇이 달라지나
-
-```yaml
-# profiles/standard.yaml
-KUNNR1: { from: expr, expr: 'meta.customer_no', required: true }
-KUNNR2: { from: expr, expr: 'meta.customer_no', required: warn,
-          explain: "기본은 판매처와 같습니다. 출하처가 다른 거래처는 규칙이 덮어씁니다" }
-KUNNR3: { from: expr, expr: 'meta.customer_no', required: true }
-```
-
-| 파일 | 지금 | 바뀐 뒤 | 비고 |
-|---|---|---|---|
-| `profiles/standard.yaml` | `KUNNR2: {from: const, value: "", todo: "거래처 파일에서 덮어쓸 것"}` | 위 선언 | **todo 가 사라진다** |
-| `profiles/generic.yaml` | `KUNNR2: {from: const, value: "", required: warn, todo: ...}` | **선언을 지운다** (프로필 기본을 그대로 받는다) | |
-| `customers/msc.yaml` | `KUNNR2: {from: table, table: ship_to_routing}` | **그대로** | 조건이 있는 예외 |
-| `customers/kl.yaml` | `KUNNR2: {from: const, value: "107525", todo: "확인 필요"}` | **선언을 지운다** | 고객코드와 같은 값이다. 프로필 기본이 같은 값을 낸다 |
-| `customers/ygjp.yaml` | `KUNNR2: {from: const, value: "319854"}` | **그대로** | 고객코드(3200)와 다르다 = 조건 |
-
-`KUNNR2` 를 `required: warn` 으로 두는 이유: 값은 항상 채워지지만 **사람이 검수 중
-지웠을 때 막지 않기 위해서다.** 빈 출하처를 보내는 것이 맞는 경우가 있을 수 있고,
-그 판단은 검수자의 몫이다(P5). 대신 노랗게 보인다.
-
-### 6.2 이것이 기존 금지 규정을 뒤집는다는 점
-
-`CLAUDE.md` §5 는 "출하처를 판매처로 넣는 식"을 **명시적으로 금지**하고 있었고,
-`profiles/generic.yaml` 머리말에도 같은 말이 적혀 있다. 이번 지시는 그 금지를
-**KUNNR 한정으로** 푸는 것이다.
-
-- 근거: 대다수 거래처에서 판매처 = 출하처 = 최종고객이고, **다르면 조건을 건다**(MSC).
-  "모르는 값"이 아니라 "기본값이 있는 값"이라는 판단이다.
-- 범위: **KUNNR1/2/3 에만 적용한다.** ZSHCO·VSART·ZBRAND 등 나머지 필드는
-  금지 그대로 — 모르면 공란이다(§5.1 · §4.2).
-- 문서: §2.3 의 §5 금지 목록 교체문과 `profiles/generic.yaml` 머리말을 함께 고친다.
+- `CLAUDE.md` §8 의 **"CBO 업서트 키 미확정"** 갭이 그대로 남는다. 행 식별자가 없으면
+  재전송은 덮어쓰기가 아니라 **중복 적재**다. 감사 로그가 `send`/`resend` 를 구분하므로
+  사후 추적은 된다.
+- 필요해지면 **2층 예외**로 순번 생성을 붙인다 — `{from: doc, path: line.posex,
+  fallback_gen: line_no_x10}`. 생성기 `line_no_x10` 은 이미 있다(`row_builder.py:21`).
+  그때 순번의 기준은 **파싱 직후 스냅샷의 `_line_no`** 여야 한다. 화면의 현재 행 위치를
+  쓰면, 검수자가 중간 행을 지우고 재전송할 때 **다음 행이 지운 행의 키를 물려받아
+  엉뚱한 행을 덮어쓴다**(계약 §6.1 의 스냅샷이 이미 있다).
+- 검증: 같은 오더(`BSTKD`) 안에서 `POSEX` 중복이면 🟡. 막지는 않는다.
+- 현업이 템플릿에서 `POSEX` 열을 빼면 식별자가 아예 사라진다 →
+  `check_template.py` 가 **경고 한 줄**을 낸다. 막지는 않는다.
+- SAP 담당 확인 질문: **"CBO 업서트 키는 무엇인가. 우리가 만든 번호를 `POSEX` 에
+  넣어도 되는가."** → §9-2.
 
 ---
 
-## 7. 전송 필드 36 → 약 15 (제안만 · **확정 아님**)
+## 5. 예외를 하나씩 붙이는 절차 (코드 0줄) ★
 
-> ⚠ **확정은 현업이 템플릿에서 한다.** 아래는 "지금 값이 채워지는 필드"를 기계적으로
-> 센 것이고, SAP CBO 가 키로 요구하는 필드가 섞여 있을 수 있다. **이 표를 근거로
-> `_base` 를 지우지 마라.** 현업·SAP 담당 확인 전까지 `_base` 는 36개 그대로 둔다.
+### 5.1 증상 → 어디에 적나
 
-### 7.1 값이 실제로 채워지는 필드 (16)
-
-| 필드 | 채우는 곳 |
-|---|---|
-| AUART · VKORG | `_base` 공통 고정값 |
-| KUNNR1 · KUNNR2 · KUNNR3 | §6 |
-| BSTKD | 거래처별 발주번호 조합 |
-| ZBRAND | §4 |
-| ZSHCO · VSART | §5 |
-| MATNR · KWMENG | 발주서 |
-| ZPKRE2 · EMPST | 거래처별 비고 |
-| WAERK | YGJP 만 (`JPY`) |
-| POSEX | KL 만 (문서 인쇄 품목번호) |
-| VTWEG | 공통 고정값이지만 **값이 `""`** |
-
-### 7.2 뺄 후보 (20) — 전 거래처에서 `const ""`
-
-```
-VBELN  VDATU  ZTERM  INCO1  INCO2  ZPKRE1  MAKTX  LGORT  ETDAT  BATCH
-VALTY  PRICE  BSTDK_E  DELCO  BSTKD_E  AUGRU  VKAUS  IHREZ_E  VGBEL  VGPOS
-```
-
-근거: `profiles/standard.yaml` 의 "미사용" 블록 그대로이며, 어느 거래처 파일도
-덮어쓰지 않는다. 즉 **지금도 전부 빈 문자열로 전송되고 있다.**
-
-### 7.3 현업에게 물어야 할 것
-
-| 질문 | 왜 |
-|---|---|
-| `VTWEG` 를 빼도 되나 | 판매조직/유통경로는 SAP 오더의 키 조합이다. 값이 `""` 여도 **키 자리로 필요할 수 있다** |
-| `VDATU` · `ETDAT`(납기) 를 정말 안 쓰나 | 발주서에 납기가 있는데 지금 안 보내고 있다. 의도인지 누락인지 확인이 필요하다 |
-| `PRICE` · `WAERK` 를 안 보내도 되나 | YGJP 만 통화를 보낸다. 단가를 안 보내는 것이 정책인지 확인 |
-| `POSEX` 가 없어도 CBO 가 행을 식별하나 | **미해결 갭이다** — MSC·YGJP 는 `POSEX: const ""` 라 행 식별자가 없고, 업서트 키가 없으면 재전송이 중복 적재가 된다 (`CLAUDE.md` §8) |
-
-→ 확인 결과를 `NEXT.md` §5 미결 5번에 반영하고, **템플릿에서 열을 지우는 것으로** 끝낸다.
-
----
-
-## 8. `NEXT.md` §2-B 미결 — 결론
-
-| # | 미결 | 결론 | 근거 |
-|---|---|---|---|
-| 1 | SSOT 충돌 | **§2.1 의 3분할.** 템플릿=목록·순서 / `_base`=규격 / 거래처 YAML=값 | 권고안 그대로 채택. 충돌 지점은 §2.2 의 4경우로 전부 닫았다 |
-| 2 | 직접 읽기 vs 가져오기 스크립트 | **직접 읽기.** 가져오기 스크립트는 만들지 않는다 | 현업이 고치면 바로 반영되길 원하신다. 실패 시 위험은 §3.4 폴백으로 닫는다. 대신 **점검 전용** `check_template.py` 를 둔다(읽기만, 비용 0) |
-| 3 | 위치·Git | **`masters/templates/SALES ORDER.xlsx` · 추적한다** | 입력물이고 바뀌면 전송이 바뀐다. `.gitignore` 수정 불필요(§3.1) |
-| 4 | "1개"의 기준 | **`brand_master.csv` 의 `kunnr` 행 수** | §4.2 |
-| 5 | 복사·붙여넣기 | **미확인 — 브라우저로 확인해야 한다.** 절차·대안은 §8.2 | 문서로 단정할 수 없는 항목이다 |
-
-### 8.1 (2번 보강) `check_template.py` 가 하는 일
-
-```
-$ python scripts/check_template.py
-템플릿  masters/templates/SALES ORDER.xlsx  (시트: SALES ORDER, 2행)
-읽은 필드 15개
-  AUART VKORG KUNNR1 KUNNR2 KUNNR3 BSTKD ZBRAND ZSHCO MATNR KWMENG ZPKRE2 EMPST VSART WAERK POSEX
-_base 에 규격이 없는 필드  : 없음
-_base 에만 있고 안 보내는 필드: VBELN VDATU ZTERM ... (20개)
-거래처별 선언 누락          : 없음
-```
-LLM 호출 없음 = 비용 0. `check.bat` 에 넣어 사내 서버에서 더블클릭으로 돈다.
-
-### 8.2 (5번) 붙여넣기 확인 절차와 대안
-
-**확인** — `ui/e2e/flow.mjs` 옆에 `ui/e2e/paste.mjs` 를 만들어 브라우저로 돌린다.
-
-1. 모의 EAI + 스트림릿 기동 (`LLM_PROVIDER=mock` — 비용 0)
-2. 엑셀에서 3행 × 2열을 복사한 것과 동일한 클립보드 페이로드
-   (`text/plain`, 탭 구분 + 개행)를 `navigator.clipboard.writeText` 로 심는다
-3. 그리드의 셀 하나를 클릭하고 `Ctrl+V`
-4. **기대**: 3행 × 2열이 한 번에 채워진다 → 추가 작업 없음
-5. 드롭다운(`SelectboxColumn`) 컬럼에 대해 같은 것을 한 번 더 — 여기가 막힐 가능성이 크다
-
-**대안 (4·5 가 실패했을 때만 만든다)**
-
-| 대안 | 내용 | 비용 |
+| 증상 | 어디에 | 무엇을 |
 |---|---|---|
-| A | 드롭다운을 **쓰지 않고** `TextColumn` + `help` 에 후보를 나열 + 후보 밖 값에 🟡 | 작다. §4.4 검증이 이미 그 일을 한다 |
-| B | 그리드 위에 **"열 일괄 채우기"** 한 줄 (컬럼 선택 + 값 + [채우기]) | 작다. 붙여넣기의 실제 용도 대부분이 이것이다 |
-| C | "붙여넣기 상자" — textarea 에 TSV 를 붙이면 컬럼 매핑 후 반영 | 중간. A·B 로 안 될 때만 |
+| 운송수단·출하조건이 이 고객만 다르다 | `refs/shipping.csv` | **행 한 줄 추가.** 거래처 파일을 만들 필요도 없다 |
+| 브랜드가 여러 개인데 발주서 문구로 가릴 수 있다 | `refs/brand_keys.csv` + `customers/<code>.yaml` 의 `rules.brand_by_text` | 문구 행 + `csv_map` 규칙 1개 |
+| 어떤 값이 **조건에 따라 갈린다** (출하지·품목 등) | `customers/<code>.yaml` 의 `tables` | 결정표 1개. `then` 에 여러 필드를 한 번에 |
+| 여러 값을 **조합**해야 한다 | 같은 파일의 `fields.<필드>.expr` | `concat` · `join` · `coalesce` · `if` (SCHEMA §4.7 화이트리스트) |
+| 품번으로 **참조표**를 봐야 한다 | `refs/<표>.csv` + `rules.<이름>` (`kind: lookup`) | `optional: true` 로 두면 파일이 없어도 동작 |
+| 발주서 1부가 **여러 오더**로 쪼개진다 | `split: {by: shipment}` | 화면은 한 그리드, 오더 키만 달라진다 |
+| 이 고객만 어떤 칸을 **Claude 에게 맡기고 싶다** | `fields.<필드>: {from: llm}` | 1층 선언을 걷어낸다(§1.3-3) |
 
-> 결론: **A·B 를 기본 대안으로 준비하고 C 는 보류.** 드롭다운과 붙여넣기가 충돌하면
-> **붙여넣기를 살린다** — 드롭다운은 편의지만 대량 입력은 업무 속도 그 자체다.
+### 5.2 새 예외를 붙이는 순서
+
+```
+1. masters/customers/_template.yaml 을 복사해 <code>.yaml 을 만든다
+   (마스터에 없는 고객이면 meta 만 채워도 1층으로 바로 돈다 — generic 프로필)
+2. meta 를 채운다 (code · name · customer_no · owner · status · file_types)
+3. extraction.hints 에 **문서 구조만** 적는다 (변환 지시 금지 — P1)
+4. ★ 예외가 되는 것만 적는다. 1층과 같은 값은 적지 않는다
+5. python scripts/validate_masters.py --customer <code>
+6. python scripts/check_sample.py <발주서> --customer <code>   # 비용 0. hints 앵커 대조
+7. python scripts/parse_one.py <발주서> --customer <code> --rows
+8. rules: 커밋 — 본문에 **근거(일자 · 확인자 · 영향 범위)**. Git 이력이 규칙 변경 대장이다
+```
+
+**적지 말아야 할 것**: 1층과 같은 값(고객코드 = `KUNNR2` 등)을 "명시적으로" 다시 적는 것.
+줄이 늘어날 뿐이고, 1층이 바뀌어도 따라오지 않아 **어긋난 채 남는다.**
+
+### 5.3 예외가 없는 고객
+
+`customers/<code>.yaml` 이 없으면 `profiles/generic.yaml` 로 돈다. SAP 에 브랜드가
+등록된 고객이면 **파일 하나 없이** 발주서를 읽고 전송까지 열린다(78곳). 브랜드가
+0건인 고객은 `CatalogEntry.ready == False` 로 업로드를 막는다 — 판정할 근거가 없다.
 
 ---
 
-## 9. 계약(`contracts/api-contract.md`) 변경
+## 6. v1 에서 **버리는** 것 ★
 
-> 계약은 공용이다. **양쪽 합의 후 단독 PR.** 아래가 그 PR 의 전부다.
-
-### 9.1 §3 `GET /api/masters/fields` — 템플릿 상태 추가
-
-```json
-{
-  "fields": [ { "name": "AUART", "label": "오더유형", "sheet": "SALES ORDER TYPE", "max_len": 4 } ],
-  "template": { "ok": "true", "source": "template",
-                "path": "masters/templates/SALES ORDER.xlsx", "reason": "" }
-}
-```
-`source` 는 `template` | `memory` | `base`. `ok` 가 `"false"` 면 화면이 배너를 띄운다.
-`fields` 의 **순서가 곧 전송 순서**라는 문장을 "`_base` 의 순서 그대로"에서
-"**유효 필드 목록 순서 그대로**"로 고친다.
-
-### 9.2 §5 `GET /api/batches/{id}` — `choices` · `notes` 추가
-
-```json
-{
-  "columns": ["AUART", "..."],
-  "choices": { "ZBRAND": [ { "value": "205", "label": "ACCUPRO BRAND" } ] },
-  "notes":   [ "템플릿에 있으나 규칙에 없는 필드: ZZTEST — 빈 값으로 전송됩니다" ],
-  "grid":    { "pinned": [], "hidden": [], "width": {} }
-}
-```
-
-| 키 | 규약 |
-|---|---|
-| `choices` | 필드명 → 후보 목록. **없는 필드는 키 자체가 없다** (빈 배열을 내리지 않는다 — "후보 없음"과 "후보 개념 없음"은 다르다) |
-| `notes` | 배치 단위 안내 문구. 행 `issues` 와 구분된다. 비면 `[]` |
-
-### 9.3 §6.1 병합 규약 — "모르는 컬럼" 의 기준
-
-```
-현재: | 모르는 컬럼 | **무시한다.** 전송 필드 목록은 `_base` 가 정한다 — 화면이 컬럼을 새로 만들 수 없다 |
-
-교체: | 모르는 컬럼 | **무시한다.** 전송 필드 목록은 **템플릿 2행이 정한 유효 필드 목록**이다 — 화면이 컬럼을 새로 만들 수 없다 |
-```
-
-### 9.4 §8 `GET /api/health` — `template` 블록 추가
-
-§9.1 과 같은 구조를 `"template"` 키로 넣는다.
-
-### 9.5 예제 파일
-
-`contracts/examples/fields.json` · `batch_msc.json` 을 위 형태로 갱신한다.
-**프론트가 이 파일로 화면을 만든다** — 계약 문서만 고치고 예제를 두면 어긋난다.
+| # | 버리는 것 | 왜 |
+|---|---|---|
+| 1 | **필드 36 → 15 축소 논의**(v1 §7 전체 — 후보표·뺄 필드 20개) | 현업이 템플릿에서 정한다. `_base` 는 규격표로 그대로 둔다 |
+| 2 | **필드별 `from/path` 공통 선언** (v1 의 `standard.yaml` 개편안) | 1층은 6줄이면 된다(§4.2) |
+| 3 | **`BSTKD`·`POSEX` 를 규칙엔진이 만든다**는 설계 | 3차 확인으로 **Claude 소관**이 됐다. `POSEX` 순번 생성은 2층 선택지로만 남는다(§4.8) |
+| 4 | **템플릿에만 있는 필드에 `{from: const, value: ""}` 자동 주입** | 주입할 이유가 사라졌다. 선언이 없는 것이 **정상**이다. `FIELD_NOT_DECLARED` 자체를 폐지 |
+| 5 | **거래처 YAML 에 전송 필드 전량 선언**(SCHEMA §4.6 · 검증 검사 1) | 검사 1 은 "선언된 필드가 유효 목록 안에 있는가"(반대 방향)로 바꾼다 |
+| 6 | **고정 표준 키 25개 전량 추출** | 2층이 참조하는 것만 남긴다(§3.2). `requested_date`·`order_text`·`bill_to_text`·`currency_text`·`incoterms_text`·`payment_terms_text`·`item_code`·`description`·`quantity`·`unit`·`unit_price`·`net_value`·`delivery_date` 는 **템플릿 칸이 대신한다** |
+| 7 | **출하 마스터 관리 화면** | 당분간 CSV 를 직접 고치고 Git 이력으로 남긴다(SCHEMA §6.1 기준) |
+| 8 | **붙여넣기 대안 C**(textarea 상자) | A(드롭다운 대신 `TextColumn`+후보 안내)·B(열 일괄 채우기)로 안 될 때만 |
+| 9 | **엑셀 내보내기 버튼** | 종착점은 EAI(HTTPS/JSON)다. 엑셀은 **입력물**이지 산출물이 아니다 |
+| 10 | v1 의 **W0~W7 작업 순서** | §8 로 대체 |
 
 ---
 
-## 10. `design.md` 반영 사항
+## 7. 다른 문서 반영 (요약 — 상세는 각 문서에서)
 
-> `design.md` 는 architect 소유다. 아래를 **그 문서 안에서** 고친다. 이 문서를 참조 링크로 걸지 않는다
-> (SSOT 는 `design.md` 쪽이다. 이 문서는 근거 기록이다).
+### 7.1 `CLAUDE.md`
 
 | 절 | 무엇을 |
 |---|---|
-| 머리말 SSOT 표 | `\| 전송 필드 목록 · 공통 고정값 \| **masters/_base/sap_defaults.yaml** \|` 행을 **두 행으로 쪼갠다** — ① `전송 필드 목록·순서` → `masters/templates/SALES ORDER.xlsx` 2행 ② `전송 필드 규격 · 공통 고정값` → `masters/_base/sap_defaults.yaml` |
-| §0 핵심 설계 결론 | 이 문서 §0 의 **D12~D19 를 표에 그대로 덧붙인다.** D4("거래처별 전송 필드 전량 선언 강제")의 요약을 "필드 수는 `_base` 가 정한다 (현재 36)" → "**필드 목록은 템플릿이 정한다**" 로 고친다 |
-| §2.3 저장소 표 | `참조표 \| CSV (Git) \| masters/refs/*.csv` 아래에 `전송 필드 템플릿 \| XLSX (Git) \| masters/templates/SALES ORDER.xlsx — **없으면 _base 로 폴백**` 을 추가 |
-| §4 규칙 마스터 | `Excel/Sheets 마스터 \| △ 단순 룩업표(참조표)만 CSV로` 를 `○ **전송 필드 목록은 엑셀 템플릿이 원천**(D12). 룩업표는 CSV` 로 고친다 |
-| §5 전송 | "`_base` 의 전송 필드 전량 포함(현재 36)" → "**유효 필드 목록 전량 포함**(템플릿 2행이 정한다)". 바로 아래 "필드 수 \| **코드에 하드코딩 금지.** `_base/sap_defaults.yaml` 이 유일한 원천" 행의 원천을 **템플릿**으로 고친다 |
-| §6 검증 | `길이 초과 \| 🔴 \| field_specs.*.max_len` 옆에 "**규격이 없는(템플릿에만 있는) 필드는 길이 검사를 하지 않는다**" 를 덧붙인다. 표에 🟡 행 하나 추가: `후보 밖 값 \| 🟡 \| choices_from 이 있는 필드에 후보에 없는 값` |
-| §7 디렉터리 | `masters/` 아래에 `templates/SALES ORDER.xlsx  ← 전송 필드 목록의 원천` · `refs/shipping.csv` 를 넣는다. `backend/app/masters/` 에 `template.py` 추가 |
-| §10 미확정 항목 | ① 전송 필드 15개 확정(§7.3 의 질문 4개) ② `shipping.csv` 의 KL ZSHCO ③ 붙여넣기 브라우저 확인(§8.2) ④ VSART/ZSHCO 코드 마스터 유무 — 네 가지를 추가 |
+| §1 P1 행 · 인용문 | **§2.1 · §2.2 의 문장 그대로** 교체 |
+| §2 SSOT 표 첫 행 | 3행으로 쪼갠다 — ① `전송 필드 목록·순서` → 템플릿 **2행** ② `필드 설명(LLM 매칭용)` → 템플릿 **1행**(없으면 `_base.label`) ③ `필드 규격`(label·max_len·type·required) → `_base/sap_defaults.yaml` |
+| §2 표 추가 2행 | `고객별 브랜드 후보` → `refs/brand_master.csv` · `고객별 운송수단·출하조건` → `refs/shipping.csv` |
+| §2 "거래처 공통 필드 매핑" 행 | "**1층 6필드 + 2규칙만** 적는다. 나머지는 선언하지 않는다(= Claude 가 채운다)" |
+| §2 굵은 문장 | "현재 36개지만" → "**목록과 순서는 템플릿 2행이 정한다.** 36이 15가 되어도 코드·화면·전송은 그대로 동작해야 한다. 못 읽으면 `_base` 로 폴백하되 **조용히 넘어가지 않는다**" |
+| §5 금지 추가 | · 템플릿 읽기 실패에 예외 올리기 · 엔진이 정하는 필드를 LLM 스키마에 넣기 · **선언이 없다고 🔴 달기** · 템플릿 서명 확인 없이 픽스처 재생 · **1층과 같은 값을 거래처 파일에 다시 적기** |
+| §5 기존 행 수정 | "공용 프로필이 모르는 값을 추측해 채우기" 끝에 "**단 KUNNR1/2/3 은 예외다**(기본값=고객코드, 2026-09-21)" |
+| §3 명령어 | `python scripts/check_template.py` 한 줄 |
+| §4 구조 트리 | `masters/templates/` · `refs/shipping.csv` · `backend/app/masters/template.py` |
+| §8 갭 | "`prompt.py`·`schema_builder.py` 가 날짜 변환을 지시한다(P1 위반)" → **W2 에서 해소**. `POSEX`/업서트 키 갭은 **남긴다**(§4.8) |
 
----
-
-## 11. 그 밖의 문서 반영 사항
-
-### 11.1 `CLAUDE.md`
-
-§2.3 에 **문장 그대로** 적어 두었다 (표 2행 교체 + 2행 추가, 굵은 문장 교체,
-§5 금지 3행 추가 + 1행 문구 교체, §3 명령어 1줄 추가).
-§4 구조 트리에도 `masters/templates/` · `refs/shipping.csv` · `backend/app/masters/template.py` 를 넣는다.
-
-### 11.2 `masters/SCHEMA.md` (architect 소유)
+### 7.2 `masters/SCHEMA.md` (architect 소유)
 
 | 절 | 무엇을 |
 |---|---|
-| §1 계층 구조 | 트리에 `templates/SALES ORDER.xlsx  ← 전송 필드 목록·순서의 원천` 과 `refs/shipping.csv` 추가 |
-| §1.1 프로필 | "`fields` 와 `grid` 만 있다" → "**`rules` · `fields` · `grid` 를 가진다.** 전 거래처가 똑같이 쓰는 규칙(브랜드 후보·출하 마스터)은 여기 올린다. `meta`·`extraction` 은 없다" (§4.6) |
-| §4.5 `rules` | `kind` 표에 **`csv_choice`** 한 줄 추가 + 전용 옵션 표(§4.3) |
-| §4.6 `fields` | 머리말 "`_base/sap_defaults.yaml` 의 필드 전부가 선언되어야 한다(현재 36개)" → "**유효 필드 목록**(템플릿 2행)의 필드 전부가 선언되어야 한다. 템플릿에만 있는 필드는 로더가 빈 값으로 채우고 배치 노트로 알린다". 공통 옵션에 **`choices_from`** 추가 |
-| §4.6 앞 | **§4.6a "유효 필드 목록"** 절을 새로 넣고 §2.1·§2.2 의 교집합 규칙·폴백 표를 옮긴다. ★ 이 절이 그 주제의 SSOT 가 된다 |
-| §7 검증 | 검사 1 의 문구를 "유효 필드 목록 기준"으로 고치고, 검사 12~17(§3.6 · §5.3)을 등재 |
+| §1 트리 | `templates/SALES ORDER.xlsx` · `refs/shipping.csv` |
+| §1.1 프로필 | "`fields`·`grid` 만" → "**`rules`·`fields`·`grid`**" (1층 규칙이 여기 산다) |
+| §2 파이프라인 | ⑥ FIELDS 의 설명을 **§1.3 해결 순서 5단계**로 교체 |
+| §3 네임스페이스 | **`row.*` 한 줄 추가**(§4.7) · `line.*` 을 "엔진 입력용 축소 표준 키"로 |
+| §3.1 표준 키 | **축소**(§3.2 의 `doc`/`shipments`/`rows` 가 새 원천) |
+| §4.2 `extraction` | `extra_fields` 를 **엔진 입력 전용**으로 좁힌다 |
+| §4.5 `rules` | `kind` 표에 **`csv_choice`** + 옵션표 |
+| §4.6 `fields` | "전부 선언되어야 한다" → "**예외만 선언한다. 선언이 없으면 Claude 가 채운다**". `from` 에 **`llm`**, 옵션에 **`choices_from`**·**`fallback_gen`** |
+| §4.6a (신규) | **"유효 필드 목록"** — 템플릿 2행 ∩ 동작 · 폴백 · `llm_field_names` 계산(§3.2). ★ 이 주제의 SSOT |
+| §5 신규 거래처 절차 | **§5 를 그대로** 옮긴다 (증상→위치 표 + 8단계) |
+| §7 검증 | 검사 1 방향 전환 · 신규: 템플릿 읽힘(경고) · 템플릿↔`_base` 차집합 양방향 · `shipping.csv` 중복 `kunnr`(오류) · `csv_choice` 스키마 · 픽스처 서명 불일치 · **1층과 동일한 값의 중복 선언**(리포트) |
 
-### 11.3 `process.md` §4 (화면 정의)
+### 7.3 `contracts/api-contract.md` (공용 — 단독 PR)
 
-- 검수 화면에 **드롭다운 컬럼**이 생긴다는 것 (§4.8)
-- 화면 상단 **템플릿 배너** (§3.5)
-- 배치 **노트** 표시 위치 (계약 §9.2 의 `notes`)
+| 절 | 변경 |
+|---|---|
+| §3 `/api/masters/fields` | 필드에 `description`(템플릿 1행) · 응답에 `template: {ok, source, path, reason}` · "순서 = `_base`" → "**유효 필드 목록 순서**" |
+| §5 `/api/batches/{id}` | `choices`(필드→후보. **후보 개념이 없으면 키를 안 내린다**) · `notes`(배치 단위 안내. 비면 `[]`) |
+| §6.1 병합 | "모르는 컬럼" 기준을 `_base` → **유효 필드 목록**으로 |
+| §8 `/api/health` | `template` 블록 |
+| `examples/*.json` | 같은 PR 에서 갱신. **프론트가 이 파일로 화면을 만든다** |
 
-### 11.4 `masters/profiles/generic.yaml` 머리말
+### 7.4 그 밖
 
-"추측해서 채우지는 않는다" 단락에 **"단 KUNNR1/2/3 은 예외다(§2-A ④, 2026-09-21)"**
-한 줄을 덧붙인다. 머리말과 실제 선언이 어긋나면 다음 사람이 선언을 되돌린다.
+`design.md`(SSOT 표·§0 결정·디렉터리·검증표) · `process.md` §4(드롭다운·배너·노트) ·
+`profiles/generic.yaml` 머리말(§4.5) · `NEXT.md`(§2-C 의 "규칙엔진은 아래 6개만
+변환한다" 문장을 **2층 구조 표로** 정정, §2-B 닫기).
 
 ---
 
-## 12. developer 작업 순서 ★
+## 8. developer 작업 순서 ★
 
-전제: 브랜치 `feat/be-rules`(백엔드·마스터·스크립트) · `contracts/**` 는 단독 PR.
-**각 작업 단위가 끝날 때마다 커밋한다.** `rules:` 커밋은 본문에 근거(일자·지시자·영향 범위)를 남긴다.
+전제: `feat/be-rules`(백엔드·마스터·스크립트) · `contracts/**` 는 단독 PR ·
+**각 단위마다 커밋**하고 `rules:` 커밋은 본문에 근거를 남긴다.
+**W3 을 W5 보다 먼저 한다** — 순서를 바꾸면 YAML 을 지운 순간 전 행이 🔴 가 된다.
 
-### W0 — 계약 먼저 (단독 PR · 양쪽 합의)
+| 단계 | 무엇을 | 파일 | 끝났다는 기준 |
+|---|---|---|---|
+| **W0** | 계약 먼저 (단독 PR) | `contracts/api-contract.md` · `examples/fields.json` · `batch_msc.json` | 프론트·백엔드가 같은 문서를 본다(§7.3) |
+| **W1** | 템플릿 리더 | `backend/app/config.py` · **`masters/template.py`**(신규) · `masters/loader.py`(`_apply_template`) · `preview.py` · `api/routes_masters.py` · `main.py` · **`scripts/check_template.py`**(신규, `use_utf8()`) · `check.bat`(cp949+CRLF) · **`tests/test_template.py`** + `tests/fixtures/templates/` | 템플릿 **없이** 기존 테스트 전량 통과(폴백=현행). 작은 xlsx 로 순서가 바뀌는 것 확인 |
+| **W2** | 추출 스키마 템플릿화 ★ | `extraction/schema_builder.py`(`rows[]`·설명 주입·`llm_field_names`) · `extraction/prompt.py`(**날짜·형식 변환 지시 삭제** = §8 P1 갭 해소) · `extractor.py` · `providers/cache.py`(`template_sig`·`desc_sig`) · `grounding.py` · `scripts/pin_fixture.py` · 픽스처 **모양 보정** | 템플릿 열을 하나 추가하면 캐시가 갈리고, 낡은 픽스처는 **경고와 함께** 재생(§3.3) |
+| **W3** | 엔진 — 선언 없는 필드 | `mapping/row_builder.py`(**`FIELD_NOT_DECLARED` 폐지**·`from: llm`·`fallback_gen`·`sap_defaults` 자동 적용) · `rules/context.py`(**`row.*`**) · `rules/engine.py` · `validation/validator.py`(`required`·`max_len` 을 `field_specs` 에서) · `domain/models.py` | 선언을 지워도 값이 그대로 나온다. 해결 순서 5단계(§1.3)가 테스트로 고정된다 |
+| **W4** | 1층 마스터 | `masters/refs/shipping.csv`(신규) · `rules/mapping_rules.py`(`csv_choice`) · `rules/engine.py`(후보 배치 합집합) · `domain/models.py`(`choices`·`notes`) · `row_builder`/`validator`(`choices_from`·🟡 `NOT_IN_CHOICES`) · `preview.py` · `api/routes_batches.py` · `batch_service.py` | 후보 1건=자동 · N건=공란+후보 · 0건=업로드 차단. **개수는 참조표에서 끌어온다** |
+| **W5** | 마스터 다이어트 | `profiles/standard.yaml`(§4.2) · `generic.yaml`(§4.5) · `customers/{msc,kl,ygjp}.yaml`(§4.6) · `_base/sap_defaults.yaml`(`required` 이관) · `scripts/validate_masters.py`(검사 방향 전환·신규) | `validate_masters` 통과 + 골든 2종의 `VSART`·`ZSHCO`·`KUNNR2`·`ZBRAND` 가 의도대로 |
+| **W6** | 화면 | `ui/service.py`(`choices`·`notes`·`template`) · `ui/views/convert.py`(드롭다운·배너·노트, **필드명 하드코딩 금지**) · `ui/e2e/paste.mjs`(신규) · `tests/test_ui_*.py` | 드롭다운이 떠도 **붙여넣기가 살아 있다.** 충돌하면 붙여넣기를 살린다 |
+| **W7** | 문서 (**architect**) | `CLAUDE.md`(§7.1) · `masters/SCHEMA.md`(§7.2) · `design.md` · `process.md` · `NEXT.md` | 문서 간 값이 어긋나지 않는다 |
+| **W8** | 관통 | `check_template.py` → `validate_masters.py` → `pytest` → `ruff` → 모의 EAI + 스트림릿 → `flow.mjs`·`paste.mjs` | 전송 페이로드의 **키 순서 = 템플릿 2행 순서**를 눈으로 확인 |
 
-| 파일 | 작업 |
-|---|---|
-| `contracts/api-contract.md` | §9.1~§9.4 반영 |
-| `contracts/examples/fields.json` | `template` 블록 추가 |
-| `contracts/examples/batch_msc.json` | `choices` · `notes` 추가 |
-
-> 먼저 하는 이유: 화면과 백엔드가 이 파일을 동시에 본다. 나중에 고치면 둘 다 다시 고친다.
-
-### W1 — 템플릿 리더 (§3)
-
-| 순서 | 파일 | 작업 |
-|---|---|---|
-| 1 | `masters/templates/SALES ORDER.xlsx` | 실물 배치 (거래처 데이터 없는지 확인 후 커밋) |
-| 2 | `.gitignore` | §3.1 의 주석 한 줄 |
-| 3 | `backend/app/config.py` | `field_template: Path` · `field_template_sheet: str` 추가 |
-| 4 | `backend/app/masters/template.py` | **신규.** `TemplateStatus` · `load_field_order(path, sheet)` · `(경로,mtime,size)` 캐시 · **예외를 올리지 않는다** |
-| 5 | `backend/app/masters/loader.py` | `_apply_extends` 뒤에 `_apply_template()` — `field_specs` 를 템플릿 순서로 재구성 + 미선언 필드에 `{from: const, value: ""}` 주입 + `data["_template"] = status` |
-| 6 | `backend/app/preview.py` | `field_list` 가 유효 목록을 쓰도록 (이미 `field_specs` 경유라 대부분 자동) |
-| 7 | `backend/app/api/routes_masters.py` · `main.py` | `/api/masters/fields` · `/api/health` 에 `template` 블록 |
-| 8 | `scripts/check_template.py` | **신규** (§8.1) · `use_utf8()` 잊지 말 것 |
-| 9 | `check.bat` | `check_template.py` 호출 추가 (cp949 + CRLF) |
-| 10 | `backend/tests/test_template.py` | **신규** — 정상 / 파일 없음 / 손상 / 2행 공백 / 중복 이름 / 템플릿에만 있는 필드가 🔴 를 만들지 않는지. **`_base` 개수를 박지 않는다** |
-
-> ⚠ 기존 테스트 중 `list(base["field_specs"])` 를 기대값으로 쓰는 것
-> (`test_engine.py:40` · `test_send.py:126` · `test_api_masters.py:46`)은
-> **템플릿이 있으면 깨진다.** `conftest` 가 테스트용 마스터 사본을 쓰도록 하거나
-> 기대값을 "유효 목록"에서 끌어오도록 고친다 — 개수·이름을 박지 않는다.
-
-### W2 — 출하 마스터 (§5) · 가장 작고 위험이 낮다
-
-| 순서 | 파일 | 작업 |
-|---|---|---|
-| 1 | `masters/refs/shipping.csv` | **신규** (§5.1 의 3행) |
-| 2 | `masters/profiles/standard.yaml` | `rules.shipping` 추가 · `VSART`/`ZSHCO` 를 `expr` 로 |
-| 3 | `masters/customers/msc.yaml` · `kl.yaml` | `ZSHCO` 선언 삭제 |
-| 4 | `masters/customers/ygjp.yaml` | `ZSHCO` 유지(예외). 규칙 이름 변경에 맞춰 식 정리 |
-| 5 | `scripts/validate_masters.py` | 검사 16·17 |
-| 6 | `python scripts/validate_masters.py` + `pytest` | 골든 2종의 VSART·ZSHCO 가 그대로인지 확인 |
-
-### W3 — 브랜드 단순화 (§4)
-
-| 순서 | 파일 | 작업 |
-|---|---|---|
-| 1 | `backend/app/rules/mapping_rules.py` | `kind: csv_choice` 구현 · `RuleOutcome` 에 `choices` 추가 |
-| 2 | `backend/app/rules/engine.py` | 후보를 배치 단위로 모아 `BuildResult.choices` |
-| 3 | `backend/app/domain/models.py` | `BuildResult.choices` · `Batch.choices` · `Batch.notes` |
-| 4 | `backend/app/mapping/row_builder.py` · `validation/validator.py` | `choices_from` 필드 옵션 · 🟡 `NOT_IN_CHOICES` |
-| 5 | `masters/profiles/standard.yaml` | `rules.brand_pick` · `ZBRAND` 선언 |
-| 6 | `masters/profiles/generic.yaml` | `rules.brand_code`(csv_map) **삭제** — 프로필의 `brand_pick` 을 그대로 쓴다 |
-| 7 | `masters/customers/msc.yaml` · `ygjp.yaml` | `brand_code` → `brand_by_text` 로 이름 변경 · `on_no_match: {action: empty}` · `ZBRAND` 를 `coalesce` 식으로 |
-| 8 | `backend/app/preview.py` | `csv_choice` 규칙 카드 (후보 표) |
-| 9 | `backend/app/api/routes_batches.py` · `batch_service.py` | 계약 §9.2 의 `choices`·`notes` 를 응답에 |
-| 10 | `scripts/validate_masters.py` | `csv_choice` 스키마 검사 · TODO 리포트 범위 축소(§4.7) |
-| 11 | `backend/tests/` | `csv_choice` 1건/N건/0건 · `coalesce` 체인 · `NOT_IN_CHOICES`. **개수를 참조표에서 끌어온다** |
-
-### W4 — KUNNR 기본값 (§6) · YAML 만
-
-| 순서 | 파일 |
-|---|---|
-| 1 | `masters/profiles/standard.yaml` — `KUNNR2` 선언 교체 |
-| 2 | `masters/profiles/generic.yaml` — `KUNNR2` 선언 삭제 + 머리말 한 줄(§11.4) |
-| 3 | `masters/customers/kl.yaml` — `KUNNR2` 선언 삭제 |
-| 4 | `python scripts/validate_masters.py` · `pytest` (골든 diff 확인) |
-
-### W5 — 화면 (§4.8 · §3.5)
-
-| 순서 | 파일 | 작업 |
-|---|---|---|
-| 1 | `ui/service.py` | `choices` · `notes` · `template` 상태 전달 |
-| 2 | `ui/views/convert.py` | 드롭다운 컬럼 · 템플릿 배너 · 배치 노트. **필드 이름을 하드코딩하지 않는다** |
-| 3 | `ui/e2e/paste.mjs` | **신규** (§8.2 의 확인) |
-| 4 | `backend/tests/test_ui_*.py` | 후보에 없는 값이 셀에 있어도 예외가 안 나는지 (§4.8) |
-
-### W6 — 문서 (architect 가 한다)
-
-`design.md`(§10) · `masters/SCHEMA.md`(§11.2) · `CLAUDE.md`(§2.3·§11.1) ·
-`process.md`(§11.3) · `NEXT.md`(§2-B 를 "해결됨"으로 닫고 §5 에 새 미결 옮김).
-
-### W7 — 관통 확인
-
-```bash
-python scripts/check_template.py
-python scripts/validate_masters.py
-pytest && ruff check backend scripts
-python scripts/mock_eai_server.py &
-streamlit run po2sap.py            # 업로드 → 드롭다운 → 붙여넣기 → 전송
-node ui/e2e/flow.mjs && node ui/e2e/paste.mjs
-```
-전송 페이로드의 **키 순서가 템플릿 2행 순서와 같은지** 눈으로 확인한다.
+> 템플릿 실물이 W2 전에 오면 W1 끝에 커밋한다 (**거래처 실데이터 시트가 없는지
+> 먼저 확인** — `samples/` 가 대외비인 이유와 같다). 안 와도 W8 까지 전부 진행된다.
 
 ---
 
-## 13. 남은 `todo:`
+## 9. 남은 `todo:`
 
-| # | 항목 | 어디에 적어 둘 것인가 |
+| # | 항목 | 어디에 |
 |---|---|---|
-| 1 | 전송 필드 15개 **확정** (§7.3 의 질문 4개) | `NEXT.md` §5-5 |
-| 2 | `shipping.csv` 의 KL `ZSHCO` | `masters/refs/shipping.csv` 의 `note` |
-| 3 | VSART/ZSHCO **코드 마스터**를 SAP 에서 받을 수 있나 (받으면 `value_check`) | `NEXT.md` §5 |
-| 4 | `st.data_editor` 붙여넣기 · 드롭다운 동시 동작 (§8.2) | `NEXT.md` §5 |
-| 5 | 행마다 후보가 달라지는 요구 (§4.4) | `SCHEMA.md` §4.6a 각주 |
-| 6 | 출하 마스터 **관리 화면** 필요 여부 (§5.4) | `SCHEMA.md` §6.1 기준 재적용 |
-| 7 | CBO **업서트 키** — `POSEX` 를 빼도 되는가와 직결 (§7.3) | `CLAUDE.md` §8 (이미 등재) |
-| 8 | 템플릿 **1행**을 `label` 로 쓸 수 있나 (지금은 `_base` 의 한글 label 사용) | `SCHEMA.md` §4.6a |
+| 1 | **MSC 브랜드가 출하지로 결정되는가, ORDERED FROM 문구로 결정되는가** (§1.2) | `customers/msc.yaml` 의 `todo:` — 확인 전까지 현행 유지 |
+| 2 | **CBO 업서트 키** — 생성한 번호를 `POSEX` 에 넣어도 되는가 (§4.8) | `NEXT.md` §5 · `CLAUDE.md` §8 (이미 등재) |
+| 3 | `shipping.csv` 의 KL `ZSHCO` | `refs/shipping.csv` 의 `note` |
+| 4 | `VSART`/`ZSHCO` **코드 마스터**를 SAP 에서 받을 수 있나 (받으면 `value_check`) | `NEXT.md` §5 |
+| 5 | `st.data_editor` **붙여넣기 · 드롭다운** 동시 동작 (실제 브라우저 1회면 판가름) | `NEXT.md` §5 |
+| 6 | 템플릿 실물의 **1행 문구 품질** — 설명이 비면 매칭 정확도가 떨어진다 | `check_template.py` 가 목록으로 띄운다 |
+| 7 | **코드성 필드**(`ZTERM`·`INCO1` 등)를 Claude 에게 맡길지, 템플릿에서 뺄지 (§2.3) | 현업 확인 → `NEXT.md` §5 |
+| 8 | `storage/llm_cache/` **고아 항목 정리** 필요 여부 (§3.3) | `NEXT.md` §5 |
+| 9 | YGJP `WAERK: "JPY"` 를 Claude 에게 맡길지 | `customers/ygjp.yaml` 의 `todo:` |

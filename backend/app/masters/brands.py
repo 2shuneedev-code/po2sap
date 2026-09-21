@@ -18,6 +18,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import backup
+
 MASTER_FILE = "refs/brand_master.csv"
 KEYS_FILE = "refs/brand_keys.csv"
 KEY_COLUMNS = ["kunnr", "zbrand", "match", "text", "note"]
@@ -117,12 +119,23 @@ def validate_keys(masters_dir: Path, kunnr: str, zbrand: str, keys: list[BrandKe
 
 
 def set_keys(
-    masters_dir: Path, kunnr: str, zbrand: str, keys: list[BrandKey]
+    masters_dir: Path,
+    kunnr: str,
+    zbrand: str,
+    keys: list[BrandKey],
+    *,
+    storage_dir: Path | None = None,
+    backup_keep: int = 30,
 ) -> list[BrandKey]:
     """(거래처, 코드) 한 묶음을 통째로 교체한다. 빈 목록이면 매핑을 지운다.
 
     같은 묶음이 있던 자리를 지켜 파일 순서를 보존한다 — 행 순서가 곧
     판정 우선순위이므로(SCHEMA §4.5) 저장할 때마다 순서가 흔들리면 안 된다.
+
+    `storage_dir` 을 주면 **덮어쓰기 전에 사본을 남긴다**
+    (`storage/master_backups/`). 운영 경로(화면·API)는 반드시 넘긴다 —
+    현업이 몇 달 채운 값이라 되돌릴 수단이 있어야 한다. 테스트처럼 사본이
+    필요 없는 자리에서만 생략한다.
     """
     validate_keys(masters_dir, kunnr, zbrand, keys)
 
@@ -142,7 +155,10 @@ def set_keys(
         at = same_customer[-1] + 1 if same_customer else len(rows)
         rows[at:at] = replacement
 
-    _write(masters_dir / KEYS_FILE, rows)
+    path = masters_dir / KEYS_FILE
+    if storage_dir is not None:
+        backup.snapshot(path, storage_dir, keep=backup_keep)
+    _write(path, rows)
     return replacement
 
 

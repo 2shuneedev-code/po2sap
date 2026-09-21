@@ -265,7 +265,11 @@ def put_brand_keys(
         for k in body.keys
     ]
     try:
-        saved = brand_store.set_keys(settings.masters_dir, kunnr, zbrand, keys)
+        saved = brand_store.set_keys(
+            settings.masters_dir, kunnr, zbrand, keys,
+            storage_dir=settings.storage_dir,
+            backup_keep=settings.master_backup_keep,
+        )
     except brand_store.BrandError as exc:
         raise HTTPException(400, str(exc)) from exc
 

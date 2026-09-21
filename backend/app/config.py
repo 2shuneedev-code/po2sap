@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     # 잠겨 있는 편이 안전하다. 암호를 정해야 비로소 고칠 수 있다.
     master_edit_password: str = ""
 
+    # 브랜드 매핑을 저장할 때마다 자동으로 커밋·푸시한다.
+    # **원격이 늘 서버와 같아지므로 다음 `git pull` 이 그 CSV 를 건드리지 않는다.**
+    # 기본은 꺼짐 — 서버에 Git 자격증명이 없거나 사내망이 원격에 닿지 않을 수
+    # 있고, 그때 조용히 실패하는 것보다 화면에서 눌러 결과를 보는 편이 낫다.
+    master_git_autopush: bool = False
+
+    # 덮어쓰기 전 사본을 몇 개까지 남길지 (storage/master_backups/).
+    # 0 이하면 지우지 않고 계속 쌓는다.
+    master_backup_keep: int = 30
+
     # ── EAI ────────────────────────────────────────────────
     # 개발  https://eai-dev.yg1.solutions:5443/po2sap/order
     # 운영  https://eai-prd... (이관 시 .env 만 교체한다 — 코드는 그대로)

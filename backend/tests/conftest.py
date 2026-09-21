@@ -45,6 +45,25 @@ def _ignore_local_env_file():
         Settings.model_config["env_file"] = original
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_storage_dir(tmp_path_factory):
+    """테스트가 실물 `storage/` 에 쓰지 않게 한다.
+
+    테스트는 보통 `Settings(masters_dir=사본)` 으로 마스터만 갈아끼운다.
+    `storage_dir` 은 손대지 않으므로 기본값 — **저장소의 진짜 storage/** 가
+    그대로 남는다. 마스터 저장 사본(`master_backups/`)이 생기면서 실제로
+    테스트가 거기에 파일을 쌓았다 (2026-09-21 에 10개가 쌓인 걸 발견했다).
+
+    `STORAGE_DIR` 을 환경변수로 박아 두면 명시적으로 넘기지 않는 한 전부
+    임시 경로를 본다 — 테스트 파일마다 기억할 필요가 없다.
+    """
+    os.environ["STORAGE_DIR"] = str(tmp_path_factory.mktemp("storage"))
+    try:
+        yield
+    finally:
+        os.environ.pop("STORAGE_DIR", None)
+
+
 @pytest.fixture(scope="session")
 def root() -> Path:
     return ROOT

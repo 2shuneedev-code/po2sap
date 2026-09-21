@@ -214,6 +214,10 @@ storage/          런타임 산출물 — Git 제외
 | 사내 프록시·CA 를 `.env` 의 `HTTPS_PROXY` 로 | `.env` 는 Settings 로만 읽히고 `os.environ` 에 안 나간다 — HTTP 클라이언트가 영영 못 본다. `LLM_PROXY` · `LLM_CA_BUNDLE` 을 쓴다 |
 | `LLM_BASE_URL` 끝에 `/v1` 붙이기 | SDK 가 붙인다. `/v1/v1/messages` 로 나가 404 가 난다 |
 | 새 스크립트에서 `use_utf8()` 생략 | 윈도우 한국어(cp949)에서 출력을 파이프로 넘기면 `—` 에서 죽는다. `test_windows_compat.py` 가 잡는다 |
+| 서버에서 `git checkout .` · `git clean -xdf` | 현업이 몇 달 채운 브랜드 매핑이 사라진다. 되돌릴 사본까지 같이 지워진다. 화면의 Git 동기화로 맞춘다 |
+| 화면·엔진이 `pull` · `reset` · `checkout` 실행 | 합칠 것이 있으면 사람이 판단할 일이다. 조용히 되돌리는 것이 가장 나쁘다. `gitsync` 는 `add`·`commit`·`push` 만 한다 |
+| 마스터 저장 경로에서 사본 생략 | 되돌리기 버튼이 없는 값이다. 운영 경로(화면·API)는 `storage_dir` 을 넘겨 덮어쓰기 전 사본을 남긴다 |
+| 테스트에서 `storage_dir` 방치 | 마스터 사본이 **실물 `storage/`** 에 쌓인다. `conftest` 가 `STORAGE_DIR` 을 임시 경로로 박는다 |
 | `git ls-files` 결과와 디스크 경로를 그대로 비교 | 윈도우는 `a\b.py`, git 은 `a/b.py`. `as_posix()` 로 맞춘다 |
 
 ---

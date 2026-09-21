@@ -129,7 +129,9 @@ def test_detail_includes_logic_for_configured_customer(client):
     logic = client.get(f"/api/brands/customers/{MSC}").json()["logic"]
     assert logic["split"]["by"] == "shipment"
     assert [t["id"] for t in logic["tables"]] == ["ship_to_routing"]
-    assert {r["id"] for r in logic["rules"]} == {"brand_code", "ref_codes"}
+    # **거래처 고유 규칙이 있는가**를 본다. 정확히 일치를 요구하면 공용
+    # 프로필에 규칙이 하나 늘 때마다(예: 통화 변환) 멀쩡한 테스트가 죽는다.
+    assert {r["id"] for r in logic["rules"]} >= {"brand_code", "ref_codes"}
     assert any(f["field"] == "BSTKD" for f in logic["fields"])
 
 

@@ -124,8 +124,10 @@ def test_brand_map_shows_only_this_customers_rows(client, workspace):
         keys = list(csv.DictReader(f))
 
     def brand_rows(body):
+        # **규칙 id 로 고른다.** "첫 번째 csv_map" 으로 집으면 통화 변환처럼
+        # 같은 kind 의 규칙이 하나 늘어날 때 엉뚱한 표를 보게 된다.
         for rule in body["rules"]:
-            if rule["kind"] == "csv_map":
+            if rule["id"] == "brand_code":
                 return {r[0] for r in rule["rows"]}
         return set()
 

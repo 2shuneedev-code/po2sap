@@ -144,6 +144,9 @@ class AnthropicProvider:
                 tools=[tool],
                 tool_choice={"type": "tool", "name": tool["name"]},
                 messages=[{"role": "user", "content": content}],
+                # 추론 깊이 = 출력 토큰 = 비용. 기본값(high)을 그대로 쓰면
+                # 추출 한 건에 생각만 수만 토큰이 나간다 (LLM_EFFORT 로 조절).
+                output_config={"effort": self._settings.llm_effort},
             )
         except Exception as exc:  # noqa: BLE001 - SDK 예외를 사용자 메시지로 변환
             message = f"Claude API 호출 실패: {exc}"

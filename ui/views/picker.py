@@ -17,19 +17,29 @@ SCOPES = {
     "규칙 있음": "configured",
     "규칙 없음": "unconfigured",
 }
-SORTS = {
-    "이름순": "name",
-    "고객코드순": "kunnr",
-    "업로드 가능 먼저": "ready",
-}
+
+# 정렬은 **이름순 하나**다. 사이드바는 좁고, 고객을 찾는 길은 검색이면 된다.
+# 선택지를 늘리면 매번 고르게 만들 뿐 찾는 속도가 빨라지지 않는다.
+_SORT = "name"
+
+# 스트림릿 버튼 라벨은 기본이 **가운데 정렬**이다. 거래처가 수백 곳이면
+# 이름 시작 위치가 제각각이라 눈으로 훑기 어렵다. 왼쪽으로 붙인다.
+_LEFT_ALIGN = """
+<style>
+section[data-testid="stSidebar"] .stButton button { justify-content: flex-start; }
+section[data-testid="stSidebar"] .stButton button p { text-align: left; }
+</style>
+"""
 
 
-def customer_picker(key: str, *, ready_first: bool = False) -> CatalogEntry | None:
+def customer_picker(key: str) -> CatalogEntry | None:
     """사이드바 거래처 목록. 고른 고객을 돌려준다.
 
     목록은 **SAP 브랜드 마스터의 전 고객(430곳)** 이다. 규칙이 없는 곳도 보여야
-    브랜드를 미리 채워둘 수 있고 어디까지 왔는지 보인다. `ready_first` 는
-    업로드 가능한 곳을 위로 올릴 뿐, 나머지를 숨기지 않는다.
+    브랜드를 미리 채워둘 수 있고 어디까지 왔는지 보인다.
+
+    거르는 수단은 **검색과 범위 드롭다운 둘뿐**이다. 정렬은 이름순 고정 —
+    사이드바는 좁고, 고객을 찾는 길은 검색이면 충분하다.
     """
     state_key = f"{key}_kunnr"
 
@@ -40,13 +50,11 @@ def customer_picker(key: str, *, ready_first: bool = False) -> CatalogEntry | No
             help="고객명 · SAP 명 · 고객코드 · 거래처코드를 함께 찾습니다",
             label_visibility="collapsed",
         )
-        # 두 칸으로 나누면 "업로드 가능 먼저" 가 잘린다 — 사이드바는 좁다.
-        scope_label = st.selectbox("범위", list(SCOPES), key=f"{key}_scope")
-        sort_label = st.selectbox(
-            "정렬", list(SORTS), key=f"{key}_sort", index=2 if ready_first else 0,
+        scope_label = st.selectbox(
+            "범위", list(SCOPES), key=f"{key}_scope", label_visibility="collapsed",
         )
 
-        rows = catalog(q, SCOPES[scope_label], SORTS[sort_label])
+        rows = catalog(q, SCOPES[scope_label], _SORT)
         st.caption(f"{len(rows):,}곳")
 
         if not rows:
@@ -56,6 +64,7 @@ def customer_picker(key: str, *, ready_first: bool = False) -> CatalogEntry | No
         selected = st.session_state.get(state_key, "")
         current = next((r for r in rows if r.kunnr == selected), None)
 
+        st.markdown(_LEFT_ALIGN, unsafe_allow_html=True)
         with st.container(height=420, border=False):
             for row in rows:
                 _entry_button(row, state_key, active=row.kunnr == selected)

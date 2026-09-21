@@ -14,63 +14,77 @@
 # ═══════════════════════════════════════════════════════════════
 version: 1
 
+rules:
+  currency:
+    kind: csv_map
+    label: "통화 → ISO 3자리"
+    description: |
+      발주서 원문("United States Dollars")을 ISO 4217 세 자리(USD)로 바꾼다.
+      **거래처와 무관한 전역 참조표**라 filter_column 을 두지 않는다.
+      행 순서가 판정 우선순위다 — "Canadian Dollar" 가 "Dollar" 보다 위에 있어야
+      캐나다 달러가 USD 로 넘어가지 않는다 (SCHEMA §4.5).
+      추가·수정은 masters/refs/currency.csv 에서 한다.
+    source: header.currency_text
+    table_file: refs/currency.csv
+    key_column: text
+    value_column: waerk
+    mode_column: match
+    case_insensitive: true
+    on_no_match:
+      action: warn
+      message: "통화를 인식하지 못했습니다: {currency_text} — refs/currency.csv 에 추가하세요"
+
 fields:
-  # ── 공통 고정값 (_base/sap_defaults.yaml 의 sap_defaults) ──────
+  # ── 전 거래처 공통 고정값 (_base/sap_defaults.yaml) ───────────
   AUART:   { from: base }
   VKORG:   { from: base }
-  VTWEG:   { from: base }
 
-  # ── 거래처 식별 — meta 에서 받는다 ────────────────────────────
-  # 판매처·최종고객은 고객코드 그대로다. 출하처(KUNNR2)는 거래처마다
-  # 다르므로(결정표/고정값) 여기 두지 않는다.
+  # ── 거래처 식별 — 셋 다 기본은 고객코드와 같은 값 ─────────────
+  # 다른 거래처는 그 파일에서 덮어쓴다 (MSC 는 출하처에 따라 KUNNR2 가
+  # 달라져 결정표를 건다).
   KUNNR1:  { from: expr, expr: 'meta.customer_no', required: true }
+  KUNNR2:  { from: expr, expr: 'meta.customer_no', required: warn }
   KUNNR3:  { from: expr, expr: 'meta.customer_no', required: true }
 
-  # ── 문서에서 그대로 읽는 값 ───────────────────────────────────
+  # ── 발주서에서 읽는 값 ────────────────────────────────────────
+  BSTKD:   { from: doc, path: header.po_number,  required: warn }
+  # ★ MATNR 은 **우리 품번**(item_code)이다. 고객 품번(our_item)이 아니다.
+  #   거래처에 따라 발주서 컬럼명이 반대인 곳이 있다 (MSC: "Your Item
+  #   Number" 가 우리 품번). 여기서 한 번 고정해 두면 그 혼동이 사라진다.
+  MATNR:   { from: doc, path: line.item_code,    required: warn }
   KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
+  PRICE:   { from: doc, path: line.unit_price }
+  POSEX:   { from: doc, path: line.posex }
 
-  # ── 전 거래처 동일 고정값 ─────────────────────────────────────
-  VSART:   { from: const, value: "04", explain: "운송수단 — 전 거래처 04" }
+  # ── 규칙·마스터가 정한다 ──────────────────────────────────────
+  WAERK:   { from: rule, rule: currency, required: warn }
+  ZBRAND:  { from: const, value: "", required: warn,
+             todo: "브랜드 마스터 조회 — 1개면 기본값, 2개 이상이면 드롭다운" }
+  ZSHCO:   { from: const, value: "", required: warn,
+             todo: "refs/shipping.csv (고객 1:1:1) 조회로 바꾼다" }
+  VSART:   { from: const, value: "04", explain: "운송수단 — 전 거래처 04",
+             todo: "refs/shipping.csv (고객 1:1:1) 조회로 바꾼다" }
 
-  # ── 미사용 (양식에는 있으나 채우지 않는다) ────────────────────
-  # 전송 JSON 에는 "" 로 들어간다. 현업 협의로 필요해지면 거래처 파일에서 덮어쓴다.
-  VBELN:   { from: const, value: "" }
-  VDATU:   { from: const, value: "" }
-  ZTERM:   { from: const, value: "" }
+  # ── 공란 (템플릿 확정본 2026-09-21) ───────────────────────────
+  # 양식에는 있으나 **채우지 않는다.** 필요해지면 거래처 파일에서 덮어쓰거나
+  # 검수 화면에서 사람이 넣는다. **추측해서 채우지 않는다** — 빈 칸은
+  # 눈에 띄지만 그럴듯한 값은 안 띈다.
+  AUGRU:   { from: const, value: "" }
+  BSTDK_E: { from: const, value: "" }
+  DELCO:   { from: const, value: "" }
+  EMPST:   { from: const, value: "" }
+  ETDAT:   { from: const, value: "" }
+  IHREZ_E: { from: const, value: "" }
   INCO1:   { from: const, value: "" }
   INCO2:   { from: const, value: "" }
-  ZPKRE1:  { from: const, value: "" }
-  MAKTX:   { from: const, value: "" }
-  LGORT:   { from: const, value: "" }
-  ETDAT:   { from: const, value: "" }
-  BATCH:   { from: const, value: "" }
-  VALTY:   { from: const, value: "" }
-  PRICE:   { from: const, value: "" }
-  WAERK:   { from: const, value: "" }
-  BSTDK_E: { from: const, value: "" }
-  POSEX:   { from: const, value: "" }
-  DELCO:   { from: const, value: "" }
-  BSTKD_E: { from: const, value: "" }
-  AUGRU:   { from: const, value: "" }
-  VKAUS:   { from: const, value: "" }
-  IHREZ_E: { from: const, value: "" }
+  VDATU:   { from: const, value: "" }
   VGBEL:   { from: const, value: "" }
   VGPOS:   { from: const, value: "" }
-
-  # ── 거래처가 반드시 덮어써야 하는 필드 ────────────────────────
-  # 여기 두는 이유: 선언을 빠뜨렸을 때 CI 가 아니라 TODO 리포트로 드러나게 하려고.
-  # 값이 비어 있으면 전송은 되지만 검증기가 목록으로 뽑아준다.
-  KUNNR2:  { from: const, value: "", todo: "출하처 — 거래처 파일에서 덮어쓸 것" }
-  BSTKD:   { from: const, value: "", todo: "고객발주번호 — 거래처 파일에서 덮어쓸 것" }
-  ZBRAND:  { from: const, value: "", todo: "브랜드 — 거래처 파일에서 덮어쓸 것" }
-  ZSHCO:   { from: const, value: "", todo: "출하조건 — 거래처 파일에서 덮어쓸 것" }
-  MATNR:   { from: const, value: "", todo: "자재번호 — 거래처 파일에서 덮어쓸 것" }
+  VKAUS:   { from: const, value: "" }
   ZPKRE2:  { from: const, value: "" }
-  EMPST:   { from: const, value: "" }
+  ZTERM:   { from: const, value: "" }
 
 grid:
   pinned: [BSTKD, MATNR, KWMENG]
-  hidden: [VTWEG, VBELN, VDATU, ZTERM, INCO1, INCO2, ZPKRE1, MAKTX, LGORT,
-           ETDAT, BATCH, VALTY, PRICE, WAERK, BSTDK_E, DELCO, BSTKD_E,
-           AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
+  hidden: [VDATU, ZTERM, INCO1, INCO2, ETDAT, PRICE, WAERK, BSTDK_E, DELCO, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
   width:  { MATNR: 140 }

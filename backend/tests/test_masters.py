@@ -66,7 +66,9 @@ def test_all_customers_have_no_errors(validate_masters, masters_dir):
 def test_every_base_field_is_declared(validate_masters, masters_dir):
     """§7-1 — 필드 수를 코드에 박지 않는다. _base 가 정하고 전량 선언이 강제된다."""
     base = validate_masters.load_base_fields(masters_dir)
-    assert len(base) >= 30
+    # 하한만 둔다 — 현업이 템플릿에서 열을 빼면 줄어드는 것이 정상이다.
+    # 여기서 잡으려는 것은 개수가 아니라 **목록이 비어버리는 사고**다.
+    assert len(base) >= 10
     for code in validate_masters.customer_codes(masters_dir):
         from app.masters.loader import load_customer
 

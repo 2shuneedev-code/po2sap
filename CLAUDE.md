@@ -48,6 +48,9 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\A
 pip install -r backend/requirements-dev.txt         # 운영 서버는 requirements.txt 만
 cp .env.example .env                                # Windows: copy .env.example .env
 
+# Claude API 연결 점검 — 모델 조회만 한다 (메시지 전송 없음 = 비용 0)
+python scripts/check_llm.py
+
 # 실물 사전 점검 — hints 의 라벨이 진짜 문서에 있는지 대조 (LLM 호출 없음 = 무료)
 python scripts/check_sample.py <발주서> --customer MSC
 python scripts/check_sample.py <발주서> --customer MSC --text   # 원문까지

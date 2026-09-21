@@ -167,14 +167,18 @@ LLM_MODEL_FALLBACK=claude-sonnet-5  # 예비
 사내 계정이 쓸 수 있는 모델로 맞춘다. **모델을 바꾸면 추출 정확도가 달라지므로
 골든 테스트를 전량 다시 돌린다.**
 
-### 확인
+### 확인 — 돈 쓰기 전에 여기서 막는다
 
 ```powershell
-python -c "from backend.app.config import get_settings as g; s=g(); print(s.llm_provider, s.llm_base_url or '(기본)', s.llm_model_extract)"
+python scripts\check_llm.py
 ```
 
-화면 좌하단 **설정 확인** 패널에도 프로바이더·모델·EAI 주소가 그대로 뜬다.
-키·권한·모델 ID 는 `/api/health` 가 모델 조회로 확인한다 (메시지를 보내지 않으므로 비용 0).
+프로바이더·주소·모델·프록시·CA 를 그대로 찍고, **모델 조회**로 키·권한·모델 ID
+세 가지를 한 번에 확인한다. 메시지를 보내지 않으므로 **비용 0**이다.
+키는 앞뒤만 남기고 가려서 찍는다 — 터미널 기록이 그대로 유출이 되지 않게.
+
+실패하면 흔한 원인(키 오타·모델 미허용·사내 CA·사내 프록시)을 함께 띄운다.
+화면 좌하단 **설정 확인** 패널과 `/api/health` 도 같은 것을 본다.
 
 ### 비용 없이 실물로 한 번 돌려보기
 

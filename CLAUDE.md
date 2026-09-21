@@ -64,6 +64,13 @@ python scripts/parse_one.py <발주서> --customer MSC
 # 규칙엔진까지 — 전송 행 36필드를 그대로 출력
 python scripts/parse_one.py <발주서> --customer MSC --rows
 
+# 시연·회귀용 고정 — 실제 응답을 픽스처로 박는다 (이후 mock 이 그대로 재생)
+python scripts/pin_fixture.py <발주서> --customer MSC --dry-run
+python scripts/pin_fixture.py <발주서> --customer MSC
+# 박은 뒤 JSON 의 payload 안 value 를 손으로 고치면 그 값이 재생된다.
+# **사람 앞에서 보여줄 때는 라이브 호출을 쓰지 않는다** — 네트워크·키·결과가
+# 매번 같다는 보장이 없고, 그 자리에서 되돌릴 수 없다.
+
 # API 서버
 cd backend && uvicorn app.main:app --reload        # → /api/health
 

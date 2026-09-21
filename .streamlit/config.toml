@@ -17,3 +17,10 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# 우상단 스트림릿 기본 툴바에서 **개발자용 버튼을 없앤다** — Deploy · Rerun ·
+# Clear cache. 현업이 쓰는 업무 화면이고, 그 버튼들은 우리 배포와 아무 관계가
+# 없으면서 눌러볼 여지만 준다. 인쇄·테마 같은 보기 옵션은 남는다.
+# (개발 중 재시작은 터미널에서 Ctrl+C 로 한다)
+toolbarMode = "viewer"

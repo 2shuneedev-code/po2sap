@@ -8,7 +8,8 @@ SAP 이 주는 것은 `코드 → 이름` 뿐이고 **원문 키는 어디에도
 **행 순서가 곧 판정 우선순위다** (SCHEMA §4.5).
 
 저장 전 검증은 서버가 한다 — 그 고객에 없는 코드, 다른 코드가 이미 쓰는 문구는
-거부된다. 인증·승인 흐름은 범위 밖이고(사내망), 변경 이력은 CSV 의 Git 이력이 남긴다.
+거부된다. **저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로**
+암호로 잠가 둔다 (`ui/auth.py`). 변경 이력은 CSV 의 Git 이력이 남긴다.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from ui.auth import gate
 from ui.service import MasterError, brand_store, catalog, preview_for, settings
 from ui.views.picker import customer_header, customer_picker
 from ui.views.rules import rule_preview
@@ -77,9 +79,12 @@ def _mapping(entry) -> None:
         columns=COLS,
     )
 
+    unlocked = gate(cfg.master_edit_password, what="브랜드 매핑")
+
     edited = st.data_editor(
         frame,
-        num_rows="dynamic",
+        disabled=not unlocked,
+        num_rows="dynamic" if unlocked else "fixed",
         width="stretch",
         hide_index=True,
         key=f"brandmap_{entry.kunnr}",
@@ -105,7 +110,7 @@ def _mapping(entry) -> None:
     )
 
     left, right = st.columns([1, 4])
-    if left.button("저장", type="primary", key=f"save_{entry.kunnr}"):
+    if left.button("저장", type="primary", key=f"save_{entry.kunnr}", disabled=not unlocked):
         _save(entry.kunnr, keys, edited)
     right.caption(f"현재 {len(keys)}건 · 브랜드 {entry.mapped_count}/{entry.brand_count} 매핑됨")
 

@@ -3,8 +3,11 @@
  *
  * 전제:
  *   LLM_PROVIDER=mock EAI_ENDPOINT=http://127.0.0.1:9000/po2sap/order \
+ *   MASTER_EDIT_PASSWORD=test1234 \
  *     streamlit run po2sap.py --server.port 8501 --server.headless true
  *   python scripts/mock_eai_server.py
+ *
+ * 편집 잠금을 지나야 표가 열린다. 같은 암호를 MASTER_EDIT_PASSWORD 로 넘긴다.
  *
  * 실행: node ui/e2e/<파일>.mjs   (로컬 크로미움이 따로면 CHROME_PATH=...)
  * LLM 호출 없음(mock 재생) = 비용 0.
@@ -31,6 +34,25 @@ await page.keyboard.press("Enter");
 await settle(2500);
 await page.locator('[data-testid="stSidebar"] button', { hasText: "YG-1 Japan" }).first().click();
 await settle(3500);
+
+console.log("\n── 편집 잠금");
+const pw = process.env.MASTER_EDIT_PASSWORD ?? "";
+const pwBox = page.locator('[data-testid="stMain"] input[type="password"]').first();
+if (await pwBox.count()) {
+  console.log("잠금 화면 떴음");
+  await pwBox.fill("틀린암호");
+  await page.locator('[data-testid="stMain"] button', { hasText: "잠금 해제" }).first().click();
+  await settle(2000);
+  console.log("틀린 암호 거부:", (await text()).includes("맞지 않습니다") ? "정상" : "문제!");
+  await page.locator('[data-testid="stMain"] input[type="password"]').first().fill(pw);
+  await page.locator('[data-testid="stMain"] button', { hasText: "잠금 해제" }).first().click();
+  await settle(2500);
+  console.log("해제됨:", (await text()).includes("편집이 열려 있습니다") ? "정상" : "문제!");
+} else {
+  console.log("잠금 화면 없음 — MASTER_EDIT_PASSWORD 가 비었거나 이미 해제됨");
+  console.log("본문:", (await text()).slice(0, 160));
+}
+await page.screenshot({ path: `${SHOT}/b0-lock.png`, fullPage: false });
 
 const heads = await page.locator('[data-testid="stMain"] [role="columnheader"]').allTextContents();
 console.log("표 컬럼:", heads.join(" | "));

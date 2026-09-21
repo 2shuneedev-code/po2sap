@@ -34,19 +34,36 @@ from app.masters import MasterError, load_customer  # noqa: E402
 _QUOTED = re.compile(r'"([^"\n]{3,80})"')
 _TRAILING_VALUE = re.compile(r"[\s:：]*[-\d.,/]+\s*$")
 
+# `예: "..."` 줄에 적힌 것은 **값의 예시**다 (브랜드명·PO 번호 등).
+# 문서마다 달라서 없는 게 정상인데, 못 찾았다고 띄우면 현업이 헛고생한다.
+_EXAMPLE_LINE = re.compile(r"^\s*(예시?|e\.?g\.?|ex)\s*[:)：]")
 
-def anchors(hints: str) -> list[str]:
-    seen: list[str] = []
-    for raw in _QUOTED.findall(hints or ""):
-        text = raw.strip()
-        if text and text not in seen:
-            seen.append(text)
-    return seen
+
+def anchors(hints: str) -> tuple[list[str], list[str]]:
+    """hints 에서 앵커를 뽑아 (라벨, 예시값) 으로 나눈다.
+
+    라벨은 양식에 **반드시** 있어야 하는 문구라 못 찾으면 경고한다.
+    예시값은 그 자리에 들어갈 값을 보여준 것뿐이라 없어도 정상이다.
+    """
+    labels: list[str] = []
+    examples: list[str] = []
+    for line in (hints or "").splitlines():
+        bucket = examples if _EXAMPLE_LINE.match(line) else labels
+        for raw in _QUOTED.findall(line):
+            text = raw.strip()
+            if text and text not in labels and text not in examples:
+                bucket.append(text)
+    return labels, examples
 
 
 def label_only(anchor: str) -> str:
     """예시값을 떼고 라벨만 남긴다. `Purchase Order ID:  10972` → `Purchase Order ID`."""
     return _TRAILING_VALUE.sub("", anchor).strip(" :：")
+
+
+# 라벨만으로 다시 찾을 때의 최소 길이. `PO#` 같은 3자짜리도 살린다
+# (따옴표 앵커 자체의 최소 길이와 같은 기준이다).
+_MIN_LABEL = 3
 
 
 def main() -> int:
@@ -91,21 +108,22 @@ def main() -> int:
         return 0
 
     haystack = normalize_ws(doc.full_text).casefold()
+    labels, examples = anchors(master.extraction.get("hints") or "")
     found, partial, missing = [], [], []
 
-    for anchor in anchors(master.extraction.get("hints") or ""):
+    for anchor in labels:
         if normalize_ws(anchor).casefold() in haystack:
             found.append(anchor)
             continue
         label = label_only(anchor)
-        if len(label) >= 4 and normalize_ws(label).casefold() in haystack:
+        if len(label) >= _MIN_LABEL and normalize_ws(label).casefold() in haystack:
             partial.append((anchor, label))
         else:
             missing.append(anchor)
 
     total = len(found) + len(partial) + len(missing)
     print(f"\n  ── hints 앵커 대조 ({total}개) " + "─" * 40)
-    if not total:
+    if not total and not examples:
         print("  hints 에 따옴표로 적힌 라벨이 없습니다. 대조할 것이 없습니다.")
         return 0
 
@@ -118,6 +136,13 @@ def main() -> int:
         print(f"    ✗ {anchor}")
 
     print(f"\n  찾음 {len(found)} / 라벨만 {len(partial)} / 못 찾음 {len(missing)}")
+
+    # 예시값은 문서마다 달라서 없는 게 정상이다. 집계에 넣지 않고 참고로만 보여준다.
+    if examples:
+        hit = [e for e in examples if normalize_ws(e).casefold() in haystack]
+        print(f"\n  ── hints 의 예시값 ({len(examples)}개) — 없어도 정상 " + "─" * 22)
+        for anchor in examples:
+            print(f"    {'✓' if anchor in hit else '·'} {anchor}")
 
     if not found and not partial:
         print("\n  ⛔ 하나도 찾지 못했습니다.")

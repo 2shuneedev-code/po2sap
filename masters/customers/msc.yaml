@@ -18,7 +18,8 @@ extraction:
   input: text
   page_limit: 40
   hints: |
-    MSC Industrial 표준 발주서(HTM)다. 표는 class="potbl" 테이블로 되어 있다.
+    MSC Industrial 표준 발주서(HTM)다. 표는 전처리를 거쳐
+    한 줄에 셀 | 셀 | 셀 형태로 넘어온다.
 
     [PO 번호]
       <title> 의 "PO#7588650" 또는 "Purchase Order #7588650" 의 숫자.

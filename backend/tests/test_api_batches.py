@@ -83,9 +83,13 @@ def test_batch_reaches_ready_with_rows(client, batch_id):
     body = client.get(f"/api/batches/{batch_id}").json()
     assert body["status"] == "READY"
     assert body["files"][0]["status"] == "DONE" and body["files"][0]["row_count"] == 2
-    assert body["summary"] == {
-        "row_count": "2", "total_qty": "25", "error_count": "0", "warn_count": "0",
-    }
+    # 건수·합계·오류 0 만 고정한다. **경고 수는 박지 않는다** — 마스터에서
+    # `required: warn` 인 필드가 늘고 주는 것은 정상이고, 그때마다 멀쩡한
+    # 테스트가 죽으면 안 된다 (CLAUDE.md §5 "테스트에 데이터 개수를 박기").
+    assert body["summary"]["row_count"] == "2"
+    assert body["summary"]["total_qty"] == "25"
+    assert body["summary"]["error_count"] == "0"      # 🔴 는 전송을 막는다
+    assert "warn_count" in body["summary"]
 
 
 def test_rows_follow_the_contract_shape(client, batch_id):
@@ -170,9 +174,11 @@ def test_deletion_is_explicit_not_omission(client, batch_id):
 
     deleted = client.post(f"/api/batches/{batch_id}/validate",
                           json={"rows": [{"row_id": "r_0002", "deleted": True}]}).json()
-    assert deleted["summary"] == {
-        "row_count": "1", "total_qty": "10", "error_count": "0", "warn_count": "0",
-    }
+    # 이 테스트가 보는 것은 **삭제가 집계에 반영되는가**다.
+    # 경고 수는 마스터가 정하는 값이라 박지 않는다 (위 §5 조회 테스트와 같은 이유).
+    assert deleted["summary"]["row_count"] == "1"
+    assert deleted["summary"]["total_qty"] == "10"
+    assert deleted["summary"]["error_count"] == "0"
 
 
 def test_deletion_can_be_undone(client, batch_id):

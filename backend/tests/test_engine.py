@@ -29,7 +29,10 @@ def msc_result(fixtures_dir, masters_dir):
 # ── 관통 ───────────────────────────────────────────────────────────────
 def test_one_row_per_item_per_order_unit(msc_result):
     assert len(msc_result.rows) == 2
-    assert msc_result.error_count == 0 and msc_result.warn_count == 0
+    # 🔴 는 전송을 막으므로 0 이어야 한다. **경고 수는 박지 않는다** —
+    # 마스터에서 `required: warn` 인 필드가 늘고 주는 것은 정상이고,
+    # 그때마다 멀쩡한 테스트가 죽으면 안 된다 (CLAUDE.md §5).
+    assert msc_result.error_count == 0
 
 
 def test_every_send_field_is_present(msc_result, masters_dir):

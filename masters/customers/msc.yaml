@@ -47,6 +47,7 @@ extraction:
           → shipment 블록마다 별도 shipments 항목을 만들고,
             품목은 반드시 그 블록의 품목표에서 가져올 것.
           ※ 상단 요약 품목표는 전 출하처 합계다. 이것을 쓰지 말 것.
+            상단 요약 품목표는 품목으로 읽지 않는다. 합계만 읽는다.
 
       창고명에 도시명(ATLANTA / ELKHART / HARRISBURG / RENO)이 들어 있고
       대소문자가 섞인다("SID TOOL Harrisburg Warehouse").

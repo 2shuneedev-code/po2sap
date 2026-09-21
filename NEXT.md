@@ -112,6 +112,62 @@
 
 ---
 
+## 2-0. 터미널에서 재개할 때 — **여기부터 읽는다** ★
+
+> 2026-09-21 모바일 세션에서 여기까지 했다. **작업은 전부 푸시돼 있다.**
+
+### 첫 3줄
+
+```powershell
+cd C:\vibe-coding\po2sap
+git pull origin claude/mobile-work-feasibility-8ojteh
+.\.venv\Scripts\Activate.ps1
+```
+
+받고 나서 확인:
+
+```powershell
+python scripts\validate_masters.py    # 오류 0 이어야 한다
+pytest                                 # 300개 통과
+```
+
+### ⚠ 먼저 처리할 것 — **PC 에만 있는 작업 두 개**
+
+| | 무엇 | 왜 |
+|---|---|---|
+| 1 | **OUTLINE + 청크 11회 추출 구조** | 어느 브랜치에도 없다. 푸시하지 않으면 다음 작업이 그 코드를 모르고 간다 |
+| 2 | **`templates/SALES ORDER` 확정본** | 필드 목록의 원천이다. `masters/templates/` 에 올리고 커밋한다 |
+
+**둘 다 `git push` 하고 나서 다음으로 간다.** 안 그러면 작업이 갈린다.
+
+### 그다음 순서
+
+| # | 할 일 | 크기 |
+|---|---|---|
+| 1 | `refs/shipping.csv` — `VSART`·`ZSHCO` (고객 1:1:1) | 작다. 통화 변환과 같은 방식 |
+| 2 | 브랜드 마스터 조회 — 1개면 기본값, 2개 이상이면 드롭다운 | 중간 |
+| 3 | 템플릿 리더 — 2행이 필드 목록을 대신한다 | 중간 |
+| 4 | 실물 발주서로 관통 확인 | PC 필요 |
+
+### 답이 필요한 것 하나
+
+**MSC 브랜드 판정** — 지시는 "출하지에 따라 브랜드가 결정된다"인데 현행
+`masters/customers/msc.yaml` 은 `ORDERED FROM` **문구**로 가린다. 다른 규칙이다.
+확인 전까지 현행 유지다.
+
+### 2026-09-21 에 끝낸 것
+
+- `LLM_EFFORT` — 출력 토큰이 비용의 65% 였다. 기본 medium (`.env` 로 조절)
+- `scripts/check_llm.py` · `pin_fixture.py` · `.bat` 런처 4종
+- 브랜드 매핑 **편집 잠금** (`MASTER_EDIT_PASSWORD`) · 사본 · Git 동기화
+- **기본 매핑표** — 표준 키 → SAP 필드 (`profiles/standard.yaml`)
+- **통화 → ISO 3자리** (`refs/currency.csv`) — "Canadian Dollar" 가 USD 로
+  안 새도록 행 순서를 테스트가 고정한다
+- **템플릿 확정본 반영 — 전송 필드 36 → 28**
+- 좌측 그리드 — 검색 + 범위만, 이름 왼쪽 정렬
+
+---
+
 ## 2-D. 매핑 방식 확정 (2026-09-21 4차 지시) ★★★ **가장 최신 · 이것이 최우선**
 
 > 사장님: **"클로드가 추출하는건 지금과 같이하고, 표준키 설명으로 매핑하는걸

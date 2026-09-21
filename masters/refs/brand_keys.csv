@@ -5,7 +5,6 @@ kunnr,zbrand,match,text,note
 100249,428,contains,CLASS C,
 100249,2,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 100249,4,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
-100249,501,contains,UNBRANDED,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 3200,1,equals,YG BRAND,
 3200,142,equals,YAMAKATSU BRAND,
 3200,181,equals,YSK BRAND,

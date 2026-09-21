@@ -35,7 +35,7 @@ class ValidateIn(BaseModel):
 
 
 def _repo(settings: Settings) -> BatchRepo:
-    return BatchRepo(settings.storage_dir)
+    return BatchRepo(settings.storage_dir, stale_after_sec=settings.parse_stale_sec)
 
 
 def _load(settings: Settings, batch_id: str) -> Batch:

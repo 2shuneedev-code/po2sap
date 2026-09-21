@@ -116,8 +116,11 @@ def _upload_section(entry) -> Batch | None:
     if uploads and st.button("변환하기", type="primary"):
         with st.status("발주서를 읽는 중…", expanded=True) as status:
             try:
-                st.write(f"{len(uploads)}개 파일 저장")
-                batch = start_batch(entry.parse_code, uploads)
+                # 진행 막대 하나를 제자리에서 갱신한다. 큰 문서는 호출이 수십 번이라
+                # `st.write` 로 줄을 쌓으면 화면이 로그로 넘친다.
+                bar = st.progress(0.0, text=f"{len(uploads)}개 파일 저장")
+                batch = start_batch(entry.parse_code, uploads, on_progress=_ticker(bar))
+                bar.empty()
                 for f in batch.files:
                     if f.status == "DONE":
                         st.write(f"✔ {f.name} — {f.row_count}행")
@@ -140,10 +143,28 @@ def _upload_section(entry) -> Batch | None:
         return None
 
 
+def _tick(bar, stage: str, done: int, total: int, label: str) -> None:
+    """진행 막대를 제자리에서 갱신한다. `st.write` 로 줄을 쌓지 않는다.
+
+    호출은 `start_batch` 를 부른 **스크립트 스레드에서만** 온다 — 추출기가 워커 스레드에서는
+    콜백을 부르지 않는다. 스트림릿 위젯은 그 스레드에서만 만질 수 있다.
+    """
+    bar.progress(min(1.0, done / max(total, 1)), text=f"{label} — {stage} {done}/{total}")
+
+
+def _ticker(bar):
+    """`start_batch(on_progress=...)` 에 넘길 콜백 — `_tick` 에 막대를 묶는다."""
+    return lambda stage, done, total, label: _tick(bar, stage, done, total, label)
+
+
 # ── ③ 검수 ───────────────────────────────────────────────────────────
 def _review_section(batch: Batch) -> None:
     if not batch.rows:
-        st.error("읽어낸 행이 없습니다. 파일 형식이나 규칙의 `hints` 를 확인하세요.")
+        failed = [f"{f.name}: {f.error}" for f in batch.files if f.status == "FAILED" and f.error]
+        st.error(
+            "읽어낸 행이 없습니다. 파일 형식이나 규칙의 `hints` 를 확인하세요."
+            + ("\n\n" + "\n\n".join(failed) if failed else "")
+        )
         return
 
     st.divider()

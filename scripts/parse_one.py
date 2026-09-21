@@ -3,8 +3,12 @@
 사용법
     python scripts/parse_one.py <파일경로> --customer MSC
     python scripts/parse_one.py sample.pdf --customer MSC --json out.json
-    python scripts/parse_one.py sample.pdf --customer MSC --text-only   # 전처리만 확인
+    python scripts/parse_one.py sample.pdf --customer MSC --text-only   # 전처리만 확인 (줄 번호 포함)
+    python scripts/parse_one.py sample.pdf --customer MSC --outline-only # 골격 1회만 (LLM 1회 호출)
     python scripts/parse_one.py sample.pdf --customer MSC --rows         # 전송 행까지
+
+`--outline-only` 는 실물 검증의 **1단계**다. 품목은 읽지 않고(출력 ~1~2k 토큰) 블록 경계·합계·
+청크 계획·예상 호출 수를 보여준다. 응답은 런타임 캐시에 저장되어 이어서 전체를 돌릴 때 재사용된다.
 """
 
 from __future__ import annotations
@@ -45,6 +49,68 @@ def _print_lines(lines, *, indent: int = 2, title: str | None = None) -> None:
         )
 
 
+def _progress(stage: str, done: int, total: int, label: str) -> None:
+    """진행 표시는 stderr 로 — `--json` 이나 파이프로 넘기는 stdout 을 오염시키지 않는다."""
+    print(f"  · {label} — {stage} {done}/{total}", file=sys.stderr, flush=True)
+
+
+def _outline_only(path: Path, customer: str) -> int:
+    """OUTLINE 1회만 — 블록 경계·합계·청크 계획을 보고 실물에 맞는지 눈으로 확인한다."""
+    settings = get_settings()
+    try:
+        master = load_customer(customer, settings.masters_dir)
+        doc = load_document(path)
+        outline, policy, chunks, cached = Extractor(settings).read_outline(doc, master)
+    except (MasterError, LLMError, ValueError, FileNotFoundError) as exc:
+        print(f"[실패] {exc}", file=sys.stderr)
+        return 1
+
+    payload = outline.payload
+    print("═" * 70)
+    print(f"  거래처   : {master.code}   파일: {doc.filename}")
+    print(f"  프로바이더: {outline.provider} / {outline.model}{'  (재생 — 호출 없음)' if cached else ''}")
+    print(f"  문서     : {doc.line_count:,} 줄 · {len(doc.full_text):,} 자")
+    print("═" * 70)
+
+    header = payload.get("header") or {}
+    for name in ("po_number", "po_date", "requested_date", "brand_text"):
+        v = header.get(name)
+        print(f"  {name:<16}: {v.get('value') if isinstance(v, dict) else v}")
+
+    def rng(block: dict) -> str:
+        return f"L{int(block.get('src') or 0):06d}~L{int(block.get('src_end') or 0):06d}"
+
+    def span(block: dict) -> int:
+        return int(block.get("src_end") or 0) - int(block.get("src") or 0) + 1
+
+    shipments = payload.get("shipments") or []
+    if shipments:
+        print(f"\n[출하처 블록] {len(shipments)}개")
+        for i, block in enumerate(shipments, start=1):
+            def val(key: str, b: dict = block) -> str:
+                v = b.get(key)
+                return str(v.get("value") if isinstance(v, dict) else v or "-")
+            print(f"  {i}. {rng(block)}  ({span(block):,}줄)  no={val('shipment_no')}  "
+                  f"loc={val('receiving_loc')}")
+    elif payload.get("line_range"):
+        block = payload["line_range"]
+        print(f"\n[품목표 구간] {rng(block)}  ({span(block):,}줄)")
+    else:
+        print("\n[!] 블록 경계가 없습니다 — 청크를 만들 수 없습니다")
+
+    t = payload.get("totals") or {}
+    print(f"\n[발주서 기재 합계] 품목수={t.get('line_count')}  수량={t.get('total_qty')}  "
+          f"금액={t.get('total_amount')}")
+
+    print(f"\n[청크 계획] {len(chunks)}개  (정책: {policy})")
+    for c in chunks:
+        owner = "-" if c.shipment_index is None else f"블록 {c.shipment_index + 1}"
+        print(f"  c{c.chunk_index:<3} {c.label()}  {c.size:>4}줄  {owner}")
+    print(f"\n예상 LLM 호출: 골격 1(완료) + 품목 {len(chunks)} = {1 + len(chunks)}회"
+          "  (출력이 잘리면 그 청크가 절반씩 다시 불립니다)")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="발주서 1부 파싱 (D1 확인용)")
     ap.add_argument("file", help="발주서 파일 경로 (PDF/HTM)")
@@ -52,6 +118,10 @@ def main() -> int:
     ap.add_argument("--json", "-o", help="결과를 JSON 파일로 저장")
     ap.add_argument("--text-only", action="store_true", help="전처리 결과(원문 텍스트)만 출력")
     ap.add_argument("--rows", action="store_true", help="규칙엔진까지 돌려 전송 행을 출력")
+    ap.add_argument(
+        "--outline-only", action="store_true",
+        help="골격(OUTLINE)만 1회 호출해 블록 경계·합계·청크 계획을 출력 (LLM 호출 1회)",
+    )
     args = ap.parse_args()
 
     path = Path(args.file)
@@ -68,9 +138,13 @@ def main() -> int:
         print(doc.numbered_text()[:4000])
         return 0
 
+    # ── 골격만 (LLM 호출 1회 — 실물 검증 1단계) ──────────────
+    if args.outline_only:
+        return _outline_only(path, args.customer)
+
     # ── 파싱 ──────────────────────────────────────────────────
     try:
-        result = Extractor().parse_file(path, args.customer)
+        result = Extractor().parse_file(path, args.customer, on_progress=_progress)
     except (MasterError, LLMError, ValueError, FileNotFoundError) as exc:
         print(f"[실패] {exc}", file=sys.stderr)
         return 1

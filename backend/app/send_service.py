@@ -62,7 +62,7 @@ def send_batch(batch: Batch, edits: list[dict], settings: Settings) -> SendRepor
 
     전송 직전이라고 검증을 건너뛰지 않는다 — 여기가 마지막 방어선이다.
     """
-    repo = BatchRepo(settings.storage_dir)
+    repo = BatchRepo(settings.storage_dir, stale_after_sec=settings.parse_stale_sec)
 
     # 계약 §7 — 재전송은 같은 호출이다. SENT 여도 다시 보낼 수 있다.
     # 전제는 "중복 전송 무해"(design D7)인데 **CBO 업서트 키가 아직 미확정이다.**

@@ -1,4 +1,4 @@
-"""마스터 YAML 검증 — masters/SCHEMA.md §7 의 9종 검사.
+"""마스터 YAML 검증 — masters/SCHEMA.md §7 의 12종 검사.
 
 CI 1단계이자 거래처 추가 절차(§5-6)의 관문이다. LLM 을 호출하지 않으므로 비용 0.
 
@@ -32,6 +32,7 @@ from _console import use_utf8  # noqa: E402
 
 use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
 
+from app.extraction.chunking import CHUNKING_KEYS  # noqa: E402
 from app.extraction.extractor import splits_by_shipment  # noqa: E402
 from app.extraction.schema_builder import (  # noqa: E402
     ANCHOR_KEYS,
@@ -48,7 +49,15 @@ TOP_LEVEL_KEYS = {                      # §4.0
     "version", "extends", "meta", "extraction", "split",
     "tables", "rules", "fields", "grid", "checks",
     "sap_defaults", "field_specs",      # _base 조각이 병합되어 올라온다
+    "extraction_defaults",              # (§4.0) 추출 기본값 — `chunking` 이 여기서 온다
 }
+EXTRACTION_KEYS = {                     # §4.2
+    "input", "page_limit", "hints", "extra_fields", "chunking",
+}
+# §4.2 chunking — 허용 키는 엔진이 쓰는 목록(`extraction/chunking.py`)과 같다.
+# 양수여야 하는 수치. `header_context_lines` 만 0 을 허용한다 (앞머리를 붙이지 않는다는 뜻).
+CHUNKING_POSITIVE = ("max_lines_per_chunk", "tokens_per_line", "safety_ratio")
+CHUNKING_INTEGERS = ("max_lines_per_chunk", "header_context_lines")
 FIELD_FROM = {"const", "base", "doc", "table", "rule", "expr", "gen"}     # §4.6
 FIELD_OPTIONS = {
     "from", "value", "path", "table", "rule", "expr", "generator",
@@ -146,6 +155,55 @@ def check_top_level(report: Report, data: dict[str, Any]) -> None:
         report.warn(2, "version 이 없습니다 (SCHEMA §4.0)")
     if not (data.get("fields") or {}):
         report.error(1, "fields 섹션이 없습니다")
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def check_extraction(report: Report, master: Any) -> None:
+    """§4.2 — `extraction` 의 키와 `chunking`(§7-12).
+
+    검사는 **병합 결과**(`_base` 기본값 + 거래처 override)에 한다. 기본값이 깨져도 전
+    거래처가 한꺼번에 걸리도록.
+    """
+    extraction = master.extraction or {}
+    for key in extraction:
+        if key not in EXTRACTION_KEYS:
+            report.error(2, f"extraction 에 정의되지 않은 키입니다: {key} (SCHEMA §4.2)")
+
+    if "chunking" not in extraction:
+        return
+    chunking = extraction["chunking"]
+    if not isinstance(chunking, dict):
+        report.error(12, "extraction.chunking 은 키: 값 형태여야 합니다")
+        return
+
+    for key in chunking:
+        if key not in CHUNKING_KEYS:
+            report.error(
+                12,
+                f"extraction.chunking 에 허용되지 않은 키입니다: {key} "
+                f"(허용: {', '.join(CHUNKING_KEYS)})",
+            )
+    if "enabled" in chunking and not isinstance(chunking["enabled"], bool):
+        report.error(12, f"extraction.chunking.enabled 는 true | false 여야 합니다: {chunking['enabled']!r}")
+
+    for key in ("max_lines_per_chunk", "tokens_per_line", "safety_ratio", "header_context_lines"):
+        if key not in chunking:
+            continue
+        value = chunking[key]
+        if not _is_number(value):
+            report.error(12, f"extraction.chunking.{key} 는 숫자여야 합니다: {value!r}")
+            continue
+        if key in CHUNKING_POSITIVE and value <= 0:
+            report.error(12, f"extraction.chunking.{key} 는 양수여야 합니다: {value!r}")
+        if key == "header_context_lines" and value < 0:
+            report.error(12, f"extraction.chunking.{key} 는 0 이상이어야 합니다: {value!r}")
+        if key in CHUNKING_INTEGERS and value != int(value):
+            report.error(12, f"extraction.chunking.{key} 는 정수여야 합니다: {value!r}")
+        if key == "safety_ratio" and value > 1:
+            report.error(12, f"extraction.chunking.safety_ratio 는 1 이하의 비율이어야 합니다: {value!r}")
 
 
 def check_meta(report: Report, master: Any) -> None:
@@ -589,6 +647,7 @@ def validate_customer(
     allowed = valid_paths(master)
 
     check_top_level(report, master.raw)
+    check_extraction(report, master)
     check_meta(report, master)
     check_tables(report, master, allowed)
     check_rules(report, master, allowed, masters_dir)

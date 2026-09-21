@@ -30,8 +30,19 @@ class Settings(BaseSettings):
     llm_model_fallback: str = "claude-sonnet-5"
 
     llm_max_tokens: int = 16000
+    # **호출 1회(청크 1개) 기준**이다. 문서 1건은 OUTLINE 1회 + LINES N회로 나뉘어 불리므로
+    # 문서 전체의 상한은 llm_doc_budget_sec 가 따로 건다 (design.md §3.3).
     llm_timeout_sec: int = 120
     llm_max_concurrency: int = 4
+
+    # 재시도·분할 손잡이 (design.md §3.3.4). 코드에 상수로 두지 않는다.
+    llm_max_retries: int = 2            # SDK 의 429·5xx·타임아웃 재시도. 호출 1회 안에서 일어난다
+    llm_chunk_retries: int = 1          # 그래도 실패한 청크를 다시 부르는 횟수 (5xx·타임아웃만)
+    llm_chunk_split_depth: int = 2      # 출력이 잘린 청크를 절반으로 쪼개 다시 부를 수 있는 단계 수
+    llm_doc_budget_sec: int = 900       # 문서 1건의 LLM 작업 전체 상한. 넘으면 남은 청크를 취소한다
+
+    # PARSING 으로 남은 배치를 실패로 보기 시작하는 나이(초). 읽을 때 한 번 본다 (design.md §8.2)
+    parse_stale_sec: int = 1800
 
     # 사내망 프록시 · SSL 검사 장비. **`.env` 에 `HTTPS_PROXY` 를 적는 것으로는
     # 안 된다** — pydantic-settings 는 `.env` 를 이 객체로만 읽고 `os.environ`

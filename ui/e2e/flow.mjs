@@ -45,8 +45,19 @@ console.log("\n── 업로드");
 await page.locator('[data-testid="stMain"] input[type="file"]').first()
   .setInputFiles("backend/tests/fixtures/msc/PO-SAMPLE-0001.htm");
 await settle();
+// 진행 막대(st.progress)는 변환 중에만 잠깐 있다가 사라진다 — 뜨는 순간을 놓치지 않게
+// 클릭 전에 관찰자를 걸어 둔다. (픽스처 재생이면 청크 호출이 없어 0% 막대만 스친다)
+await page.evaluate(() => {
+  window.__sawProgressBar = false;
+  new MutationObserver(() => {
+    if (document.querySelector('[data-testid="stProgress"], [role="progressbar"]')) {
+      window.__sawProgressBar = true;
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+});
 await page.locator('[data-testid="stMain"] button', { hasText: "변환하기" }).first().click();
 await settle();
+console.log("진행 막대 떴음:", await page.evaluate(() => window.__sawProgressBar));
 const afterParse = await text();
 console.log("변환 결과:", afterParse.match(/변환 (완료|실패)[^가-힣]*[^·]*/)?.[0] ?? "(못 찾음)");
 console.log("파싱 로그:", afterParse.match(/✔[^✔✖]*/g)?.join(" | ") ?? "(없음)");

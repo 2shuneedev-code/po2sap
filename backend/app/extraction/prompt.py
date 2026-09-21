@@ -7,8 +7,8 @@
 호출은 패스마다 다르다 (design.md §3.3.2).
   · OUTLINE  `build_outline_prompt` — 골격만. 품목은 읽지 않는다
   · LINES    `build_lines_prompt`   — 구간 하나의 품목만
-  · `build_user_prompt` 는 문서 1건을 한 번에 읽히는 **과도기 경로**용이다
-    (다음 단계에서 오케스트레이터가 OUTLINE+LINES 로 바꾸면 쓰이지 않는다)
+  · SINGLE   `build_scan_prompt`    — 스캔본. 문서 1건을 한 번에 (줄 번호가 없어 나눌 수 없다,
+                                      design.md §3.3.6)
 """
 
 from __future__ import annotations
@@ -61,18 +61,19 @@ def _head(customer_name: str, hints: str | None) -> list[str]:
     return parts
 
 
-def build_user_prompt(*, customer_name: str, hints: str | None, document_text: str | None) -> str:
-    """문서 1건을 한 번에 읽히는 과도기 경로용 프롬프트."""
+def build_scan_prompt(*, customer_name: str, hints: str | None) -> str:
+    """스캔본(텍스트 레이어 없음) — 첨부된 PDF 를 한 번에 판독시킨다 (design.md §3.3.6).
+
+    이 문서에는 줄 번호가 없다. 시스템 프롬프트의 "src 를 붙인다"는 규칙이 이 호출에는
+    해당하지 않음을 여기서 분명히 한다 — 도구 스키마에도 `src` 가 없고 `page` 가 대신 있다.
+    """
     parts = _head(customer_name, hints)
-
-    if document_text is not None:
-        parts.append(f"# 발주서 원문\n\n{document_text}")
-    else:
-        parts.append("# 발주서\n첨부된 문서를 판독하세요.")
-
+    parts.append("# 발주서\n첨부된 문서를 판독하세요.")
     parts.append(
         "위 발주서를 판독해 제공된 도구로 결과를 반환하세요.\n"
-        "모든 품목을 빠짐없이 포함하고, 각 값에 근거 줄 번호(src)를 반드시 붙이세요."
+        "- 이 문서에는 줄 번호가 없습니다. **src 대신 page(그 값이 있는 PDF 페이지 번호, 1부터)** 를 "
+        "모든 값과 품목에 붙이세요.\n"
+        "- 모든 품목을 빠짐없이 포함하세요."
     )
     return "\n\n".join(parts)
 

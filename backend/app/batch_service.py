@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
-from .domain.models import Batch, BatchRow, GroundingIssue, RowIssue
+from .domain.models import Batch, BatchRow, GroundingIssue, IssueCode, RowIssue
 from .extraction import Extractor
+from .extraction.extractor import ProgressCallback
 from .extraction.providers.base import LLMError
 from .masters import MasterError, load_customer
 from .rules.engine import build
@@ -24,11 +25,19 @@ __all__ = ["parse_batch", "merge_edits"]
 # grounding 이 쓰는 경로 표기 — "shipments[2].lines[1].quantity" / "lines[3].item_code"
 _SHIPMENT_LINE = re.compile(r"^shipments\[(\d+)\]\.lines\[(\d+)\]\.(.+)$")
 _LINE = re.compile(r"^lines\[(\d+)\]\.(.+)$")
+# 오더 단위 경로 — 청크 실패(CHUNK_FAILED)·빈 청크·중복 품목이 이 모양으로 온다
+_SHIPMENT_ONLY = re.compile(r"^shipments\[(\d+)\]\.lines$")
 
 
-def parse_batch(batch_id: str, settings: Settings) -> None:
-    """파일별로 파싱 → 행 생성. 한 파일이 실패해도 나머지는 계속 간다."""
-    repo = BatchRepo(settings.storage_dir)
+def parse_batch(
+    batch_id: str, settings: Settings, *, on_progress: ProgressCallback | None = None
+) -> None:
+    """파일별로 파싱 → 행 생성. 한 파일이 실패해도 나머지는 계속 간다.
+
+    `on_progress(단계, 완료, 전체, 라벨)` 은 **이 함수를 부른 스레드에서만** 불린다 —
+    추출기가 워커 스레드에서는 부르지 않는다. 화면(스트림릿)이 안전하게 받을 수 있다.
+    """
+    repo = BatchRepo(settings.storage_dir, stale_after_sec=settings.parse_stale_sec)
     batch = repo.load(batch_id)
 
     try:
@@ -40,13 +49,22 @@ def parse_batch(batch_id: str, settings: Settings) -> None:
         repo.save(batch)
         return
 
-    extractor = Extractor(settings)
+    try:
+        extractor = Extractor(settings)
+    except LLMError as exc:                     # 키·설정 오류 — PARSING 으로 남기지 않는다
+        for f in batch.files:
+            f.status, f.error = "FAILED", str(exc)
+        batch.status = batch.recompute_status()
+        repo.save(batch)
+        return
     counter = 0
 
     for entry in batch.files:
         path = repo.upload_path(batch_id, entry.file_id, entry.name)
         try:
-            parsed = extractor.parse_file(path, batch.customer, display_name=entry.name)
+            parsed = extractor.parse_file(
+                path, batch.customer, display_name=entry.name, on_progress=on_progress
+            )
             result = build(parsed.raw, master, settings.masters_dir, file_name=entry.name)
             batch.columns = result.columns
             batch.grid = result.grid
@@ -63,6 +81,15 @@ def parse_batch(batch_id: str, settings: Settings) -> None:
                     issues=_dedupe(issues),
                 ))
             entry.status, entry.row_count = "DONE", len(result.rows)
+            if not result.rows:
+                # 행이 없으면 이슈를 붙일 곳이 없다 — 이유(구간을 못 읽음 · 품목 없음 등)가
+                # 사라지지 않게 파일의 실패 사유로 올린다.
+                reasons = [i.message for i in parsed.issues if i.level == "error"]
+                if reasons:
+                    entry.status = "FAILED"
+                    entry.error = " / ".join(reasons[:3]) + (
+                        f" (외 {len(reasons) - 3}건)" if len(reasons) > 3 else ""
+                    )
 
         except (LLMError, MasterError, ValueError, FileNotFoundError) as exc:
             entry.status, entry.error, entry.row_count = "FAILED", str(exc), 0
@@ -101,6 +128,16 @@ def _grounding_by_row(
         ))
 
     for issue in issues:
+        only = _SHIPMENT_ONLY.match(issue.field)
+        if only:
+            # 오더 단위 이슈 → 그 오더의 전 행. 그 오더에 행이 하나도 없으면(구간을 통째로
+            # 못 읽은 경우) 붙일 행이 없으므로 아래에서 문서 전 행에 붙인다 — 막아야 하는
+            # 이슈가 조용히 사라지면 안 된다.
+            rows_of = [pos for (s_idx, _l), pos in positions.items() if s_idx == int(only[1])]
+            if rows_of:
+                for row_index in rows_of:
+                    add(row_index, issue, "")
+                continue
         m = _SHIPMENT_LINE.match(issue.field) or _LINE.match(issue.field)
         if m:
             groups = m.groups()
@@ -162,7 +199,14 @@ def merge_edits(
                 row.fields[name] = "" if value is None else str(value)
 
         row.edited = sorted(n for n in columns if row.fields.get(n, "") != row.original.get(n, ""))
-        row.issues = validate_row(row.fields, fields, field_specs) if not row.deleted else []
+        if row.deleted:
+            row.issues = []
+        else:
+            # 값 검증은 다시 하되, **읽지 못한 구간**(CHUNK_FAILED)은 값이 아니라 행 자체가
+            # 없다는 뜻이라 화면에서 고칠 수 없다. 검증 버튼으로 지워지면 빠진 품목을 안고
+            # 전송이 열린다 — 서버가 들고 있는 그 이슈는 그대로 둔다 (다시 변환해야 풀린다).
+            carried = [i for i in row.issues if i.code == IssueCode.CHUNK_FAILED]
+            row.issues = _dedupe(carried + validate_row(row.fields, fields, field_specs))
 
     batch.status = batch.recompute_status()
     return rejected

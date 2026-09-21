@@ -5,6 +5,8 @@ Tool Use 로 출력을 강제하면 스키마를 벗어난 응답이 원천 차�
 
   OUTLINE  header · shipments[] (또는 line_range) · totals · notes.  품목은 받지 않는다.
   LINES    구간 하나의 품목만.  헤더·합계는 다시 받지 않는다.
+  SINGLE   문서 1건을 한 번에. **스캔본(텍스트 레이어 없음) 전용** — 줄 번호가 없어 나눌 수 없다
+           (design.md §3.3.6). `src` 대신 모델이 `page` 를 준다.
 
 **값의 포장은 `masters/SCHEMA.md` §3.2 가 단일 원천이다.**
   · header · shipment 값 : `{value, src, src_end?, confidence}` — 값마다 따로
@@ -18,10 +20,12 @@ Tool Use 로 출력을 강제하면 스키마를 벗어난 응답이 원천 차�
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 OUTLINE_TOOL_NAME = "outline_purchase_order"
 LINES_TOOL_NAME = "extract_lines"
+SINGLE_TOOL_NAME = "extract_purchase_order"
 
 # 앵커·신뢰도 키. 표준 키(§3.1)가 아니라 **포장**이므로 키 목록 비교에서 뺀다.
 ANCHOR_KEYS = frozenset({"src", "src_end", "confidence"})
@@ -278,3 +282,80 @@ def build_lines_tool(extra_fields: list[dict[str, str]] | None = None) -> dict[s
         "description": "주어진 구간의 품목을 구조화해 반환한다. 헤더·합계는 반환하지 않는다.",
         "input_schema": build_lines_schema(extra_fields),
     }
+
+
+# ── SINGLE — 스캔본 (design.md §3.3.6) ────────────────────────────────
+_PAGE = {
+    "type": "integer",
+    "minimum": 1,
+    "description": (
+        "이 값이 있는 **PDF 페이지 번호**(1부터). 이 문서에는 줄 번호가 없으므로 "
+        "줄 번호 대신 페이지로 위치를 알려 줄 것."
+    ),
+}
+
+
+def build_single_tool(
+    extra_fields: list[dict[str, str]] | None = None,
+    *,
+    include_shipments: bool = False,
+    src_required: bool = False,
+) -> dict[str, Any]:
+    """문서 1건을 한 번에 읽는 툴 — OUTLINE 과 LINES 를 한 스키마로 합친 것이다.
+
+    새 키를 만들지 않는다. 두 빌더가 만든 스키마를 **그대로** 이어 붙일 뿐이라 스키마의
+    원천은 계속 이 모듈의 두 빌더 하나다.
+
+    src_required  True 면 줄 번호(`src`)가 필수인 텍스트 문서용이다 (앵커 대조를 쓴다).
+                  False(기본)면 **스캔본용**이다 — 줄 번호가 존재하지 않으므로 `src`·`src_end`
+                  를 스키마에서 빼고, 그 자리에 `page` 를 넣어 **모델이** 페이지를 알려 준다.
+                  §3.1 의 "페이지는 코드가 계산한다"에 대한 명시적 예외다 (§3.3.6).
+    """
+    outline = build_outline_schema(extra_fields, include_shipments=include_shipments)
+    lines = build_lines_schema(extra_fields)["properties"]["lines"]
+
+    props = dict(outline["properties"])
+    required = [r for r in outline["required"] if r != "line_range"]
+    props.pop("line_range", None)
+
+    if include_shipments:
+        block = props["shipments"]["items"]
+        block["properties"] = {**block["properties"], "lines": lines}
+        block["required"] = [*block["required"], "lines"]
+    else:
+        props["lines"] = lines
+        required.append("lines")
+
+    schema: dict[str, Any] = {"type": "object", "properties": props, "required": required}
+    if not src_required:
+        schema = _to_page_anchor(copy.deepcopy(schema))
+
+    return {
+        "name": SINGLE_TOOL_NAME,
+        "description": "발주서에서 추출한 정보를 구조화해 반환한다.",
+        "input_schema": schema,
+    }
+
+
+def _to_page_anchor(node: Any) -> Any:
+    """`src`·`src_end` 를 걷어내고, 값·품목(=`confidence` 가 있는 객체)에는 `page` 를 넣는다.
+
+    출하처 블록의 `src`~`src_end` 는 청크 경계용이라 그냥 빠진다 — 스캔본은 나누지 않는다.
+    """
+    if isinstance(node, list):
+        return [_to_page_anchor(n) for n in node]
+    if not isinstance(node, dict):
+        return node
+
+    out = {k: _to_page_anchor(v) for k, v in node.items()}
+    props = out.get("properties")
+    if isinstance(props, dict) and "src" in props:
+        anchored_value = "confidence" in props
+        props.pop("src", None)
+        props.pop("src_end", None)
+        required = [r for r in out.get("required", []) if r not in ("src", "src_end")]
+        if anchored_value:
+            props["page"] = dict(_PAGE)
+            required.append("page")
+        out["required"] = required
+    return out

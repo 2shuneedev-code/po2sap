@@ -72,6 +72,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
 
     data = _load_yaml(str(path), path.stat().st_mtime)
     data = _apply_extends(data, masters_dir)
+    data = _resolve_chunking(data)
 
     meta = data.get("meta") or {}
     if not meta.get("code"):
@@ -130,6 +131,7 @@ def _generic_customer(code: str, masters_dir: Path) -> CustomerMaster:
         },
         "extends": GENERIC_EXTENDS,
     }, masters_dir)
+    data = _resolve_chunking(data)
 
     meta = data["meta"]
     return CustomerMaster(
@@ -145,6 +147,27 @@ def _generic_customer(code: str, masters_dir: Path) -> CustomerMaster:
         grid=data.get("grid") or {},
         raw=data,
     )
+
+
+def _resolve_chunking(data: dict[str, Any]) -> dict[str, Any]:
+    """`extraction.chunking` 을 **키 단위로** 합친다 — SCHEMA §1 의 통째 교체 규칙의 유일한 예외.
+
+    `_base` 의 기본값(`extraction_defaults.chunking`) 위에 거래처가 적은 키만 덮는다.
+    성능 손잡이라 거래처가 한 값만 조절하는 일이 흔한데, 나머지를 다시 적게 하면
+    `_base` 의 기본값을 올려도 그 거래처만 낡은 값에 묶인다 (SCHEMA §4.2).
+
+    합친 결과는 `extraction.chunking` 에 들어간다. 기본값이 없고 거래처도 안 적었으면
+    아무것도 만들지 않는다 (그때는 `chunking.chunk_policy` 가 명시적으로 실패한다).
+    """
+    defaults = (data.get("extraction_defaults") or {}).get("chunking") or {}
+    extraction = data.get("extraction") or {}
+    override = extraction.get("chunking") or {}
+    if not isinstance(defaults, dict) or not isinstance(override, dict):
+        return data                      # 형식 오류는 validate_masters 가 잡는다
+    merged = {**defaults, **override}
+    if not merged:
+        return data
+    return {**data, "extraction": {**extraction, "chunking": merged}}
 
 
 def _apply_extends(data: dict[str, Any], masters_dir: Path) -> dict[str, Any]:

@@ -24,7 +24,7 @@ LLM 파싱을 업무에 쓰려면 "그럴듯하지만 틀린 값"을 코드로 �
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 
 from ..domain.models import ExtractedValue, GroundingIssue, IssueCode, RawPO
@@ -55,14 +55,20 @@ def verify(
     doc: SourceDoc,
     *,
     allowed_range: tuple[int, int] | None = None,
+    anchored: bool = True,
 ) -> list[GroundingIssue]:
-    """`allowed_range` 는 **청크 응답을 검증할 때** 그 청크의 줄 구간이다.
+    """`allowed_range` 는 **모든 값에** 적용할 줄 구간이다.
 
-    `src` 가 구간 밖이면 🔴 — 프롬프트가 "구간 밖을 참조하지 말 것"을 지시했는데도
-    벗어난 것이므로 그 값은 믿을 수 없다. 청크 호출자는 다음 단계에서 붙인다.
+    청크로 읽은 품목은 이 인자가 아니라 **품목마다** `POLine.chunk_range` 를 갖는다 —
+    청크마다 구간이 다르므로 한 범위로는 표현할 수 없다. 두 가지가 다 있으면 품목의
+    `chunk_range` 가 이긴다. 어느 쪽이든 `src` 가 구간 밖이면 🔴 — 프롬프트가 "구간 밖을
+    참조하지 말 것"을 지시했는데도 벗어난 것이므로 그 값은 믿을 수 없다.
+
+    `anchored=False` 는 **줄 번호를 요구하지 않은 호출**(스캔 경로, design §3.3.6)이다.
+    텍스트 레이어가 있어도 그 문서를 이미지로 읽혔다면 대조할 `src` 가 없으므로 건너뛴다.
     """
     # 스캔본(텍스트 레이어 없음)은 대조할 원문이 없으므로 앵커 검증을 건너뛴다.
-    check_anchor = doc.has_text_layer
+    check_anchor = anchored and doc.has_text_layer
     ctx = _Ctx(
         doc=doc,
         check_anchor=check_anchor,
@@ -75,16 +81,18 @@ def verify(
         issues += _check_value(f"header.{name}", val, ctx)
 
     for idx, line in enumerate(raw.lines, start=1):
+        line_ctx = _line_ctx(ctx, line)
         for name, val in _iter_line(line):
-            issues += _check_value(f"lines[{idx}].{name}", val, ctx)
+            issues += _check_value(f"lines[{idx}].{name}", val, line_ctx)
 
     for s_idx, shipment in enumerate(raw.shipments, start=1):
         prefix = f"shipments[{s_idx}]"
         for name, val in _iter_shipment(shipment):
             issues += _check_value(f"{prefix}.{name}", val, ctx)
         for idx, line in enumerate(shipment.lines, start=1):
+            line_ctx = _line_ctx(ctx, line)
             for name, val in _iter_line(line):
-                issues += _check_value(f"{prefix}.lines[{idx}].{name}", val, ctx)
+                issues += _check_value(f"{prefix}.lines[{idx}].{name}", val, line_ctx)
 
     issues += _check_totals(raw)
 
@@ -116,6 +124,13 @@ def verify(
 
 
 # ── 개별 값 검증 ───────────────────────────────────────────────────────
+def _line_ctx(ctx: _Ctx, line) -> _Ctx:
+    """청크로 읽은 품목은 **자기 청크의 구간**으로 검사한다."""
+    if line.chunk_range is None:
+        return ctx
+    return replace(ctx, allowed_range=tuple(line.chunk_range))
+
+
 def _check_value(path: str, val: ExtractedValue, ctx: _Ctx) -> list[GroundingIssue]:
     if val is None or val.is_empty():
         return []

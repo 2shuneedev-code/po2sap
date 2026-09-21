@@ -48,7 +48,8 @@ def settings() -> Settings:
 
 
 def repo() -> BatchRepo:
-    return BatchRepo(settings().storage_dir)
+    cfg = settings()
+    return BatchRepo(cfg.storage_dir, stale_after_sec=cfg.parse_stale_sec)
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -64,12 +65,15 @@ def customer_master(code: str):
     return load_customer(code.lower(), settings().masters_dir)
 
 
-def start_batch(code: str, uploads: list) -> Batch:
+def start_batch(code: str, uploads: list, on_progress=None) -> Batch:
     """업로드 → 저장 → 파싱. 파싱은 여기서 **동기로** 돈다.
 
     FastAPI 쪽은 배경 작업으로 돌리고 화면이 폴링하지만, 스트림릿은 스크립트가
     위에서 아래로 한 번 도는 모델이라 폴링이 더 복잡하다. 진행 표시는
     호출하는 쪽이 `st.status` 로 감싼다.
+
+    `on_progress(단계, 완료, 전체, 라벨)` 은 **이 함수를 부른 스레드에서만** 불린다
+    (추출기가 워커 스레드에서는 부르지 않는다) — 스트림릿 위젯을 그 안에서 갱신해도 안전하다.
     """
     _check_uploads(uploads)
 
@@ -82,7 +86,7 @@ def start_batch(code: str, uploads: list) -> Batch:
         store.save_upload(batch.batch_id, file_id, up.name, up.getvalue())
     store.save(batch)
 
-    parse_batch(batch.batch_id, settings())
+    parse_batch(batch.batch_id, settings(), on_progress=on_progress)
     return store.load(batch.batch_id)
 
 

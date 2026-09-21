@@ -338,3 +338,66 @@ def test_template_file_is_not_a_customer(masters_dir):
     codes = {c.code for c in list_customers(masters_dir)}
     assert "XXX" not in codes
     assert "MSC" in codes
+
+
+# ── §7-12 extraction.chunking ──────────────────────────────────────────
+def with_chunking(workspace, *body: str) -> None:
+    """msc.yaml 의 `extraction` 에 `chunking:` 블록을 심는다."""
+    lines = "\n".join(f"    {line}" for line in body)
+    break_msc(workspace, "page_limit: 40", f"page_limit: 40\n  chunking:\n{lines}")
+
+
+CHUNKING_FAULTS = [
+    ("줄 수 0", "max_lines_per_chunk: 0"),
+    ("줄 수 음수", "max_lines_per_chunk: -5"),
+    ("줄 수 소수", "max_lines_per_chunk: 12.5"),
+    ("줄 수 문자", 'max_lines_per_chunk: "많이"'),
+    ("줄당 토큰 0", "tokens_per_line: 0"),
+    ("안전 비율 0", "safety_ratio: 0"),
+    ("안전 비율 100% 초과", "safety_ratio: 1.5"),
+    ("앞머리 음수", "header_context_lines: -1"),
+    ("enabled 가 불리언 아님", 'enabled: "yes"'),
+    ("허용 밖의 키", "max_lines: 100"),
+]
+
+
+@pytest.mark.parametrize("label,line", CHUNKING_FAULTS, ids=[f[0] for f in CHUNKING_FAULTS])
+def test_bad_chunking_is_an_error(validate_masters, workspace, label, line):
+    """§7-12 — 잘못된 청크 설정을 놓치면 큰 문서에서만 조용히 이상하게 나뉜다."""
+    with_chunking(workspace, line)
+    report = run(validate_masters, workspace)
+    assert any("§7-12" in e for e in report.errors), f"{label} 을 놓쳤다: {report.errors}"
+
+
+def test_a_customer_may_override_one_chunking_key(validate_masters, workspace):
+    with_chunking(workspace, "max_lines_per_chunk: 150")
+    assert run(validate_masters, workspace).errors == []
+
+
+def test_zero_header_context_and_disabled_chunking_are_valid(validate_masters, workspace):
+    """앞머리를 안 붙이거나 분할을 끄는 것은 정당한 선택이다."""
+    with_chunking(workspace, "header_context_lines: 0", "enabled: false")
+    assert run(validate_masters, workspace).errors == []
+
+
+def test_unknown_extraction_key_is_an_error(validate_masters, workspace):
+    break_msc(workspace, "page_limit: 40", "page_limit: 40\n  bogus: 1")
+    report = run(validate_masters, workspace)
+    assert any("bogus" in e for e in report.errors), report.errors
+
+
+def test_a_broken_base_default_is_caught_for_every_customer(validate_masters, workspace):
+    """기본값이 깨지면 그 값을 물려받는 전 거래처가 걸린다."""
+    _patch(workspace / "_base" / "sap_defaults.yaml", "tokens_per_line: 80", "tokens_per_line: 0")
+    for code in ("msc", "kl", "ygjp"):
+        report = run(validate_masters, workspace, code)
+        assert any("§7-12" in e and "tokens_per_line" in e for e in report.errors), code
+
+
+def test_extraction_defaults_is_allowed_at_the_top_level(validate_masters, masters_dir):
+    """`_base` 조각이 병합되어 올라오는 키다 (SCHEMA §4.0) — 최상위 키 검사가 막으면 안 된다."""
+    assert "extraction_defaults" in validate_masters.TOP_LEVEL_KEYS
+    assert set(validate_masters.CHUNKING_KEYS) == {
+        "enabled", "max_lines_per_chunk", "tokens_per_line", "safety_ratio",
+        "header_context_lines",
+    }

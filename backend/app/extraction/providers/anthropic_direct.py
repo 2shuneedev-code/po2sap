@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from ...config import Settings
-from .base import DocumentInput, LLMError, ProviderHealth, ToolCallResult
+from .base import (
+    DocumentInput,
+    LLMError,
+    LLMTransientError,
+    LLMTruncatedError,
+    ProviderHealth,
+    ToolCallResult,
+)
 
 # PDF 원본을 그대로 넘길 때의 상한 (대략치, 초과 시 텍스트 경로 권장)
 _MAX_PDF_BYTES = 30 * 1024 * 1024
@@ -58,6 +65,19 @@ def _http_client(settings: Settings):
     return DefaultHttpxClient(**options)
 
 
+def _is_transient(exc: Exception) -> bool:
+    """다시 시도해 볼 만한 실패인가 — 타임아웃 · 연결 끊김 · 429 · 5xx.
+
+    SDK 예외 클래스를 임포트해 비교하지 않고 속성으로 본다. 게이트웨이가 다른 예외
+    타입을 던져도 상태 코드가 있으면 같은 기준으로 판정된다.
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status == 429 or status >= 500
+    name = type(exc).__name__
+    return "Timeout" in name or "Connection" in name
+
+
 class AnthropicProvider:
     name = "anthropic"
 
@@ -75,7 +95,11 @@ class AnthropicProvider:
 
         kwargs: dict[str, Any] = {
             "api_key": settings.llm_api_key,
+            # 호출 1회(청크 1개)의 상한이다. 문서 전체는 LLM_DOC_BUDGET_SEC 가 자른다.
             "timeout": float(settings.llm_timeout_sec),
+            # SDK 기본(2회)에 맡기지 않고 명시한다. 기본값이 타임아웃과 곱해져
+            # 최악 (1+2) × 120초 ≈ 6분이 되는 것을 눈에 보이게 하려는 것이다.
+            "max_retries": int(settings.llm_max_retries),
         }
         # 사내 게이트웨이든 Anthropic 직접이든 코드는 같다. 주소만 다르다.
         if settings.llm_base_url:
@@ -122,7 +146,10 @@ class AnthropicProvider:
                 messages=[{"role": "user", "content": content}],
             )
         except Exception as exc:  # noqa: BLE001 - SDK 예외를 사용자 메시지로 변환
-            raise LLMError(f"Claude API 호출 실패: {exc}") from exc
+            message = f"Claude API 호출 실패: {exc}"
+            if _is_transient(exc):
+                raise LLMTransientError(message) from exc
+            raise LLMError(message) from exc
 
         payload = self._extract_tool_input(resp, tool["name"])
         usage = getattr(resp, "usage", None)
@@ -132,6 +159,7 @@ class AnthropicProvider:
             provider=self.name,
             input_tokens=getattr(usage, "input_tokens", 0) or 0,
             output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            stop_reason=str(getattr(resp, "stop_reason", "") or ""),
         )
 
     # ── 내부 ───────────────────────────────────────────────────────────
@@ -159,10 +187,17 @@ class AnthropicProvider:
 
     @staticmethod
     def _extract_tool_input(resp: Any, tool_name: str) -> dict[str, Any]:
+        stop = getattr(resp, "stop_reason", "?")
+        # 출력이 잘렸으면 tool_use 블록이 **있어도** 쓰지 않는다. 잘린 입력은 마지막 품목이
+        # 반쪽이거나 배열이 닫히지 않은 채 SDK 가 복구한 것일 수 있다 (design.md §3.3.4).
+        if stop == "max_tokens":
+            raise LLMTruncatedError(
+                "모델 출력이 max_tokens 에서 잘렸습니다 (stop_reason=max_tokens). "
+                "부분 결과는 사용하지 않습니다."
+            )
         for block in getattr(resp, "content", []) or []:
             if getattr(block, "type", None) == "tool_use" and getattr(block, "name", "") == tool_name:
                 return dict(getattr(block, "input", {}) or {})
-        stop = getattr(resp, "stop_reason", "?")
         raise LLMError(
             f"모델이 구조화 결과를 반환하지 않았습니다 (stop_reason={stop}). "
             "문서가 발주서가 아니거나 판독이 불가능할 수 있습니다."

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .base import DocumentInput, LLMError, ProviderHealth, ToolCallResult
-from .cache import count, fixture_name
+from .cache import count, fixture_name, outline_fixture_name
 
 
 class MockProvider:
@@ -38,19 +38,27 @@ class MockProvider:
         max_tokens: int = 16000,
         customer: str = "",
     ) -> ToolCallResult:
-        wanted = (
-            self._fixtures_dir / fixture_name(customer or "unknown", document.filename)
-            if self._fixtures_dir
-            else None
-        )
+        who = customer or "unknown"
+        if self._fixtures_dir:
+            doc_path = self._fixtures_dir / fixture_name(who, document.filename)
+            outline_path = self._fixtures_dir / outline_fixture_name(who, document.filename)
+            chunk_name = fixture_name(who, document.filename, "c{n}")
+            where = (
+                f"  픽스처 경로: {doc_path}\n"
+                f"  (문서 단위가 없을 때만 호출 단위도 된다 — 골격 {outline_path.name} ·\n"
+                f"   청크 {chunk_name}, n 은 1부터)\n"
+            )
+        else:
+            where = ""
         raise LLMError(
             "mock 프로바이더에 재생할 응답이 없습니다.\n"
             f"  문서: {document.filename} (거래처 {customer or '?'})\n"
-            + (f"  픽스처 경로: {wanted}\n" if wanted else "")
+            f"  호출: {tool.get('name', '?')}\n"
+            + where
             + f"  런타임 캐시: {self._cache_dir}/\n"
             "해결 방법:\n"
             "  1) .env 에서 LLM_PROVIDER=anthropic 으로 바꾸고 실제 파싱을 1회 실행\n"
-            "     (결과가 런타임 캐시에 저장되어 이후 mock 으로 무료 재생 가능)\n"
+            "     (호출마다 런타임 캐시에 저장되어 이후 mock 으로 무료 재생 가능)\n"
             "  2) 또는 위 픽스처 경로에 기대 결과 JSON 을 직접 넣기\n"
             "     형태: {\"payload\": {...추출 결과...}, \"model\": \"fixture\"}"
         )

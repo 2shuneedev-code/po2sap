@@ -12,10 +12,12 @@ from app.extraction.schema_builder import (
     ANCHOR_KEYS,
     LINES_TOOL_NAME,
     OUTLINE_TOOL_NAME,
+    SINGLE_TOOL_NAME,
     build_lines_schema,
     build_lines_tool,
     build_outline_schema,
     build_outline_tool,
+    build_single_tool,
 )
 
 VALUE_KEYS = {"value", "src", "src_end", "confidence"}
@@ -158,15 +160,58 @@ def test_tool_wrappers():
     assert outline["name"] != lines["name"]
 
 
-def test_single_shot_interim_tool_is_composed_from_the_two_builders():
-    """과도기 단일 툴은 새 키를 만들지 않고 두 빌더의 결과를 잇는다."""
-    from app.extraction.extractor import _single_shot_tool
-
-    split = _single_shot_tool(None, include_shipments=True)["input_schema"]
+def test_single_tool_is_composed_from_the_two_builders():
+    """단일 툴(스캔본용)은 새 키를 만들지 않고 두 빌더의 결과를 잇는다 (design §3.3.6)."""
+    split = build_single_tool(None, include_shipments=True, src_required=True)["input_schema"]
     block = split["properties"]["shipments"]["items"]
     assert "lines" in block["properties"] and "lines" in block["required"]
     assert "line_range" not in split["properties"] and "lines" not in split["properties"]
 
-    single = _single_shot_tool(None, include_shipments=False)["input_schema"]
+    single = build_single_tool(None, include_shipments=False, src_required=True)["input_schema"]
     assert "lines" in single["properties"] and "lines" in single["required"]
     assert "line_range" not in single["properties"] and "shipments" not in single["properties"]
+
+
+def _walk(node):
+    """스키마의 모든 하위 노드."""
+    if isinstance(node, dict):
+        yield node
+        for v in node.values():
+            yield from _walk(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _walk(v)
+
+
+def test_scan_tool_has_no_src_anywhere_and_asks_the_model_for_the_page():
+    """스캔본은 줄 번호가 없다 — `src` 를 요구하면 모델이 지어낸다. 위치는 `page` 로 받는다."""
+    tool = build_single_tool([{"name": "contract_no", "description": "d"}],
+                             include_shipments=True)          # src_required 기본값 = 스캔본
+    assert tool["name"] == SINGLE_TOOL_NAME
+    schema = tool["input_schema"]
+
+    for node in _walk(schema):
+        props = node.get("properties") if isinstance(node, dict) else None
+        if not isinstance(props, dict):
+            continue
+        assert "src" not in props and "src_end" not in props
+        assert "src" not in node.get("required", []) and "src_end" not in node.get("required", [])
+        if "confidence" in props:                              # 값 · 품목 = 근거를 갖는 자리
+            assert "page" in props and "page" in node["required"]
+
+    lines = schema["properties"]["shipments"]["items"]["properties"]["lines"]["items"]
+    assert lines["required"] == ["confidence", "page"]
+    assert "lines" in schema["properties"]["shipments"]["items"]["required"]
+
+
+def test_text_tool_keeps_src_required_and_has_no_page():
+    schema = build_single_tool(None, include_shipments=False, src_required=True)["input_schema"]
+    item = schema["properties"]["lines"]["items"]
+    assert "src" in item["required"] and "page" not in item["properties"]
+
+
+def test_building_the_scan_tool_does_not_disturb_the_text_schemas():
+    """스캔 변형은 복사본에서 만든다 — 텍스트용 스키마가 오염되면 앵커가 사라진다."""
+    before = build_lines_schema()
+    build_single_tool(None, include_shipments=True)
+    assert build_lines_schema() == before

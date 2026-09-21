@@ -64,6 +64,11 @@ class POLine(BaseModel):
     line_no: int
     src: int | None = None          # 이 품목이 있는 원문 줄 (줄 단위 앵커 1개, SCHEMA §3.2-나)
     src_end: int | None = None      # 여러 줄에 걸칠 때의 마지막 줄
+    # 이 품목을 읽은 호출의 **읽기 구간** [시작, 끝]. 청크로 읽은 품목에만 있다 (design §3.3.4).
+    # 그라운딩이 `src` 가 이 구간을 벗어나면 🔴 로 잡는다 — 구간 밖을 참조하지 말라는
+    # 프롬프트 지시를 어긴 값은 믿을 수 없다 (§3.4-0). 추출 값이 아니라 **검증용 배선**이라
+    # 직렬화하지 않는다 (골든·`--json` 출력이 청크 크기에 흔들리지 않게).
+    chunk_range: tuple[int, int] | None = Field(default=None, exclude=True)
     posex: ExtractedValue = Field(default_factory=_ev)
     our_item: ExtractedValue = Field(default_factory=_ev)
     item_code: ExtractedValue = Field(default_factory=_ev)
@@ -142,7 +147,7 @@ class IssueCode:
     LOW_CONFIDENCE = "LOW_CONFIDENCE"
     TOTAL_MISMATCH = "TOTAL_MISMATCH"
     NO_LINES = "NO_LINES"
-    # 청크 분할·병합 (design.md §3.3.4) — 발행은 다음 단계의 오케스트레이터가 한다
+    # 청크 분할·병합 (design.md §3.3.4) — 발행은 `extraction/merge.py`
     CHUNK_FAILED = "CHUNK_FAILED"               # 🔴 그 구간을 못 읽음 → 전송 차단
     EMPTY_CHUNK = "EMPTY_CHUNK"                 # 🟡 구간에서 품목 0건
     DUPLICATE_LINE = "DUPLICATE_LINE"           # 🟡 인접 청크에서 같은 src 가 두 번

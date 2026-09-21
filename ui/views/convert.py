@@ -32,7 +32,7 @@ META = ["#", "파일", "그룹"]
 
 
 def render() -> None:
-    entry = customer_picker("convert", ready_first=True)
+    entry = customer_picker("convert")
 
     st.title("P/O 변환")
     st.caption("발주서(PDF·HTM)를 올리면 SAP 전송표로 펼쳐집니다. 고친 값이 그대로 전송됩니다.")

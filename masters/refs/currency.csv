@@ -1,0 +1,28 @@
+text,waerk,match,note
+Canadian Dollar,CAD,contains,"'Dollar' 만 보고 USD 로 넘기지 않도록 **USD 보다 먼저** 둔다"
+Australian Dollar,AUD,contains,같은 이유로 USD 앞에 둔다
+Singapore Dollar,SGD,contains,같은 이유로 USD 앞에 둔다
+Hong Kong Dollar,HKD,contains,같은 이유로 USD 앞에 둔다
+New Taiwan Dollar,TWD,contains,같은 이유로 USD 앞에 둔다
+United States Dollar,USD,contains,
+U.S. Dollar,USD,contains,
+US Dollar,USD,contains,
+USD,USD,equals,ISO 코드가 그대로 적힌 경우
+Japanese Yen,JPY,contains,
+JPY,JPY,equals,
+YEN,JPY,equals,단독 표기일 때만. 'Yen' 이 섞인 문장은 위 행이 잡는다
+Euro,EUR,contains,
+EUR,EUR,equals,
+Korean Won,KRW,contains,
+KRW,KRW,equals,
+Pound Sterling,GBP,contains,
+GBP,GBP,equals,
+Chinese Yuan,CNY,contains,
+Renminbi,CNY,contains,
+CNY,CNY,equals,
+Indian Rupee,INR,contains,
+INR,INR,equals,
+Mexican Peso,MXN,contains,
+MXN,MXN,equals,
+Swiss Franc,CHF,contains,
+CHF,CHF,equals,

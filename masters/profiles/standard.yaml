@@ -14,6 +14,26 @@
 # ═══════════════════════════════════════════════════════════════
 version: 1
 
+rules:
+  currency:
+    kind: csv_map
+    label: "통화 → ISO 3자리"
+    description: |
+      발주서 원문("United States Dollars")을 ISO 4217 세 자리(USD)로 바꾼다.
+      **거래처와 무관한 전역 참조표**라 filter_column 을 두지 않는다.
+      행 순서가 판정 우선순위다 — "Canadian Dollar" 가 "Dollar" 보다 위에 있어야
+      캐나다 달러가 USD 로 넘어가지 않는다 (SCHEMA §4.5).
+      추가·수정은 masters/refs/currency.csv 에서 한다.
+    source: header.currency_text
+    table_file: refs/currency.csv
+    key_column: text
+    value_column: waerk
+    mode_column: match
+    case_insensitive: true
+    on_no_match:
+      action: warn
+      message: "통화를 인식하지 못했습니다: {currency_text} — refs/currency.csv 에 추가하세요"
+
 fields:
   # ── 공통 고정값 (_base/sap_defaults.yaml 의 sap_defaults) ──────
   AUART:   { from: base }
@@ -52,8 +72,7 @@ fields:
              todo: "지급조건 — 원문(NET 30) → SAP 코드 변환표 필요" }
   INCO1:   { from: const, value: "", required: warn,
              todo: "인도조건 — 원문(FCA) → SAP 코드 확인 필요" }
-  WAERK:   { from: const, value: "", required: warn,
-             todo: "통화 — 원문(United States Dollars) → USD 변환표 필요" }
+  WAERK:   { from: rule, rule: currency, required: warn }
   ZPKRE1:  { from: doc, path: header.remark_default }
   ZPKRE2:  { from: doc, path: header.packing_spec }
 

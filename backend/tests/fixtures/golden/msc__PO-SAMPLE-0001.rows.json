@@ -32,7 +32,7 @@
         "EMPST": "",
         "VSART": "04",
         "PRICE": "",
-        "WAERK": "",
+        "WAERK": "USD",
         "BSTDK_E": "20260217",
         "POSEX": "",
         "DELCO": "",
@@ -55,12 +55,6 @@
           "severity": "warn",
           "code": "REQUIRED_MISSING",
           "message": "인도조건1(INCO1) 이 비어 있습니다. 확인하세요."
-        },
-        {
-          "field": "WAERK",
-          "severity": "warn",
-          "code": "REQUIRED_MISSING",
-          "message": "통화(WAERK) 이 비어 있습니다. 확인하세요."
         }
       ]
     },
@@ -96,7 +90,7 @@
         "EMPST": "",
         "VSART": "04",
         "PRICE": "",
-        "WAERK": "",
+        "WAERK": "USD",
         "BSTDK_E": "20260217",
         "POSEX": "",
         "DELCO": "",
@@ -119,12 +113,6 @@
           "severity": "warn",
           "code": "REQUIRED_MISSING",
           "message": "인도조건1(INCO1) 이 비어 있습니다. 확인하세요."
-        },
-        {
-          "field": "WAERK",
-          "severity": "warn",
-          "code": "REQUIRED_MISSING",
-          "message": "통화(WAERK) 이 비어 있습니다. 확인하세요."
         }
       ]
     }

@@ -106,3 +106,47 @@ def test_readme_documents_the_endpoint_setup(root):
     text = (root / "README.md").read_text(encoding="utf-8")
     assert "LLM_BASE_URL" in text
     assert "LLM_PROXY" in text, "프록시 설정이 README 에 없으면 사내에서 막힌다"
+
+
+# ── 추론 깊이(effort) = 출력 토큰 = 비용 ─────────────────────────────
+def _captured_request(settings):
+    """프로바이더를 실제로 한 번 호출하고 SDK 에 넘어간 인자를 잡아 온다."""
+    from app.extraction.providers.anthropic_direct import AnthropicProvider
+    from app.extraction.providers.base import DocumentInput
+
+    captured: dict = {}
+
+    class _FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            raise RuntimeError("여기까지만 — 실제 호출은 하지 않는다")
+
+    provider = AnthropicProvider(settings)
+    provider._client = type("C", (), {"messages": _FakeMessages()})()
+
+    with pytest.raises(LLMError):
+        provider.extract(
+            system="s",
+            tool={"name": "t", "input_schema": {"type": "object"}},
+            user_prompt="p",
+            document=DocumentInput(text="본문", filename="x.htm"),
+        )
+    return captured
+
+
+def test_effort_is_actually_sent():
+    """**비용의 65% 가 출력 토큰이다.** 이 연결이 끊기면 조용히 기본값(high)으로 돌아간다."""
+    sent = _captured_request(Settings(llm_provider="anthropic", llm_api_key="k",
+                                      llm_effort="low"))
+    assert sent.get("output_config") == {"effort": "low"}
+
+
+def test_effort_default_is_not_the_expensive_one():
+    """기본값이 high 로 돌아가면 아무도 모르게 비용이 올라간다."""
+    assert Settings(llm_provider="mock").llm_effort in {"low", "medium"}
+
+
+def test_sampling_params_are_never_sent():
+    """현행 모델은 temperature·top_p 를 받지 않고 400 을 낸다 (CLAUDE.md §5)."""
+    sent = _captured_request(Settings(llm_provider="anthropic", llm_api_key="k"))
+    assert "temperature" not in sent and "top_p" not in sent

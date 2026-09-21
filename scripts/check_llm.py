@@ -48,6 +48,7 @@ def main() -> int:
     print(f"  예비 모델      : {s.model_id('fallback')}")
     print(f"  LLM_PROXY      : {s.llm_proxy or '(없음)'}")
     print(f"  LLM_CA_BUNDLE  : {s.llm_ca_bundle or '(없음)'}")
+    print(f"  추론 깊이      : {s.llm_effort}   (출력 토큰 = 비용을 좌우한다)")
     print(f"  프롬프트 버전  : {s.llm_prompt_version}")
     print("─" * 64)
 

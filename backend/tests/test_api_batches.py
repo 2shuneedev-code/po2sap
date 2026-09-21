@@ -143,7 +143,9 @@ def test_unknown_column_is_ignored(client, batch_id):
                 json={"rows": [{"row_id": "r_0001", "fields": {"해킹컬럼": "X"}}]})
     row = client.get(f"/api/batches/{batch_id}").json()["rows"][0]
     assert "해킹컬럼" not in row["fields"]
-    assert len(row["fields"]) == 36
+    # **개수를 박지 않는다.** 전송 필드 목록은 _base(→ 앞으로는 템플릿)가
+    # 정하고, 현업이 열을 빼면 줄어드는 것이 정상이다 (CLAUDE.md §2).
+    assert list(row["fields"]) == client.get(f"/api/batches/{batch_id}").json()["columns"]
 
 
 def test_original_snapshot_is_kept_for_comparison(client, batch_id, settings):

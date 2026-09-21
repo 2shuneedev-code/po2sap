@@ -8,19 +8,18 @@
 sap_defaults:
   AUART: "ZEXP"      # 확정 (기존 운영 결과지 전량 ZEXP)
   VKORG: "1000"      # 확정
-  VTWEG: ""          # 확정 — 비움 (기존 "10" 은 오기였음)
-  LGORT: ""
-  ZTERM: ""
 
-# ── SAP 전송 필드 36개 ─────────────────────────────────────────
+# ── SAP 전송 필드 ──────────────────────────────────────────────
 #  순서 = 업로드 양식 컬럼 순서. label = 양식의 영문 헤더.
-#  ★ 33 → 36 으로 증가: IHREZ_E / VGBEL / VGPOS 추가 (신규 양식)
-#  ※ 현업 협의로 불필요 필드 제거 시 이 목록에서 빼면 된다.
+#
+#  2026-09-21 현업 확정본(SALES ORDER 템플릿) 반영 — 36 → 28.
+#  뺀 8개: VTWEG · VBELN · ZPKRE1 · MAKTX · LGORT · BATCH · VALTY · BSTKD_E
+#
+#  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
+#    여기가 유효 필드 목록이다 (NEXT.md §2-D).
 field_specs:
   AUART:   { label: "오더유형",          sheet: "SALES ORDER TYPE",     max_len: 4 }
   VKORG:   { label: "판매조직",          sheet: "SALES ORG.",           max_len: 4 }
-  VTWEG:   { label: "유통경로",          sheet: "DIS CH",               max_len: 2 }
-  VBELN:   { label: "외부오더번호",      sheet: "EXT SO NO",            max_len: 10 }
   KUNNR1:  { label: "판매처",            sheet: "SOLD-TO PARTY",        max_len: 10 }
   KUNNR2:  { label: "출하처",            sheet: "SHIP-TO PARTY",        max_len: 10 }
   KUNNR3:  { label: "최종고객",          sheet: "END CUSTOM",           max_len: 10 }
@@ -31,14 +30,9 @@ field_specs:
   INCO2:   { label: "인도조건2",         sheet: "INCOTERMS2",           max_len: 28 }
   ZBRAND:  { label: "브랜드",            sheet: "BRAND",                max_len: 4 }
   ZSHCO:   { label: "출하조건",          sheet: "SHIPPING CONDITION",   max_len: 2 }
-  ZPKRE1:  { label: "헤더비고",          sheet: "HEADER REMARK",        max_len: 50 }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
-  MAKTX:   { label: "자재내역",          sheet: "MATERIAL DESCRIPTION", max_len: 40 }
   KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
-  LGORT:   { label: "저장위치",          sheet: "STOR. LOC",            max_len: 4 }
   ETDAT:   { label: "품목납기일",        sheet: "ITEM DEL. DATE",       type: date }
-  BATCH:   { label: "배치",              sheet: "BATCH",                max_len: 10 }
-  VALTY:   { label: "평가유형",          sheet: "VAL TY",               max_len: 4 }
   ZPKRE2:  { label: "포장비고",          sheet: "PACKING REMARK",       max_len: 50 }
   EMPST:   { label: "비고",              sheet: "REMARK",               max_len: 25 }
   VSART:   { label: "운송수단",          sheet: "SHIPPING TYPE",        max_len: 2 }
@@ -47,7 +41,6 @@ field_specs:
   BSTDK_E: { label: "발주일",            sheet: "PO ORDER DATE",        type: date }
   POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
   DELCO:   { label: "납기소요일",        sheet: "DELIVERY TIME",        max_len: 4 }
-  BSTKD_E: { label: "발주번호(출하처)",  sheet: "PO NUMBER(SHIP-TO)",   max_len: 35 }
   AUGRU:   { label: "오더사유",          sheet: "ORDER REASON",         max_len: 3 }
   VKAUS:   { label: "용도",              sheet: "USAGE",                max_len: 3 }
   IHREZ_E: { label: "무상단가",          sheet: "FREE PRICE",           max_len: 20, added: "2026-09 신규양식" }

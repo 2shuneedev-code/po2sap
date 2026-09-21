@@ -2,15 +2,15 @@
 
 > 거래처 선택 → PDF/HTM 업로드 → Claude 추출 → 규칙엔진 → 통합 스프레드시트 검수 → EAI(HTTPS/JSON) 일괄 전송 → SAP CBO 적재
 >
-> 버전 **v1.0** · 2026-09-11 · **낡은 v0.5 전면 재작성**
+> 버전 **v1.1** · 2026-09-21 · §3.3/§3.4 재작성 (대용량 발주서 분할 추출)
 >
 > ### 이 문서의 범위
 > 기술 스택 · 전체 아키텍처 · 파싱 설계 · 저장소 · 배포. **여기서 끝나는 이야기만 쓴다.**
 >
 > | 주제 | 단일 원천(SSOT) |
 > |---|---|
-> | 규칙 스키마 · 엔진 파이프라인 | **`masters/SCHEMA.md`** |
-> | 전송 필드 목록 · 공통 고정값 | **`masters/_base/sap_defaults.yaml`** |
+> | 규칙 스키마 · 엔진 파이프라인 · **추출 표준 키** | **`masters/SCHEMA.md`** |
+> | 전송 필드 목록 · 공통 고정값 · **추출 기본값** | **`masters/_base/sap_defaults.yaml`** |
 > | 거래처별 규칙 실제 값 | **`masters/customers/*.yaml`** |
 > | API 요청/응답 형태 | **`contracts/api-contract.md`** |
 > | 업무 흐름 · 화면 | **`process.md`** |
@@ -31,12 +31,16 @@
 | D6 | 검수 = **다중 파일 통합 평면 그리드** | 헤더성 필드도 품목마다 다를 수 있음 |
 | D7 | 전송 = **`rows` 배열 일괄, 인증·멱등키 없음** | 중복 전송 무해 → 재전송이 단순 |
 | D8 | **DB 없음** — YAML 마스터 + 파일 저장 + Git | 승격 트리거는 §4 |
-| D9 | LLM 결과는 **근거(evidence) 강제 + 자동 검증** | 환각 차단 4중 (§3.4) |
+| D9 | LLM 결과는 **근거(앵커) 강제 + 자동 검증** | 환각 차단 (§3.4) |
 | D10 | **LLM 프로바이더 추상화** | 사내 계정 전환 시 코드 0줄, `.env`만 교체 |
 | D11 | **1 문서 → N 오더 분할 존재** | MSC는 `Shipment` 블록마다 별개 오더 (`split.by: shipment`) |
+| D12 | **1 문서 → N 호출 분할 존재** ★ | 출력 토큰이 병목이다. OUTLINE 1회 + LINES N회 (§3.3) |
 
 > D11은 v0.5의 "오더 분할 불필요"를 **뒤집은 것이다.** MSC 실물 발주서 1부에 출하처가 여러 개 있고,
 > 기존 운영 결과지도 출하처별로 분리되어 있다 (`samples/MSC/…(ELKHART).csv` 등).
+>
+> D12는 v1.0의 "문서 1건 = 호출 1회"를 **뒤집은 것이다.** 실물 MSC 발주서 1건이
+> 품목 1,226줄이었고, 한 번에 담으면 출력만 수십만 토큰이 필요해 타임아웃으로 실패했다.
 
 ---
 
@@ -67,10 +71,10 @@
 | PDF 전처리 | **pypdf / pdfplumber** | 텍스트 레이어 판정, 근거 검증용 원문 확보 |
 | HTM 전처리 | **BeautifulSoup4 + lxml** | 깨진 HTM 복구 (MSC 발주서가 HTM) |
 | HTTP | **httpx + tenacity** | 비동기, 프록시/사설 CA, 백오프 |
-| 비동기 실행 | **FastAPI BackgroundTasks** | 파일별 병렬 파싱 + 프론트 폴링 |
+| 비동기 실행 | **FastAPI BackgroundTasks** + 청크 단위 스레드 풀 | 파일별·청크별 병렬 파싱 + 프론트 폴링 |
 | 설정 | **pydantic-settings** | `.env` = 환경 전환의 단일 창구 |
 
-> 큐(Celery/Redis)를 쓰지 않는 이유: 동시 사용자 한 자리 수, 작업이 수십 초. **폴링으로 충분하다.**
+> 큐(Celery/Redis)를 쓰지 않는 이유: 동시 사용자 한 자리 수, 작업이 수십 초~수 분. **폴링으로 충분하다.**
 
 ### 2.2 프론트엔드 — React 18 + TypeScript + Vite
 
@@ -82,6 +86,9 @@
 | UI | Mantine | 드롭존 · 모달 · 알림 |
 
 > 그리드는 이 시스템의 본체다. 여기서 자체 구현하면 Excel 붙여넣기·가상 스크롤에서 반드시 막힌다.
+>
+> 사내 서버에서 실제로 띄우는 화면은 현재 **스트림릿(`ui/`)** 이다. 위 스택은
+> 프론트를 따로 세울 때의 선정이며, 두 화면 모두 `contracts/api-contract.md` 를 따른다.
 
 ### 2.3 저장소 — DB 없이
 
@@ -89,9 +96,9 @@
 |---|---|---|
 | 거래처 마스터 | YAML (Git) | `masters/customers/{code}.yaml` |
 | 참조표 | CSV (Git) | `masters/refs/*.csv` — **없어도 정상 동작** |
-| 업로드 원본 | 파일 | `storage/uploads/{batch_id}/` |
+| 업로드 원본 | 파일 | `storage/batches/{batch_id}/uploads/` |
 | 배치 상태 | JSON | `storage/batches/{batch_id}/batch.json` |
-| LLM 응답 캐시 | 파일(해시 키) | `storage/llm_cache/` |
+| LLM 응답 캐시 | 파일(해시 키) | `storage/llm_cache/` — **호출 1회 단위**(§3.3) |
 | 전송 감사 로그 | JSONL | `storage/audit/{YYYY-MM}/` |
 
 `batch_id` 는 **서버 내부 식별자**다. 전송 페이로드에 포함하지 않는다.
@@ -106,8 +113,8 @@
 
 | 구분 | 내용 |
 |---|---|
-| ✅ **LLM에게 시킴 (읽기)** | PO번호, 발주일, 납기일, 출하처 **원문 텍스트**, 품번, 품명, 수량, 단가, 통화, 브랜드 **원문 문구** |
-| ❌ **절대 안 시킴 (판단)** | ZBRAND(38/127/205…), KUNNR2(319677…), ZPKRE2 비고, ZSHCO(A/L), VSART, 참조표 조회, 날짜 형식 변환 |
+| ✅ **LLM에게 시킴 (읽기)** | PO번호, 발주일, 납기일, 출하처 **원문 텍스트**, 품번, 품명, 수량, 단가, 통화, 브랜드 **원문 문구**, 그 값이 있는 **원문 줄 번호** |
+| ❌ **절대 안 시킴 (판단)** | ZBRAND(38/127/205…), KUNNR2(319677…), ZPKRE2 비고, ZSHCO(A/L), VSART, 참조표 조회, 날짜 형식 변환, **페이지 번호 계산** |
 
 > LLM이 "HARRISBURG"를 읽으면 → `KUNNR2=319677` 은 **결정표**가 정한다.
 > SAP 코드가 틀리면 오더가 잘못 생성되므로 재현성·감사·즉시 반영이 필요하다.
@@ -118,8 +125,9 @@
 거래처 선택 → 파일 업로드 (N개)
   ┌─ 파일별 병렬 ────────────────────────────────────────────┐
   │ ① 전처리    HTM: BS4 정리 → 텍스트 / PDF: 레이어 판정    │
-  │ ② 추출      공통 프롬프트(캐시) + 거래처 hints + Tool Use │
-  │ ③ 근거 검증  evidence 원문 대조 · 합계 교차검증           │
+  │            **전 줄에 문서 통번호를 붙인다** (§3.3.5)      │
+  │ ② 추출      OUTLINE 1회 → LINES N회(청크 병렬) → 병합     │
+  │ ③ 근거 검증  앵커(줄 번호) 대조 · 합계 교차검증           │
   │      ▼ RawPO (원문 값만)                                  │
   │ ④ 규칙엔진   SCHEMA.md §2 의 7단계 (분할·결정표·규칙·필드) │
   │      ▼ SapRow[] (전송 필드 × 품목 수)                     │
@@ -134,60 +142,207 @@
 
 | 항목 | 설정 |
 |---|---|
-| 출력 강제 | **Tool Use** (`extract_purchase_order` 단일 툴, `tool_choice` 고정) |
+| 출력 강제 | **Tool Use** (`tool_choice` 고정). 툴은 패스마다 다르다 — §3.3.2 |
 | 샘플링 | **보내지 않는다.** 현행 모델은 temperature·top_p 를 받지 않고 400 을 낸다. 재현성은 응답 캐시가 보장한다 |
-| 모델 | 역할 별칭(`extract` / `extract_fallback`) → 실제 ID는 `.env` 주입 |
+| 모델 | 역할 별칭(`extract` / `fallback`) → 실제 ID는 `.env` 주입 |
 | 프롬프트 캐싱 | 공통 시스템 프롬프트 + 스키마 캐시, 거래처 힌트만 가변 |
-| 페이지 | `extraction.page_limit` 초과 시 청크 분할 후 라인 병합 |
-| 응답 캐시 | `sha256(파일) + 프롬프트버전 + 거래처 + 모델ID` |
-| 병렬 | 파일 단위 동시 실행 (`LLM_MAX_CONCURRENCY`) |
-| 재시도 | 120s 타임아웃, 429·5xx만 3회 백오프 |
+| 문서 분할 | **문서 1건 ≠ 호출 1회.** OUTLINE 1회 + LINES N회 — §3.3.2~3.3.4 |
+| 응답 캐시 | **호출 1회 단위.** `sha256(그 호출에 실제로 보낸 텍스트) + 프롬프트버전 + 거래처 + 모델ID + 패스종류` |
+| 병렬 | 파일 단위 + **청크 단위** 동시 실행 (`LLM_MAX_CONCURRENCY`) |
+| 재시도 | `LLM_TIMEOUT_SEC` 는 **호출 1회** 기준. 429·5xx·타임아웃만 `LLM_MAX_RETRIES` 회. 문서 전체는 `LLM_DOC_BUDGET_SEC` 로 상한을 건다 |
 
-**추출 스키마의 키 이름은 `masters/SCHEMA.md` §3.1 표준 키를 따른다.**
-모든 값은 `{value, evidence, page, confidence}` 4종 세트를 강제한다.
-`evidence` 는 원문에서 **그대로 복사한 문자열**이어야 한다.
+**추출 스키마의 키 이름과 값 포장은 `masters/SCHEMA.md` §3.1 이 단일 원천이다.**
+여기에 다시 적지 않는다. 키를 바꿀 때는 §3.1 을 먼저 고치고
+`schema_builder.py` · `domain/models.py` 가 따라온다.
 
 > ★ 헤더성 값(출하처·브랜드·납기)은 **품목마다 다를 수 있으므로** line 레벨에도 같은 키를 둔다.
 > line 값이 비면 header 값으로 폴백한다 (`fallback_source`).
 
-### 3.4 환각 차단 4중 장치 ★
+#### 3.3.1 왜 한 번에 못 보내는가 — 출력 토큰이 병목이다
+
+입력은 넉넉하다. 막히는 것은 **출력**이다. 품목 1줄이 만들어내는 JSON 이
+크면 `max_tokens` 안에 몇십 줄밖에 안 들어간다. 실물 MSC 발주서 1건이
+품목 1,226줄인데, 줄당 350~400토큰이면 출력만 40만 토큰이 필요했다.
+
+그래서 **줄당 출력을 먼저 줄이고**, 그래도 남는 양을 청크로 나눈다.
+**순서가 중요하다** — 줄당 출력을 안 줄이고 나누기만 하면 청크 수가 그대로
+호출 수·대기 시간·비용이 된다.
+
+| # | 줄인 것 | 방법 | 효과 |
+|---|---|---|---|
+| 1 | `evidence` 원문 인용 | 원문 **줄 번호 참조(`src`)** 로 대체 (§3.3.5) | 품목 줄에서 같은 원문이 5번 되풀이되던 것이 정수 1개가 된다 |
+| 2 | 필드별 4종 세트 | 품목 줄은 **줄 단위로 `src`·`confidence` 1개씩**. 값 필드는 평평한 스칼라 | 13필드 × 4키 → 7키 안팎 |
+| 3 | 빈 필드 `null` 반복 | 품목 줄의 값 필드를 `required` 에서 빼고 **없으면 생략** | 빈 필드 1개당 4줄이 0줄 |
+| 4 | 요약표 품목 | `split.by` 가 `none` 이 아니면 **상단 요약표를 품목으로 읽지 않는다** (SCHEMA §2.1-2) | MSC 실물에서 추출 대상이 절반으로 |
+
+설계 기준값은 **줄당 80 출력 토큰**(`tokens_per_line`)이다. 빗나가도
+§3.3.4 의 절단 감지가 받아낸다 — 추정이 틀려도 실패하지 않는 것이 요점이다.
+
+#### 3.3.2 2패스 구조 — OUTLINE 한 번, LINES 여러 번
+
+청크를 나누려면 **어디가 경계인지**를 먼저 알아야 한다. 경계를 거래처별
+정규식으로 코드에 넣는 순간 P2 가 깨지므로(그러려고 파서를 버렸다),
+경계도 문서에서 **읽는다**. 다만 아주 싸게 읽는다 — 품목을 빼고.
+
+```
+① OUTLINE  (호출 1회, 출력 ~1~2k 토큰)
+   tool: outline_purchase_order
+   받는 것: header · shipments[] (품목 없이, 블록마다 src~src_end)
+            · totals · notes · (split.by=none 이면) line_range
+   안 받는 것: 품목 1줄도 받지 않는다
+
+② LINES    (호출 N회, 청크마다 1회 · 병렬)
+   tool: extract_lines
+   보내는 것: 전처리 텍스트의 [src, src_end] **구간만** + 헤더 발췌(문맥용)
+   받는 것: { lines: [...] } 뿐. 헤더·합계는 다시 받지 않는다
+```
+
+헤더를 청크마다 다시 받지 않으므로 **병합할 때 헤더끼리 충돌할 일이 없다.**
+청크는 품목만 들고 오고, 어느 shipment 의 몇 번째 구간인지는 **요청한 쪽이**
+이미 알고 있다.
+
+`split.by: none` 인 거래처도 같은 구조를 쓴다. OUTLINE 이 `shipments` 대신
+`line_range` 하나를 돌려주고, 그 구간을 줄 수로 나눈다. **거래처 이름으로
+분기하지 않는다** — `split.by` 값만 본다.
+
+> 작은 문서에서도 호출이 2회가 된다. 그래도 그렇게 한다 — 경로가 하나면
+> 큰 문서에서만 터지는 버그가 생기지 않는다. OUTLINE 은 출력이 작아 싸다.
+
+#### 3.3.3 청크 경계 — 블록 먼저, 그 다음 줄 수
+
+```
+for 블록 in (shipments[] or [line_range]):
+    구간 = [블록.src, 블록.src_end]
+    if 구간 길이 <= max_lines_per_chunk:  청크 1개
+    else:                                 max_lines_per_chunk 로 균등 분할
+```
+
+- **블록 경계를 넘는 청크는 만들지 않는다.** 한 청크의 결과가 두 오더로
+  갈리면 병합이 추측이 된다.
+- 청크 구간은 **정확히 분할**한다 (겹침 0). 프롬프트가 "이 구간 밖의 줄을
+  참조하지 말 것"을 지시하고, 그라운딩이 구간 밖 `src` 를 🔴 로 잡는다(§3.4).
+- `max_lines_per_chunk` 의 값과 상속은 **`masters/SCHEMA.md` §4.2**(`extraction.chunking`)
+  가 정한다. 코드에 상수로 두지 않는다.
+
+권장 초기값은 `floor(LLM_MAX_TOKENS × 0.7 / tokens_per_line)` 언저리다 —
+`16000 × 0.7 / 80 ≈ 140`. `_base` 기본값은 보수적으로 **120**.
+
+#### 3.3.4 실패·절단·병합
+
+| 상황 | 동작 |
+|---|---|
+| `stop_reason == "max_tokens"` (출력 절단) | 부분 결과를 **쓰지 않는다.** 그 청크를 절반으로 쪼개 다시 부른다. `LLM_CHUNK_SPLIT_DEPTH` 단계까지 |
+| 청크 1개가 5xx·타임아웃 | `LLM_CHUNK_RETRIES` 회 재시도 |
+| 그래도 실패한 청크 | **전체 실패로 만들지 않는다.** 나머지 결과를 살리고, 그 청크가 속한 오더 단위의 전 행에 🔴 `CHUNK_FAILED` 를 붙인다 → 검수 화면에는 보이고 전송은 막힌다 |
+| OUTLINE 실패 | 여기는 파일 전체 실패다. 경계를 모르면 나눌 수도 없다 |
+| 청크가 품목 0건 반환 | 🟡 `EMPTY_CHUNK` (구간에 진짜 품목이 없을 수도 있다) |
+| `LLM_DOC_BUDGET_SEC` 초과 | 남은 청크를 취소하고 위 "실패한 청크"와 같이 처리 |
+
+> **왜 부분 결과를 살리는가.** 청크 하나가 죽었다고 파일을 통째로 버리면
+> 이미 지불한 나머지 호출 비용이 사라지고, 사람은 같은 대기를 처음부터 다시
+> 한다. 값이 빠진 것은 사실이므로 🔴 로 **전송은 막되**, 보이기는 보이게 한다.
+> "막지 않는다"는 원칙은 `warn` 에 해당하는 이야기고, 여기는 실제 누락이다.
+
+**병합 규약** (SCHEMA §2.1 을 그대로 지킨다)
+
+1. shipment 순서 = OUTLINE 이 준 순서. 청크 결과는 `(shipment_index, chunk_index)`
+   오름차순으로 그 shipment 의 `lines` 에 이어 붙인다.
+2. `line_no` 는 병합 **후에** 오더 단위 안에서 1부터 다시 매긴다(§2.1-6).
+   모델이 준 번호는 쓰지 않는다 — 청크마다 1부터 셌을 것이다.
+3. `POSEX` 는 건드리지 않는다. 생성은 여전히 ⑥ FIELDS 의 몫이다(§2.1-7).
+4. 같은 `src` 가 인접 청크에서 두 번 오면 앞의 것만 남기고 🟡 `DUPLICATE_LINE`.
+5. `page` 는 모델에게 묻지 않는다. `src` 로부터 **코드가 계산한다** — 파생 사실을
+   LLM 에게 시키지 않는다(P1).
+
+#### 3.3.5 `src` — 줄 번호 앵커
+
+전처리 텍스트의 모든 줄에 문서 전체 통번호를 붙여 보낸다.
+
+```
+L000412| 10 | 09876543 | YG-EM0600 | END MILL 6MM 4FL | 12.50
+```
+
+- 번호는 **문서 전체 1-기준**이고 청크와 무관하다. OUTLINE 이 말한 412 와
+  LINES 청크가 말한 412 가 같은 줄이어야 한다.
+- 값이 여러 줄에 걸치면(주소 블록 등) `src` + `src_end` 로 구간을 준다.
+- 모델은 번호를 **세지 않고 복사**한다. 그래서 싸고 정확하다.
+- 페이지 구분선(`===== PAGE n =====`)도 한 줄로 번호를 차지한다. 그래야
+  번호와 줄이 1:1 로 고정되고, 코드가 `src → page` 를 역산할 수 있다.
+
+### 3.4 환각 차단 — 앵커 대조
 
 | # | 장치 | 동작 |
 |---|---|---|
-| 1 | **근거 그라운딩** | `evidence` 가 실제 원문에 있는지 코드로 대조. 없으면 🔴 |
+| 0 | **앵커 존재** | `src` 가 비었거나 문서 줄 수 밖이면 🔴 `EVIDENCE_NOT_FOUND`. 청크 응답이면 **그 청크 구간 밖**이어도 🔴 |
+| 1 | **앵커 대조** | `src`(~`src_end`) 줄의 원문에서 추출한 `value` 를 실제로 찾는다. 못 찾으면 🔴 |
 | 2 | **합계 교차검증** | 문서 기재 합계(행수/수량/금액)와 산술 대조 → 불일치 시 🔴 "라인 누락 가능" |
 | 3 | **신뢰도 임계** | `confidence < 0.9` → 🟡, 필수 필드 `< 0.7` → 🔴 |
-| 4 | **사람 검수** | 위 3개를 통과해도 전송 전 반드시 검수 |
+| 4 | **사람 검수** | 위를 전부 통과해도 전송 전 반드시 검수 |
+
+**1번이 예전의 "evidence 문자열이 원문 어딘가에 있는가"보다 강하다.**
+예전 방식은 모델이 원문 아무 데서나 그럴듯한 문장을 베껴 붙이면 통과했다 —
+값과 근거가 묶여 있지 않았기 때문이다. 앵커 방식은 **값이 그 줄에 있어야**
+통과하므로, 값을 지어내면 반드시 걸린다. 게다가 `src` 가 범위 밖이라는
+사실만으로도 환각이 확정되는데, 이 검사는 공짜다.
+
+다만 `value` 는 정규화된 값이라(날짜 `2/17/26` → `2026-02-17`, 수량 `1,250` → `1250`)
+글자 그대로는 안 맞는다. 대조기는 아래 순서로 판정한다.
+
+| 판정 | 방법 | 결과 |
+|---|---|---|
+| `exact` | 공백·대소문자 정규화 후 포함 | 통과 |
+| `numeric` | 양쪽을 `Decimal` 로 읽어 수치 비교 (쉼표·통화기호 제거) | 통과 |
+| `date` | `value` 를 그 줄에 나올 법한 표기들로 되돌려 대조 (`M/D/YY` · `MM/DD/YYYY` · `YYYYMMDD` · `D-Mon-YY` …) | 통과 |
+| `fuzzy` | 토큰 겹침 비율이 임계 이상 | 🟡 `EVIDENCE_WEAK` |
+| `miss` | 그 밖 | 🔴 `EVIDENCE_NOT_FOUND` |
+
+> 날짜 표기 되돌리기가 실패하면 **`miss` 로 떨구지 않고 `fuzzy`(🟡)** 로 둔다.
+> 지역별 표기가 다양해서 우리가 못 만들어 본 형식이 얼마든지 있고, 멀쩡한
+> 값을 🔴 로 막으면 사람이 경고를 무시하기 시작한다.
+
+여기에 **품번 백스톱**을 하나 더 둔다. 영숫자 4자 이상인 값(`MATNR`·`our_item`)은
+앵커를 통과했더라도 **문서 전체 원문에 존재하는지** 한 번 더 본다. 값을 지어내는
+사고가 가장 비싼 자리이고, 검사는 공짜다.
+
+**스캔본(텍스트 레이어 없음)** 은 대조할 원문이 없다. 이때는 앵커 검사를
+통째로 건너뛰고(지금과 같다) `confidence` 임계와 합계 검증만 남는다.
 
 ### 3.5 LLM 프로바이더 추상화 (사내 계정 전환)
 
 ```python
 class LLMProvider(Protocol):
-    def extract(self, *, system, tools, content, model_alias, max_tokens) -> ToolCallResult: ...
+    def extract(self, *, system, tool, user_prompt, document, model_alias,
+                max_tokens, customer) -> ToolCallResult: ...
     def health(self) -> ProviderHealth: ...
-# anthropic_direct / bedrock / vertex / gateway / mock
+# anthropic_direct / gateway / mock / cache
 ```
 
 ```bash
-LLM_PROVIDER=anthropic     # anthropic | bedrock | vertex | gateway | mock
+LLM_PROVIDER=anthropic     # anthropic | gateway | mock
 LLM_API_KEY=...            # ← 사내 계정 키로 교체하는 지점
 LLM_BASE_URL=
 LLM_MODEL_EXTRACT=...      # 역할 별칭 → 실제 모델 ID
 LLM_MODEL_FALLBACK=...
-HTTPS_PROXY=               # 사내 프록시
-REQUESTS_CA_BUNDLE=        # 사내 SSL 검사 장비 대응
+LLM_PROXY=                 # 사내 프록시 (셸의 HTTPS_PROXY 로는 전달되지 않는다)
+LLM_CA_BUNDLE=             # 사내 SSL 검사 장비 대응
 LLM_MAX_CONCURRENCY=4
-LLM_PROMPT_VERSION=v1
+LLM_PROMPT_VERSION=v3
 ```
+
+`ToolCallResult` 는 `stop_reason` 을 그대로 담아 올린다 — §3.3.4 의 절단 감지가
+그 값을 본다. 프로바이더가 `stop_reason` 을 삼키면 절단을 알 방법이 없다.
 
 | 전환 시 체크 | 내용 |
 |---|---|
 | `.env` 교체 | `LLM_API_KEY`, `LLM_MODEL_*` |
-| 방화벽 | 사내 서버 → 인터넷 아웃바운드 허용. **폐쇄망이면 gateway/bedrock 전환** |
+| 방화벽 | 사내 서버 → 인터넷 아웃바운드 허용. **폐쇄망이면 gateway 전환** |
 | 프록시/CA | 사내 SSL 검사 장비가 있으면 인증서 번들 지정 |
 | **골든 테스트 전량 실행** ★ | 모델이 바뀌면 추출 정확도가 달라진다 |
 
 > `LLM_PROVIDER=mock` — 저장된 응답 재생. **프론트 개발·CI는 API 키 없이 비용 0.**
+> 픽스처는 **문서 단위**(`{거래처}__{파일명}.json`)로 찾는다 — 청크 크기를 바꿔도
+> 픽스처가 미아가 되지 않게 하기 위해서다. 청크 단위 픽스처는
+> 문서 단위가 없을 때만 쓰는 보조 수단이다.
 
 ---
 
@@ -197,12 +352,12 @@ LLM_PROMPT_VERSION=v1
 |---|---|
 | 코드 하드코딩 | ✗ 배포 없이 변경 불가, 거래처 50곳에서 if문 지옥 |
 | **YAML 마스터 + Git 리뷰 + 스키마 검증** | ✅ **채택** — 결정표 표현, diff 리뷰, 화면 자동 렌더링 |
-| Excel/Sheets 마스터 | △ 단순 룩업표(참조표)만 CSV로 |
+| Excel/Sheets 마스터 | △ 단순 룩업표(참조표)만 CSV로 · 편집 입구로만 엑셀 |
 | DB | 보류 (§2.3 승격 트리거) |
-| 관리 UI | **현재 불필요** — 판단 기준은 `masters/SCHEMA.md` §6.1, 설계안은 `master-admin.md`(D6 보류) |
+| 관리 UI | **현재 불필요** — 판단 기준은 `masters/SCHEMA.md` §6.1 |
 
 **스키마 정의 · 파이프라인 · 프리미티브 · 신규 거래처 추가 절차는 전부 `masters/SCHEMA.md`.**
-거래처 3곳의 실제 규칙 값은 `masters/customers/{msc,kl,ygjp}.yaml` 이 원본이며,
+거래처의 실제 규칙 값은 `masters/customers/*.yaml` 이 원본이며,
 기존 POC 로직과의 대조 근거는 `samples/PO변환_비즈니스로직_명세서.md` 다.
 
 ---
@@ -249,6 +404,7 @@ Content-Type: application/json; charset=utf-8
 | 형식 오류 | 🔴 | 날짜 파싱 실패, 수량 비숫자 |
 | 길이 초과 | 🔴 | `field_specs.*.max_len` |
 | 합계 불일치 | 🔴 | 문서 기재 합계 ≠ 추출 합계 |
+| **추출 구간 누락** | 🔴 | 청크 실패 (`CHUNK_FAILED`) — §3.3.4 |
 | 참조표 미등록 | 🟡 | `on_no_match.action: warn` |
 | 낮은 신뢰도 | 🟡 | `confidence < 0.9` |
 
@@ -265,43 +421,40 @@ po2sap/
 ├── design.md               ← 이 문서 (기술 설계)
 ├── process.md              ← 업무 흐름 · 화면
 ├── CONTRIBUTING.md         ← Git · 브랜치 · CI
-├── master-admin.md         ← ❄ D6 보류 (마스터 관리 화면 설계)
 │
 ├── masters/                ★ 규칙의 단일 원천
 │   ├── SCHEMA.md             스키마 정의 = 백엔드 구현 명세
-│   ├── _base/sap_defaults.yaml
-│   ├── customers/{msc,kl,ygjp,_template}.yaml
+│   ├── _base/sap_defaults.yaml   전송 필드 + 공통 고정값 + 추출 기본값
+│   ├── profiles/{standard,generic}.yaml
+│   ├── customers/*.yaml
 │   └── refs/*.csv
 │
 ├── contracts/              ★ 백엔드↔프론트 유일 접점
 │   ├── api-contract.md
-│   └── examples/*.json       프론트 목 데이터
+│   └── examples/*.json       프론트용 목 데이터
 │
 ├── backend/app/
-│   ├── main.py  config.py
-│   ├── api/{routes_masters,routes_batch,routes_send}.py
+│   ├── main.py  config.py  batch_service.py
+│   ├── api/{routes_batches,routes_masters,routes_brands}.py
 │   ├── domain/models.py                    RawPO / SapRow / Batch
-│   ├── extraction/                         [D1 완료]
-│   │   ├── preprocess.py  schema_builder.py  prompt.py  grounding.py
-│   │   ├── extractor.py
+│   ├── extraction/
+│   │   ├── preprocess.py                   전처리 + **줄 번호 부여**
+│   │   ├── schema_builder.py               OUTLINE · LINES 툴 스키마
+│   │   ├── chunking.py                     구간 계산 (§3.3.3)
+│   │   ├── merge.py                        청크 결과 병합 (§3.3.4)
+│   │   ├── prompt.py  extractor.py
+│   │   ├── grounding.py  anchor.py         앵커 대조 (§3.4)
 │   │   └── providers/{base,anthropic_direct,mock,cache,factory}.py
-│   ├── masters/loader.py                   [D1 완료]
-│   ├── rules/                              [D2] schema · engine · primitives
-│   │   ├── decision_table.py  expr.py  reftable.py
-│   │   └── preview.py                      YAML → 규칙 카드 생성
-│   ├── mapping/row_builder.py              [D2] 전송 필드 행 생성
-│   ├── validation/validator.py             [D2]
-│   ├── transport/{eai_client,payload}.py    [D4]
+│   ├── masters/{loader,brands}.py
+│   ├── rules/                              engine · expr · decision_table …
+│   ├── mapping/row_builder.py
+│   ├── validation/validator.py
+│   ├── transport/{eai_client,payload}.py
 │   └── storage/{batch_repo,audit_log}.py
 ├── backend/tests/{fixtures,golden}/
 │
-├── frontend/src/                           [D3]
-│   ├── pages/{UploadPage,ReviewPage}.tsx
-│   ├── components/{CustomerPicker,RulePreviewCard,FileDropzone,
-│   │               SapGrid,IssuePanel,SendModal}.tsx
-│   └── types/sapRow.ts
-│
-├── scripts/{parse_one,validate_masters,mock_eai_server}.py
+├── ui/                     ★ 스트림릿 화면 (사내 서버에서 띄우는 것)
+├── scripts/{parse_one,check_sample,validate_masters,mock_eai_server}.py
 ├── samples/                ← 대외비. Git 제외
 └── storage/                ← Git 제외
 ```
@@ -318,14 +471,6 @@ po2sap/
 
 **환경 차이는 `.env` 뿐. 코드·이미지는 동일.**
 이관 절차: 배포 → `.env` 작성 → `/api/health` 확인 → **골든 테스트 전량 실행** → 병행 검증 → 전환
-
-| 항목 | 방침 |
-|---|---|
-| 배포 | Docker Compose (backend + nginx) / Windows면 uvicorn + NSSM |
-| 시크릿 | `.env` Git 제외 |
-| 로그 | 구조화 JSON. **원문·단가 미기록** (감사 레코드는 아래 §8.1) |
-| 보존 | 원본 1년 / 배치 1년 / 감사 JSONL 5년 |
-| 인증 | 1차 사내망(무인증) → 2차 JWT/SSO |
 
 ### 8.1 감사 레코드 — `storage/audit/{YYYY-MM}/send.jsonl`
 
@@ -351,6 +496,17 @@ po2sap/
 **품번·품명·단가·금액은 남기지 않는다.** 되짚기에 필요한 것은 오더 키와 해시뿐이고,
 값까지 남기면 5년 보존되는 파일이 그대로 대외비가 된다.
 
+### 8.2 중단된 파싱 — `PARSING` 으로 남는 배치
+
+서버가 재기동되면 `BackgroundTasks` 로 돌던 파싱이 사라지고 배치는
+`PARSING` 상태로 디스크에 영원히 남는다. 청크 분할로 파싱 시간이 길어질수록
+이 창이 넓어진다.
+
+**조치는 읽을 때 한 번 보는 것으로 끝낸다.** `status == "PARSING"` 이고
+`created_at` 이 `PARSE_STALE_SEC`(기본 1800) 보다 오래됐으면 조회 결과에서만
+`FAILED` 로 보이게 한다 — **디스크를 고치지 않는다.** 정말로 아직 돌고 있는
+작업을 다른 프로세스가 죽은 것으로 단정해 덮어쓰는 사고를 피한다.
+
 ---
 
 ## 9. 테스트 & 거버넌스
@@ -361,6 +517,7 @@ po2sap/
 | 결정표 정합성 | 도달 불가 행 · 중복 조건 · 기본행 누락 (`validate_masters.py`) |
 | 필드 커버리지 | 거래처별 전송 필드 전량 선언 — **CI 실패 조건** |
 | **골든 테스트** ★ | 샘플 → 기대 행 고정 비교. 프롬프트·모델·계정 변경 시 회귀 검출 |
+| **청크 경계·병합** ★ | 구간 계산 · 병합 후 `line_no` 재부여 · 중복/누락 · 절단 감지 — **LLM 호출 없이** 합성 응답으로 |
 | 다중 파일 병합 | 파일 순서 · 행번호 · POSEX 재부여 |
 | 오프라인 | `LLM_PROVIDER=mock` → CI 비용 0 |
 | 병행 검증 | 초기 2주 기존 운영 결과지(`samples/MSC/*.csv`)와 자동 diff |
@@ -371,5 +528,5 @@ po2sap/
 
 ## 10. 미확정 항목
 
-`NEXT.md §4` 에서 관리한다. **이 문서에 중복 기재하지 않는다.**
+`NEXT.md` 에서 관리한다. **이 문서에 중복 기재하지 않는다.**
 공통 원칙: 미확정 값은 YAML 에 `todo:` 를 달고 개발을 계속한다.

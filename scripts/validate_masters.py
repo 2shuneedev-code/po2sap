@@ -27,6 +27,11 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _console import use_utf8  # noqa: E402
+
+use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
+
 from app.extraction.extractor import splits_by_shipment  # noqa: E402
 from app.extraction.schema_builder import build_tool_schema  # noqa: E402
 from app.masters.loader import MasterError, load_customer  # noqa: E402

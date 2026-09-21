@@ -210,6 +210,8 @@ storage/          런타임 산출물 — Git 제외
 | `/api/health`에서 실제 메시지 전송 | 화면·모니터링이 주기적으로 부른다. 모델 조회로 키·권한·모델 ID 를 확인한다 |
 | 사내 프록시·CA 를 `.env` 의 `HTTPS_PROXY` 로 | `.env` 는 Settings 로만 읽히고 `os.environ` 에 안 나간다 — HTTP 클라이언트가 영영 못 본다. `LLM_PROXY` · `LLM_CA_BUNDLE` 을 쓴다 |
 | `LLM_BASE_URL` 끝에 `/v1` 붙이기 | SDK 가 붙인다. `/v1/v1/messages` 로 나가 404 가 난다 |
+| 새 스크립트에서 `use_utf8()` 생략 | 윈도우 한국어(cp949)에서 출력을 파이프로 넘기면 `—` 에서 죽는다. `test_windows_compat.py` 가 잡는다 |
+| `git ls-files` 결과와 디스크 경로를 그대로 비교 | 윈도우는 `a\b.py`, git 은 `a/b.py`. `as_posix()` 로 맞춘다 |
 
 ---
 

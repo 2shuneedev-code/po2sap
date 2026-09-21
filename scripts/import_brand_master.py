@@ -27,6 +27,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _console import use_utf8  # noqa: E402
+
+use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
+
 MASTERS = ROOT / "masters"        # --masters 로 바꾼다 (테스트가 실물을 안 건드리게)
 TARGET = MASTERS / "refs" / "brand_master.csv"
 

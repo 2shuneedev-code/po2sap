@@ -28,6 +28,11 @@ from openpyxl.utils import get_column_letter  # noqa: E402
 from openpyxl.worksheet.datavalidation import DataValidation  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "scripts"))
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _console import use_utf8  # noqa: E402
+
+use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
 from master_sheets import (  # noqa: E402
     ALLOWED,
     COLUMNS,

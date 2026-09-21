@@ -13,10 +13,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _console import use_utf8  # noqa: E402
+
+use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "storage" / "mock_eai"

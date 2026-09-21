@@ -50,7 +50,7 @@ def run_export(workspace, out: Path) -> None:
     subprocess.run(
         [sys.executable, str(SCRIPTS / "master_export.py"),
          "--out", str(out), "--masters", str(workspace)],
-        cwd=ROOT, check=True, capture_output=True,
+        cwd=ROOT, check=True, capture_output=True, encoding="utf-8",
     )
 
 
@@ -58,7 +58,7 @@ def run_import(workspace, out: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(SCRIPTS / "master_import.py"), str(out),
          "--masters", str(workspace), *args],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
     )
 
 

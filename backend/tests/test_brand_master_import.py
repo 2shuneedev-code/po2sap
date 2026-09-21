@@ -30,7 +30,7 @@ def run(workspace: Path, export: Path, *args: str) -> subprocess.CompletedProces
     """**항상 사본을 가리킨다.** 가드가 깨졌을 때 실물 참조표가 망가지면 안 된다."""
     return subprocess.run(
         [sys.executable, str(SCRIPT), str(export), "--masters", str(workspace), *args],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
     )
 
 

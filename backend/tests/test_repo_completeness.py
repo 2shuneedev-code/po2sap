@@ -21,15 +21,22 @@ SOURCE_DIRS = ["backend/app", "ui", "scripts", "masters"]
 
 def tracked(path: str) -> set[str]:
     out = subprocess.run(
-        ["git", "ls-files", path], cwd=ROOT, capture_output=True, text=True, check=False,
+        ["git", "ls-files", path], cwd=ROOT, capture_output=True, text=True,
+        encoding="utf-8", check=False,
     )
     return {line for line in out.stdout.splitlines() if line}
 
 
 def on_disk(path: str) -> set[str]:
+    """디스크의 `.py` 목록. **경로를 `/` 로 맞춘다.**
+
+    `git ls-files` 는 언제나 `backend/app/x.py` 를 돌려주지만 윈도우의
+    `Path.relative_to` 는 `backend\\app\\x.py` 를 준다. 그대로 빼면 전부
+    "커밋 안 됨"으로 보여서, 멀쩡한 저장소에 대고 46개 파일이 없다고 한다.
+    """
     base = ROOT / path
     return {
-        str(p.relative_to(ROOT))
+        p.relative_to(ROOT).as_posix()
         for p in base.rglob("*.py")
         if "__pycache__" not in p.parts
     }

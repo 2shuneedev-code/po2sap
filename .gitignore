@@ -23,6 +23,10 @@ __pycache__/
 
 # ── Node ──────────────────────────────────────────────────────
 node_modules/
+# e2e 확인용으로 `npm i -D playwright` 를 돌리면 루트에 생긴다 (CLAUDE.md §3).
+# 이 저장소는 파이썬이고 브라우저 확인은 그때그때 돌리는 것이라 커밋하지 않는다.
+/package.json
+/package-lock.json
 frontend/dist/
 frontend/.vite/
 npm-debug.log*

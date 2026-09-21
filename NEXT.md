@@ -139,7 +139,7 @@ SALES ORDER 템플릿 (현업 확정본을 사장님이 templates 폴더에 올�
 | `KUNNR1` · `KUNNR2` · `KUNNR3` | 기본은 `KUNNR` 과 동일, 조건 있으면 그것 (§2-A ④) |
 | 운송수단 (`VSART`) | `refs/shipping.csv` 조회 |
 | 출하조건 (`ZSHCO`) | `refs/shipping.csv` 조회 |
-| `BSTNK`(?) | **확인 필요 — 현재 필드 목록에 없다. `BSTKD`(고객발주번호) 오기인지** |
+| `BSTKD` | 고객발주번호 (2026-09-21 확인 — `BSTNK` 이 아니라 `BSTKD` 다) |
 | `POSEX` | PO 품목번호 |
 
 브랜드(`ZBRAND`)는 규칙이 아니라 **마스터**다 — 1개면 기본값, 2개 이상이면

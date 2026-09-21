@@ -9,6 +9,18 @@ sap_defaults:
   AUART: "ZEXP"      # 확정 (기존 운영 결과지 전량 ZEXP)
   VKORG: "1000"      # 확정
 
+# ── 추출 기본값 — 큰 문서를 몇 번에 나눠 읽을지 (SCHEMA.md §4.2 chunking) ──
+#  문서 1건이 LLM 1회 호출의 **출력** 한도를 넘으면 구간으로 나눠 부른다.
+#  거래처는 바꾸고 싶은 키만 `extraction.chunking` 에 적는다 — 여기만 키 단위로 합쳐진다.
+#  경계 기준은 선언하지 않는다. `split.by` 가 정한다.
+extraction_defaults:
+  chunking:
+    enabled: true
+    max_lines_per_chunk: 120     # 청크 하나에 담을 전처리 텍스트 줄 수 상한
+    tokens_per_line: 80          # 품목 1줄이 만들어내는 출력 토큰 추정치
+    safety_ratio: 0.7            # max_tokens 대비 실제로 쓸 비율
+    header_context_lines: 40     # 청크에 함께 붙여 보낼 문서 앞머리 줄 수
+
 # ── SAP 전송 필드 ──────────────────────────────────────────────
 #  순서 = 업로드 양식 컬럼 순서. label = 양식의 영문 헤더.
 #

@@ -99,14 +99,12 @@ def test_rows_follow_the_contract_shape(client, batch_id):
                         "issues", "edited"}
     assert row["_file"] == SAMPLE                      # 저장명(f1__…)이 아니라 원본명
     assert list(row["fields"]) == body["columns"]      # 전 필드가 키로 존재
-    assert row["_group"] in {"ELK", "HAR"}
+    assert row["_group"] in {"ELKHART", "HARRISBURG"}
 
 
 def test_split_survives_the_round_trip(client, batch_id):
-    """출하처 수만큼 행이 나뉘어 있다 — KUNNR2 는 예외를 걷어내 지금은 둘 다 같다."""
     rows = client.get(f"/api/batches/{batch_id}").json()["rows"]
-    assert [r["_group"] for r in rows] == ["ELK", "HAR"]
-    assert [r["fields"]["KUNNR2"] for r in rows] == ["100249", "100249"]
+    assert [r["fields"]["KUNNR2"] for r in rows] == ["100249", "319677"]
 
 
 def test_unknown_batch_is_404(client):

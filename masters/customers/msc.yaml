@@ -2,10 +2,15 @@
 #  MSC Industrial Supply  (고객코드 100249)
 #  스키마: masters/SCHEMA.md
 #
-#  2026-09-23: 거래처 전용 규칙(ORDERED FROM 문구로 브랜드 판별 · 출하처별
-#  KUNNR2 결정표 · 출하처별 오더 분할 · 참조표 포장비고 조회)을 걷어내고
-#  기본(profiles/standard)만 쓴다. **의도적으로 비웠다** — 나중에 정리해서
-#  다시 얹는다. 지운 규칙은 git 이력(이 커밋 이전)에 그대로 남아 있다.
+#  2026-09-23: 거래처 전용 규칙(ORDERED FROM 문구로 브랜드 판별 · 참조표
+#  포장비고 조회)을 걷어내고 기본(profiles/standard)만 쓴다. **의도적으로
+#  비웠다** — 나중에 정리해서 다시 얹는다. 지운 규칙은 git 이력(이 커밋
+#  이전)에 그대로 남아 있다.
+#
+#  2026-09-23(같은 날, 2차): **출하처별 SHIP-TO PARTY(KUNNR2) 결정**만
+#  실물 테스트 전에 먼저 다시 얹었다 — 출하처마다 실제로 다른 SAP 고객
+#  (KUNNR2)로 나가야 하는 업무 규칙이라 기본값(KUNNR2=KUNNR)으로는 오더가
+#  잘못된 곳으로 간다. 브랜드·BSTKD·포장비고는 여전히 기본만 쓴다.
 # ═══════════════════════════════════════════════════════════════
 version: 2
 
@@ -75,7 +80,34 @@ extraction:
 split:
   by: shipment
   label: "출하처(Shipment)별로 오더를 나눈다"
+  group_label: _city
   description: |
     MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다. 화면에는 한 그리드로
-    통합해 보여준다. (출하처별 KUNNR2·BSTKD 결정 로직은 걷어냈다 — 나중에
-    정리해서 다시 얹는다. 지금은 둘 다 전 출하처에서 같은 기본값이다.)
+    통합해 보여주고, 출하처마다 KUNNR2(SHIP-TO PARTY)가 달라진다. BSTKD·
+    포장비고는 아직 기본값만 쓴다 — 나중에 정리해서 다시 얹는다.
+
+tables:
+  ship_to_routing:
+    label: "출하처(Ship To) → SHIP-TO PARTY(KUNNR2) 분기"
+    scope: shipment
+    description: |
+      출하처 창고 도시명으로 그 오더가 실려 나갈 SAP 고객(KUNNR2)을 정한다.
+      확인된 값 — ATLANTA/ELKHART/HARRISBURG/RENO 외 도시는 아직 모른다.
+    when:
+      - source: shipment.ship_to_text
+        fallback_source: header.ship_to_text
+        op: contains_ci
+        label: "출하처 블록에 포함"
+    then: [KUNNR2, _city]
+    rows:
+      - { when: ["ELKHART"], then: ["100249", "ELKHART"] }
+      - { when: ["HARRISBURG"], then: ["319677", "HARRISBURG"] }
+      - { when: ["RENO"], then: ["319678", "RENO"] }
+      - { when: ["ATLANTA"], then: ["319679", "ATLANTA"] }
+    on_no_match:
+      action: error
+      message: "출하처 도시를 인식하지 못했습니다 (ATLANTA / ELKHART / HARRISBURG / RENO) — 잘못된 SAP 고객으로 나갈 수 있어 전송을 막습니다"
+
+fields:
+  # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
+  KUNNR2: { from: table, table: ship_to_routing }

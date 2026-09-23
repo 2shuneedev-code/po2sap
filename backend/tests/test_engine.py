@@ -17,7 +17,7 @@ import json
 import pytest
 from app.config import Settings
 from app.domain.models import ExtractedValue as EV
-from app.domain.models import POHeader, POLine, POTotals, RawPO
+from app.domain.models import POHeader, POLine, POShipment, POTotals, RawPO
 from app.extraction import Extractor
 from app.masters.loader import load_customer
 from app.rules.engine import build
@@ -53,9 +53,9 @@ def test_every_send_field_is_present(msc_result, masters_dir):
         assert all(isinstance(v, str) for v in row.fields.values())
 
 
-def test_group_falls_back_to_receiving_loc_without_a_split_config(msc_result):
-    """split.group_label 이 없으면 shipment 의 receiving_loc 을 쓴다 (SCHEMA §4.3)."""
-    assert [r.group for r in msc_result.rows] == ["ELK", "HAR"]
+def test_group_uses_the_split_group_labels_derived_variable(msc_result):
+    """split.group_label 이 결정표의 파생변수(_city)를 가리킨다 (SCHEMA §4.3)."""
+    assert [r.group for r in msc_result.rows] == ["ELKHART", "HARRISBURG"]
 
 
 def test_summary_table_did_not_become_orders(msc_result):
@@ -63,15 +63,14 @@ def test_summary_table_did_not_become_orders(msc_result):
     assert sorted(r.fields["KWMENG"] for r in msc_result.rows) == ["10", "15"]
 
 
-def test_base_defaults_feed_every_row_the_same_way(msc_result):
-    """거래처 전용 예외가 없으니 두 출하처 모두 같은 기본값을 받는다.
+def test_ship_to_routing_picks_kunnr2_per_shipment(msc_result):
+    """출하처별 SHIP-TO PARTY(KUNNR2) 결정표 — 2026-09-23 2차로 다시 얹었다.
 
-    (KUNNR2 가 출하처마다 달라지는 것은 걷어낸 예외였다 — 다시 얹을 때 이
-    테스트를 갱신한다.)
+    BSTKD·포장비고는 아직 기본값만 쓴다(예외 미구현) — 둘 다 같다.
     """
     a, b = msc_result.rows
     assert a.fields["BSTKD"] == b.fields["BSTKD"] == "PO-SAMPLE-0001"
-    assert a.fields["KUNNR2"] == b.fields["KUNNR2"] == "100249"
+    assert (a.fields["KUNNR2"], b.fields["KUNNR2"]) == ("100249", "319677")
     assert a.fields["KUNNR1"] == a.fields["KUNNR3"] == "100249"
     assert a.fields["AUART"] == "ZEXP"
 
@@ -137,7 +136,9 @@ def test_required_true_still_blocks_sending(masters_dir):
     master = load_customer("msc", masters_dir)
     raw = raw_po(
         header=POHeader(po_number=ev("PO-1")),
-        lines=[POLine(line_no=1, item_code=ev("X"))],          # quantity 없음
+        lines=[],
+        shipments=[POShipment(ship_to_text=ev("ELKHART"),
+                              lines=[POLine(line_no=1, item_code=ev("X"))])],  # quantity 없음
     )
     row = build(raw, master, masters_dir).rows[0]
     codes = {(i.field, i.code) for i in row.issues}
@@ -154,7 +155,11 @@ def test_required_warn_does_not_block_sending(masters_dir):
     master = load_customer("msc", masters_dir)
     raw = raw_po(
         header=POHeader(po_number=ev("PO-1")),
-        lines=[POLine(line_no=1, quantity=ev("1"))],            # item_code 없음
+        lines=[],
+        # ship_to_routing 은 shipment 가 있어야 KUNNR2 를 정한다 — 이 테스트는
+        # MATNR 을 보는 것이지 출하처 판정을 보는 게 아니므로 인식되는 도시를 준다.
+        shipments=[POShipment(ship_to_text=ev("ELKHART"),
+                              lines=[POLine(line_no=1, quantity=ev("1"))])],  # item_code 없음
     )
     row = build(raw, master, masters_dir).rows[0]
     codes = {(i.field, i.code, i.severity) for i in row.issues}

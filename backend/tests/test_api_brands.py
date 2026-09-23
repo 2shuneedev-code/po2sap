@@ -126,13 +126,13 @@ def test_unmapped_brands_are_still_listed(client):
 
 
 def test_detail_includes_logic_for_configured_customer(client):
-    """MSC 는 이제 거래처 전용 규칙이 없다(2026-09-23) — 공용 기본만 붙는다.
+    """MSC 는 출하처별 SHIP-TO PARTY(KUNNR2) 결정표만 예외로 다시 얹었다(2026-09-23).
 
-    그래도 split 은 문서 구조(출하처별 분할)라 그대로 남아 있다.
+    브랜드·통화는 여전히 공용 기본(profiles/standard)이다.
     """
     logic = client.get(f"/api/brands/customers/{MSC}").json()["logic"]
     assert logic["split"]["by"] == "shipment"
-    assert logic["tables"] == []
+    assert [t["id"] for t in logic["tables"]] == ["ship_to_routing"]
     # **공용 기본 규칙은 붙어 있는가**를 본다. 정확히 일치를 요구하면 공용
     # 프로필에 규칙이 하나 늘 때마다(예: 통화 변환) 멀쩡한 테스트가 죽는다.
     assert {r["id"] for r in logic["rules"]} >= {"brand_code", "currency"}

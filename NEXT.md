@@ -58,6 +58,19 @@
   거래처 `fx` 로 옮겼다 — 거래처 규칙이 정리될 때마다 검증기 테스트가 통째로
   죽는 걸 막기 위해서다).
 
+### 2026-09-23 추가 — MSC 출하처별 SHIP-TO PARTY(KUNNR2) 결정표 다시 얹음
+
+> 사장님: **"출하처별 SHIP-TO PARTY 결정하는것도 예외로직으로 재구현할거임
+> 이것만 수정하면 실물로 테스트해보겠음."**
+
+`masters/customers/msc.yaml` 에 `tables.ship_to_routing`(ELKHART→100249 ·
+HARRISBURG→319677 · RENO→319678 · ATLANTA→319679, `on_no_match: error`)과
+`fields.KUNNR2`·`split.group_label: _city` 만 다시 얹었다. 브랜드·BSTKD·
+포장비고(ZPKRE2)는 **여전히 기본만 쓴다** — 이번에 손댄 건 KUNNR2 뿐이다.
+골든 픽스처(`msc__PO-SAMPLE-0001.rows.json`)와 관련 API 테스트 갱신 완료,
+`pytest`·`ruff`·`validate_masters` 전부 0 오류. **이제 실물 발주서로 테스트할
+차례.**
+
 ### 안 한 것 (§4.5-A·"거래처 전용 예외" 예시는 설계만, 구현은 다음 차례)
 
 - `masters/refs/brand_master_manual.csv` 오버레이(사람이 SAP 원본 옆에 손으로

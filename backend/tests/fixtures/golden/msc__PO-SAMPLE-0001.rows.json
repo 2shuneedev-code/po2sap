@@ -3,7 +3,7 @@
     {
       "row_id": "r_0001",
       "file": "PO-SAMPLE-0001.htm",
-      "group": "ELK",
+      "group": "ELKHART",
       "line_no": 1,
       "fields": {
         "AUART": "ZEXP",
@@ -59,13 +59,13 @@
     {
       "row_id": "r_0002",
       "file": "PO-SAMPLE-0001.htm",
-      "group": "HAR",
+      "group": "HARRISBURG",
       "line_no": 1,
       "fields": {
         "AUART": "ZEXP",
         "VKORG": "1000",
         "KUNNR1": "100249",
-        "KUNNR2": "100249",
+        "KUNNR2": "319677",
         "KUNNR3": "100249",
         "BSTKD": "PO-SAMPLE-0001",
         "VDATU": "",

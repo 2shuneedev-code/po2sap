@@ -5,30 +5,6 @@ kunnr,zbrand,match,text,note
 100249,428,contains,CLASS C,
 100249,002,contains,OEM BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 100249,004,contains,NO MARKING,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
-3200,001,equals,YG BRAND,
-3200,142,equals,YAMAKATSU BRAND,
-3200,181,equals,YSK BRAND,
-3200,183,equals,YMKT BRAND,
-3200,209,equals,YCS BRAND,
-3200,227,equals,NIKKO KIZAI BRAND,
-3200,245,equals,SUGIMOTO BRAND,
-3200,248,equals,KURODA BRAND,
-3200,249,equals,SAKANOSHITA BRAND,
-3200,250,equals,DAIWA SHOKAI,
-3200,411,equals,TOSA KIKO BRAND,
-3200,412,equals,CHUO KOKI BRAND,
-3200,435,equals,SIAM YAMAKATSU BRAND,
-3200,439,equals,YAMA-K,
-3200,448,equals,NIKKO KIZAI BRAND (2),원문 구분 키 확인 / SAP: NIKKO KIZAI 별도
-3200,450,equals,YAMAKATSU BRAND (2),원문 구분 키 확인 / SAP: YAMAKATSU 별도
-3200,465,equals,KUMAZAWA,
-3200,471,equals,YG BRAND (COMINIX),
-3200,476,equals,SAKUSAKU BRAND,
-3200,477,equals,YG BRAND (SAKUSAKU),SAP: YG BRAND_PRICE (SAKUSAKU)
-3200,480,equals,YG BRAND (YGT Y),
-3200,481,equals,YG BRAND (CHUO KOKI),
-3200,482,equals,YG BRAND (IBIDEN),
-3200,507,equals,NEW CENTURY BRAND(COMINIX),
 3200,112,contains,TANAKAZEN BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 3200,166,contains,IWASE SANGYO BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요
 3200,192,contains,JIMK BRAND,자동 초벌 (SAP 브랜드명) — 실제 발주서 문구 확인 필요

@@ -101,31 +101,36 @@ def test_fixed_resolves_customer_code_from_meta(client):
 
 
 def test_rule_cards_come_from_yaml_not_from_code(client, workspace):
-    """거래처 YAML 의 라벨을 고치면 카드 라벨이 바뀐다."""
-    path = workspace / "customers" / "msc.yaml"
+    """규칙 라벨을 고치면 카드 라벨이 바뀐다.
+
+    msc/kl/ygjp 는 이제 거래처 전용 규칙이 없다 — 라벨은 공용 기본
+    (profiles/standard.yaml) 에서 온다. 그래도 "화면이 YAML 을 그대로
+    따라간다"는 요점은 같다.
+    """
+    path = workspace / "profiles" / "standard.yaml"
     data = yaml.safe_load(path.read_text("utf-8"))
-    data["tables"]["ship_to_routing"]["label"] = "출하처 분기(수정됨)"
+    data["rules"]["brand_code"]["label"] = "브랜드 판별(수정됨)"
     path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
 
     body = client.get("/api/masters/customers/MSC/preview").json()
     labels = [r["label"] for r in body["rules"]]
-    assert "출하처 분기(수정됨)" in labels
+    assert "브랜드 판별(수정됨)" in labels
 
 
 def test_brand_map_shows_only_this_customers_rows(client, workspace):
-    """거래처를 고르면 **그 거래처 행만** 보인다 — 참조표는 전 고객 공용이다.
+    """거래처를 고르면 **그 거래처 후보만** 보인다 — 참조표는 전 고객 공용이다.
 
-    문구 자체는 겹칠 수 있다 ("OEM BRAND" 는 여러 고객에게 있다). 겹치는지가
-    아니라 **kunnr 로 갈리는지**가 요점이다.
+    브랜드는 이제 원문 대조(`csv_map`)가 아니라 후보 수 판정(`csv_choice`)이다
+    (SCHEMA §4.5) — 화면 표는 그 거래처의 브랜드 마스터 후보 목록이다.
     """
     import csv
 
-    with (workspace / "refs" / "brand_keys.csv").open(encoding="utf-8-sig", newline="") as f:
-        keys = list(csv.DictReader(f))
+    with (workspace / "refs" / "brand_master.csv").open(encoding="utf-8", newline="") as f:
+        master_rows = list(csv.DictReader(f))
 
     def brand_rows(body):
-        # **규칙 id 로 고른다.** "첫 번째 csv_map" 으로 집으면 통화 변환처럼
-        # 같은 kind 의 규칙이 하나 늘어날 때 엉뚱한 표를 보게 된다.
+        # **규칙 id 로 고른다.** "첫 번째 csv_choice" 로 집으면 다른 규칙이
+        # 하나 늘어날 때 엉뚱한 표를 보게 된다.
         for rule in body["rules"]:
             if rule["id"] == "brand_code":
                 return {r[0] for r in rule["rows"]}
@@ -134,7 +139,7 @@ def test_brand_map_shows_only_this_customers_rows(client, workspace):
     for code, kunnr in (("MSC", "100249"), ("YGJP", "3200")):
         body = client.get(f"/api/masters/customers/{code}/preview").json()
         shown = brand_rows(body)
-        mine = {k["text"] for k in keys if k["kunnr"] == kunnr}
+        mine = {r["zbrand"] for r in master_rows if r["kunnr"] == kunnr}
         assert shown, f"{code} 브랜드 표가 비었다"
         assert shown == mine, f"{code} 화면에 다른 고객 행이 섞였다"
 
@@ -142,7 +147,7 @@ def test_brand_map_shows_only_this_customers_rows(client, workspace):
 def test_todos_surface_unconfirmed_values(client):
     """P4 — 미확정 값은 개발을 막지 않지만 검수자는 알아야 한다."""
     body = client.get("/api/masters/customers/KL/preview").json()
-    assert [t for t in body["todos"] if t["field"] == "KUNNR2"]
+    assert [t for t in body["todos"] if t["field"] == "ZSHCO"]
 
 
 def test_split_tells_the_front_whether_orders_are_divided(client):

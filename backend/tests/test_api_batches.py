@@ -99,12 +99,14 @@ def test_rows_follow_the_contract_shape(client, batch_id):
                         "issues", "edited"}
     assert row["_file"] == SAMPLE                      # 저장명(f1__…)이 아니라 원본명
     assert list(row["fields"]) == body["columns"]      # 전 필드가 키로 존재
-    assert row["_group"] in {"ELKHART", "HARRISBURG"}
+    assert row["_group"] in {"ELK", "HAR"}
 
 
 def test_split_survives_the_round_trip(client, batch_id):
+    """출하처 수만큼 행이 나뉘어 있다 — KUNNR2 는 예외를 걷어내 지금은 둘 다 같다."""
     rows = client.get(f"/api/batches/{batch_id}").json()["rows"]
-    assert [r["fields"]["KUNNR2"] for r in rows] == ["100249", "319677"]
+    assert [r["_group"] for r in rows] == ["ELK", "HAR"]
+    assert [r["fields"]["KUNNR2"] for r in rows] == ["100249", "100249"]
 
 
 def test_unknown_batch_is_404(client):
@@ -161,8 +163,9 @@ def test_original_snapshot_is_kept_for_comparison(client, batch_id, settings):
 
 
 def test_clearing_a_required_field_blocks_sending(client, batch_id):
+    """KWMENG 은 공용 프로필에서도 `required: true` 다 (MATNR 은 이제 warn 이라 막지 않는다)."""
     body = client.post(f"/api/batches/{batch_id}/validate",
-                       json={"rows": [{"row_id": "r_0001", "fields": {"MATNR": ""}}]}).json()
+                       json={"rows": [{"row_id": "r_0001", "fields": {"KWMENG": ""}}]}).json()
     assert body["status"] == "NEEDS_REVIEW"
     codes = [i["code"] for i in body["rows"][0]["issues"]]
     assert "REQUIRED_MISSING" in codes

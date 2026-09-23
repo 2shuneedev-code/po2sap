@@ -1,8 +1,73 @@
 # 다음에 이어서 하기
 
-> 최종 갱신 2026-09-21 · **§2-A 구조 단순화 요구사항이 최우선이다**
+> 최종 갱신 2026-09-23 · **§0 이 최신이다 — 이 문서에서 가장 먼저 읽는다**
 > **재개할 때 이 파일부터 읽으면 된다.** 아래 §1 의 진척 표기는 2026-09-11
 > 시점이라 낡았다 — 백엔드·프론트·전송은 그 뒤로 구현이 끝났다 (CLAUDE.md §4).
+
+---
+
+## 0. 2026-09-23 진행 — `csv_choice` 기본 구현 + msc/kl/ygjp 예외 전부 걷어냄 ★
+
+> 사장님 지시: **"msc(sid tool)·ygjp·kl 기존에 해놨던 로직도 다 없애버려.
+> 일단 기본 먼저 만들어놓고 나중에 정리해서 디벨롭하는 걸로 할게."**
+
+### 한 것
+
+- **`csv_choice` 규칙 신설** (`backend/app/rules/mapping_rules.py`) — SCHEMA.md
+  v3 §4.5 그대로. 이 고객의 브랜드 마스터 후보가 1개면 자동, 0개·2개 이상이면
+  비우고 `on_many`/`on_no_match` 로 경고. `scripts/validate_masters.py` 도
+  같은 kind 를 검증한다(§7-13: `on_many.action: default` 금지 포함).
+- **`profiles/standard.yaml`** 의 `ZBRAND` 가 이제 이 `csv_choice` 규칙을 쓴다
+  (`table_file: refs/brand_master.csv`). `profiles/generic.yaml` 은 자기
+  자신의 `rules`/`fields` 오버라이드를 걷어내고 표준 프로필 기본에 얹혔다.
+- **`masters/customers/{msc,kl,ygjp}.yaml` 전부 델타 0개로 초기화** — 결정표
+  (MSC 출하처별 KUNNR2)·csv_map(브랜드 문구 대조)·keyword_map(KL 포장비고)·
+  lookup(MSC 참조표)·const 예외를 전부 뺐다. 남은 것은 `meta`·`extends`·
+  `extraction.hints`(문서 읽기 힌트, P1 범위라 그대로 둠)·`split` 뿐이다.
+  **지운 원본 규칙은 이 커밋 이전의 git 이력에 그대로 남아 있다** — 나중에
+  다시 얹을 때 그대로 베껴 쓰면 된다.
+  - `split: by: shipment` (MSC) 는 **남겨뒀다** — 이건 SAP 코드 결정이 아니라
+    "발주서 1부가 출하처 수만큼 나뉜다"는 문서 구조 사실이다(P1). 지우면
+    스캔·텍스트 추출 스키마에서 `shipments[]` 자체가 빠진다
+    (`test_scan_of_a_split_customer_...` 가 이걸 잡는다).
+  - `group_label: _city` 는 지웠다(결정표가 없어 `_city` 가 없다) — 그룹 라벨은
+    이제 `shipment.receiving_loc` 으로 자동 대체된다(엔진 기본 동작).
+- **부수 효과(지금은 의도한 회귀)**: 세 거래처 모두 브랜드 후보가 여럿이라
+  `ZBRAND` 가 항상 빈값+경고다. MSC 는 출하처별 `KUNNR2`·`BSTKD` 가 더 이상
+  갈리지 않는다(둘 다 기본값 하나). `MATNR` 은 `required: warn` 이라(옛
+  MSC 파일의 `required: true` 예외가 사라져서) 없어도 막지 않는다.
+- **데이터 버그 발견 + 복구**: 커밋 안 된 `masters/refs/brand_master.csv`
+  개편(4컬럼 소문자 전환) 과정에서 **YGJP(3200)의 등록 브랜드가 31 → 7행으로
+  줄어 있었다** — 다른 고객은 전부 그대로인데 YGJP만 24행이 빠져 있어 실수로
+  보인다. `git show HEAD:...` 의 31행을 4컬럼으로 변환해 되살렸다(현재 329행).
+  **한 번 더 확인 바람** — 만약 7행이 의도한 축소였다면 이 복구는 되돌려야 한다.
+  - 같은 작업 중 `brand_keys.csv`(사람이 채운 원문→코드 매핑, 189행)의
+    `zbrand` 가 죄다 zero-pad 안 된 옛 표기("38")였던 것도 `brand_master.csv`
+    의 새 3자리 표기("038")에 맞춰 함께 바로잡았다.
+- `scripts/import_brand_master.py` 의 `SCHEMA` 를 6컬럼→4컬럼으로 맞췄다
+  (SCHEMA.md 가 이미 이걸 요구하고 있었다). `masters/refs/msc_ref.csv`(전부
+  DUMMY 였던 참조표, 이제 아무 규칙도 안 씀)는 삭제했다.
+- `pytest`(전량) · `ruff check backend scripts` · `validate_masters.py` 전부
+  0 오류로 통과하도록 테스트 30여 개를 새 기본 동작에 맞춰 다시 썼다
+  (`test_masters.py` 는 검증기 회귀 스위트를 실물 거래처가 아니라 전용 합성
+  거래처 `fx` 로 옮겼다 — 거래처 규칙이 정리될 때마다 검증기 테스트가 통째로
+  죽는 걸 막기 위해서다).
+
+### 안 한 것 (§4.5-A·"거래처 전용 예외" 예시는 설계만, 구현은 다음 차례)
+
+- `masters/refs/brand_master_manual.csv` 오버레이(사람이 SAP 원본 옆에 손으로
+  고치는 파일) — SCHEMA.md §4.5-A 에 설계는 있으나 로더·화면 어느 쪽도
+  아직 안 읽는다.
+- `ui/views/brands.py` 는 그대로다 — 지금도 `brand_keys.csv`(문구→코드) 를
+  편집하는 화면이라, `csv_choice` 로 넘어간 기본 판정 경로와는 이미
+  분리돼 있다(고쳐도 기본 판정에 반영 안 됨). §4.5-A 대로 "이 고객의
+  `brand_master_manual.csv` 행 편집" 화면으로 바꾸는 건 남은 일이다.
+- MSC(ORDERED FROM 문구)·YGJP(SAP 브랜드명 대조)·KL(고정값 2) 의 확정된
+  예외 로직 — SCHEMA.md §4.5 "거래처 전용 예외" A·B·C 에 그대로 적어 뒀다.
+  그 문구 그대로 `masters/customers/{code}.yaml` 에 옮기면 된다.
+- `samples/` 커밋 — 오늘 사장님이 "보안 필요 없다"며 커밋하자고 하셨으나,
+  CLAUDE.md 의 절대 금지 항목(실물 발주서·거래처 단가, 한 번 올라가면 git
+  이력에서 못 지움)이라 **여쭤보고 보류했다.** 다시 확인 후 진행할지 결정.
 
 ---
 

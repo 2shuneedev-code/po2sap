@@ -147,8 +147,9 @@ def test_deleted_rows_are_not_sent(client, batch_id, stub):
 
 
 def test_errors_block_sending(client, batch_id, stub):
+    """KWMENG 은 공용 프로필에서도 `required: true` 다 (MATNR 은 이제 warn 이라 막지 않는다)."""
     client.post(f"/api/batches/{batch_id}/validate",
-                json={"rows": [{"row_id": "r_0001", "fields": {"MATNR": ""}}]})
+                json={"rows": [{"row_id": "r_0001", "fields": {"KWMENG": ""}}]})
     r = client.post(f"/api/batches/{batch_id}/send", json={"rows": []})
     assert r.status_code == 409 and "오류" in r.json()["error"]["message"]
     assert stub.received == []                             # 한 건도 나가지 않았다
@@ -243,7 +244,8 @@ def test_audit_records_the_attempt(client, batch_id, stub):
     client.post(f"/api/batches/{batch_id}/send", json={"rows": []})
     entry = audit(client.settings)[0]
     assert entry["result"] == "ok" and entry["row_count"] == 2
-    assert entry["orders"] == ["PO-SAMPLE-0001(ELKHART)", "PO-SAMPLE-0001(HARRISBURG)"]
+    # BSTKD 가 출하처마다 갈리던 것은 걷어낸 예외였다 — 지금은 둘 다 같아 하나로 뭉친다.
+    assert entry["orders"] == ["PO-SAMPLE-0001"]
     assert len(entry["payload_sha256"]) == 64
     assert entry["endpoint"] == stub.url and entry["http_status"] == 200
 

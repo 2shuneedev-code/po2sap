@@ -93,7 +93,24 @@ def test_export_carries_every_customer(tmp_path, workspace):
 
 
 def test_expr_and_hints_are_exported_read_only(tmp_path, workspace):
-    """표로 못 옮기는 것도 **보여는 준다** — 안 보이면 값의 출처를 못 찾는다."""
+    """표로 못 옮기는 것도 **보여는 준다** — 안 보이면 값의 출처를 못 찾는다.
+
+    2026-09-23 이후 msc/kl/ygjp 는 거래처 전용 필드(expr 포함)가 없다 — 기본
+    (profiles/standard)만 쓰기 때문이다. 내보내기는 **거래처 파일 자신의
+    델타만** 옮기므로(프로필 상속분은 그 거래처 몫이 아니다), expr 노출 자체는
+    합성 거래처로 확인한다.
+    """
+    (workspace / "customers" / "fx.yaml").write_text(
+        'version: 1\n'
+        'meta: { code: FX, name: "expr 노출 테스트용", customer_no: "999999", '
+        'status: draft, file_types: [pdf] }\n'
+        'extends: [_base/sap_defaults, profiles/standard]\n'
+        'extraction: { input: text, page_limit: 10 }\n'
+        'fields:\n'
+        '  BSTKD: { from: expr, expr: "header.po_number", explain: "그대로 통과" }\n',
+        encoding="utf-8",
+    )
+
     sheets = load_script("master_sheets")
     out = tmp_path / "마스터.xlsx"
     run_export(workspace, out)

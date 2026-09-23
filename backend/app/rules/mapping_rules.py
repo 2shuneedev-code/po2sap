@@ -45,6 +45,8 @@ def evaluate_rule(
         return _entries_map(name, rule, ctx, kind)
     if kind == "csv_map":
         return _csv_map(name, rule, ctx, masters_dir)
+    if kind == "csv_choice":
+        return _csv_choice(name, rule, ctx, masters_dir)
     if kind == "lookup":
         return _lookup(name, rule, ctx, masters_dir)
     if kind == "regex_extract":
@@ -107,6 +109,64 @@ def _csv_map(
             return RuleOutcome(value=row.get(value_col, ""), matched=True)
 
     return _no_match(name, rule, ctx)
+
+
+def _csv_choice(
+    name: str, rule: dict[str, Any], ctx: EvalContext, masters_dir: Path
+) -> RuleOutcome:
+    """`csv_choice` — 원문을 보지 않고 이 고객의 후보 수로 판정한다 (SCHEMA §4.5).
+
+    후보 1개면 자동으로 채우고, 0개나 2개 이상이면 비워 둔다. 여럿 중 하나를
+    마스터가 짐작해 고르지 않는다 — 그건 검수 화면(사람)이 할 일이다.
+    """
+    rows = reftable.load(masters_dir, str(rule.get("table_file") or ""), optional=True)
+
+    filter_col = str(rule.get("filter_column") or "")
+    mine = ctx.meta.get("customer_no", "")
+    rows = [r for r in rows if r.get(filter_col, "") == mine]
+
+    value_col = str(rule.get("value_column") or "")
+    label_col = rule.get("label_column")
+
+    seen: set[str] = set()
+    candidates: list[dict[str, str]] = []
+    for row in rows:                       # 파일 순서 = 후보 순서 (SCHEMA §4.5)
+        value = row.get(value_col, "")
+        if value in seen:
+            continue
+        seen.add(value)
+        candidates.append(row)
+
+    count = len(candidates)
+    if count == 1:
+        row = candidates[0]
+        extras = {}
+        if label_col:
+            extras["label"] = row.get(str(label_col), "")
+        return RuleOutcome(value=row.get(value_col, ""), matched=True, extras=extras)
+
+    return _choice_no_match(name, rule, ctx, "on_no_match" if count == 0 else "on_many", count)
+
+
+def _choice_no_match(
+    name: str, rule: dict[str, Any], ctx: EvalContext, key: str, count: int
+) -> RuleOutcome:
+    spec = rule.get(key) or {}
+    action = str(spec.get("action") or "warn")
+    raw_message = str(spec.get("message") or f"규칙 {name}: 후보가 {count}개입니다")
+    message = (
+        raw_message.replace("{count}", str(count))
+        if key == "on_many"
+        else ctx.render_message(raw_message)
+    )
+
+    if action == "empty":
+        return RuleOutcome(value="", matched=False)
+    return RuleOutcome(
+        value="", matched=False,
+        severity="error" if action == "error" else "warn",
+        message=message,
+    )
 
 
 def _lookup(

@@ -35,8 +35,10 @@ use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 �
 MASTERS = ROOT / "masters"        # --masters 로 바꾼다 (테스트가 실물을 안 건드리게)
 TARGET = MASTERS / "refs" / "brand_master.csv"
 
-# 우리 스키마. 없는 컬럼은 빈 값으로 채운다 (vkorg·vtweg 는 코드가 쓰지 않는다).
-SCHEMA = ["kunnr", "zbrand", "zbrant", "name1", "vkorg", "vtweg"]
+# 우리 스키마 — masters/refs/brand_master.csv 와 같은 4컬럼(SCHEMA.md §4.5-A).
+# vkorg·vtweg 는 SAP 마스터가 고객·브랜드 단위로만 등록돼 있어 항상 비거나
+# 무의미했다 — 코드 어디서도 참조하지 않으므로 뺀다.
+SCHEMA = ["kunnr", "name1", "zbrand", "zbrant"]
 REQUIRED = ["kunnr", "zbrand", "zbrant", "name1"]
 
 

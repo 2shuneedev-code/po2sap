@@ -1,6 +1,10 @@
 # ═══════════════════════════════════════════════════════════════
 #  YGJP / YG-1 Japan  (고객코드 3200)
 #  스키마: masters/SCHEMA.md
+#
+#  2026-09-23: 거래처 전용 규칙(SAP 브랜드명 원문대조 · ZSHCO 브랜드분기
+#  · BSTKD 조립식 · 통화 고정)을 걷어내고 기본(profiles/standard)만 쓴다.
+#  **의도적으로 비웠다** — 나중에 정리해서 다시 얹는다.
 # ═══════════════════════════════════════════════════════════════
 version: 1
 
@@ -27,7 +31,7 @@ extraction:
       "Incoterms: CIP"                → incoterms_text
       "Payment Terms: ..." 뒤 문장     → payment_terms_text
       "Ship-to Address:" 뒤 주소 블록  → ship_to_text
-      통화는 표 하단 "Total Value: 82,575 JPY" 의 통화표기
+      "Total Value: 82,575 JPY" 의 통화표기(JPY)  → currency_text (원문 그대로)
 
     [품목표] — 머리글이 이렇게 붙어서 나온다.
       NoProduct IDYour CodeProduct DimensionsDelivery dateQtyNet PriceNet Value
@@ -57,48 +61,3 @@ extraction:
 
 split:
   by: none
-
-rules:
-  brand_code:
-    kind: csv_map
-    label: "브랜드 판별"
-    description: |
-      발주서 원문을 참조표 refs/brand_keys.csv 의 이 거래처(kunnr) 행과 대조한다.
-      매핑 추가·수정은 이 파일이 아니라 CSV 에서 한다 — 브랜드 관리 화면의 원천이다.
-    source: header.brand_text
-    table_file: refs/brand_keys.csv
-    filter_column: kunnr
-    key_column: text
-    mode_column: match
-    value_column: zbrand
-    case_insensitive: true
-    value_check:
-      table_file: refs/brand_master.csv
-      value_column: zbrand
-      filter_column: kunnr
-    on_no_match:
-      action: error
-      message: "브랜드를 인식하지 못했습니다: {brand_text}"
-
-fields:
-  # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
-  KUNNR2: {from: const, value: "319854"}
-  BSTKD:
-    from: expr
-    expr: 'join("-", ["01", date_yyyymmdd(header.po_date), header.po_number])'
-    explain: '01-{발주일YYYYMMDD}-{Purchase Order ID}  예: 01-20260518-10972'
-    required: true
-  ZBRAND: {from: rule, rule: brand_code, required: true}
-  ZSHCO:
-    from: expr
-    expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'
-    explain: '브랜드 코드가 471 또는 507 이면 A, 그 외 L'
-  MATNR: {from: doc, path: line.item_code, required: true}
-  ZPKRE2: {from: doc, path: header.packing_spec}
-  EMPST: {from: doc, path: line.remark, fallback: header.remark_default}
-  WAERK: {from: const, value: "JPY"}
-
-grid:
-  pinned: [BSTKD, MATNR, KWMENG]
-  hidden: [VDATU, ZTERM, INCO1, INCO2, ETDAT, PRICE, BSTDK_E, POSEX, DELCO, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
-  width: {MATNR: 150, ZPKRE2: 140, EMPST: 200}

@@ -2,6 +2,12 @@
 
 엔진은 마스터가 시킨 것만 한다. 거래처 이름으로 분기하지 않으므로(원칙 P2)
 테스트도 거래처를 **설정으로** 밀어 넣어 확인한다.
+
+2026-09-23: msc/kl/ygjp 는 거래처 전용 규칙(결정표·csv_map·keyword_map·expr
+조합)을 걷어내고 기본(profiles/standard, `csv_choice`)만 쓴다. 그 예외
+로직에 대한 엔진 테스트(결정표·on_no_match:error·날짜 조립식 BSTKD 등)는
+합성 마스터로 뒤덮기보다, 예외가 다시 생길 때 그 거래처 파일과 함께
+다시 쓴다 — 지금은 **기본 동작**만 확인한다.
 """
 
 from __future__ import annotations
@@ -11,7 +17,7 @@ import json
 import pytest
 from app.config import Settings
 from app.domain.models import ExtractedValue as EV
-from app.domain.models import POHeader, POLine, POShipment, POTotals, RawPO
+from app.domain.models import POHeader, POLine, POTotals, RawPO
 from app.extraction import Extractor
 from app.masters.loader import load_customer
 from app.rules.engine import build
@@ -47,17 +53,9 @@ def test_every_send_field_is_present(msc_result, masters_dir):
         assert all(isinstance(v, str) for v in row.fields.values())
 
 
-def test_split_produces_different_orders(msc_result):
-    """D11 — 출하처마다 BSTKD·KUNNR2 가 달라진다. 나머지는 같다."""
-    a, b = msc_result.rows
-    assert a.fields["BSTKD"] != b.fields["BSTKD"]
-    assert (a.fields["KUNNR2"], b.fields["KUNNR2"]) == ("100249", "319677")
-    assert a.fields["KUNNR1"] == b.fields["KUNNR1"] == "100249"
-
-
-def test_group_label_comes_from_a_derived_var(msc_result):
-    """split.group_label 이 결정표의 파생변수를 가리킨다 (SCHEMA §4.3)."""
-    assert [r.group for r in msc_result.rows] == ["ELKHART", "HARRISBURG"]
+def test_group_falls_back_to_receiving_loc_without_a_split_config(msc_result):
+    """split.group_label 이 없으면 shipment 의 receiving_loc 을 쓴다 (SCHEMA §4.3)."""
+    assert [r.group for r in msc_result.rows] == ["ELK", "HAR"]
 
 
 def test_summary_table_did_not_become_orders(msc_result):
@@ -65,14 +63,25 @@ def test_summary_table_did_not_become_orders(msc_result):
     assert sorted(r.fields["KWMENG"] for r in msc_result.rows) == ["10", "15"]
 
 
-def test_expr_and_table_and_rule_all_feed_fields(msc_result):
-    row = msc_result.rows[0]
-    assert row.fields["BSTKD"] == "PO-SAMPLE-0001(ELKHART)"   # expr + 파생변수
-    assert row.fields["ZBRAND"] == "38"                        # csv_map 규칙
-    assert row.fields["KUNNR2"] == "100249"                    # 결정표
-    assert row.fields["ZPKRE2"].startswith("C")                # expr + lookup
-    assert row.fields["AUART"] == "ZEXP"                       # _base 공통값
-    assert row.fields["KUNNR3"] == "100249"                    # meta.customer_no
+def test_base_defaults_feed_every_row_the_same_way(msc_result):
+    """거래처 전용 예외가 없으니 두 출하처 모두 같은 기본값을 받는다.
+
+    (KUNNR2 가 출하처마다 달라지는 것은 걷어낸 예외였다 — 다시 얹을 때 이
+    테스트를 갱신한다.)
+    """
+    a, b = msc_result.rows
+    assert a.fields["BSTKD"] == b.fields["BSTKD"] == "PO-SAMPLE-0001"
+    assert a.fields["KUNNR2"] == b.fields["KUNNR2"] == "100249"
+    assert a.fields["KUNNR1"] == a.fields["KUNNR3"] == "100249"
+    assert a.fields["AUART"] == "ZEXP"
+
+
+def test_brand_is_blank_with_a_warning_when_many_candidates(msc_result):
+    """MSC 는 브랜드 후보가 여럿이다 — 문구 판별 예외를 걷어냈으니 비워 둔다."""
+    for row in msc_result.rows:
+        assert row.fields["ZBRAND"] == ""
+        assert any(i.field == "" and i.severity == "warn" for i in row.issues)
+        assert not [i for i in row.issues if i.severity == "error"]
 
 
 def test_matches_golden(msc_result, fixtures_dir):
@@ -99,115 +108,66 @@ def test_no_split_customer_uses_top_level_lines(masters_dir):
     master = load_customer("ygjp", masters_dir)
     raw = raw_po(
         header=POHeader(po_number=ev("10972"), po_date=ev("2026-05-18"),
-                        brand_text=ev("YG BRAND"), packing_spec=ev("S-Y,B-Y")),
+                        brand_text=ev("YG BRAND"), currency_text=ev("JPY")),
         lines=[POLine(line_no=1, item_code=ev("E24201502SE"), quantity=ev("15"))],
     )
     result = build(raw, master, masters_dir)
     row = result.rows[0]
     assert row.group == ""                                     # 분할 없음
-    assert row.fields["BSTKD"] == "01-20260518-10972"           # expr + date_yyyymmdd
-    assert row.fields["ZBRAND"] == "1"                          # csv_map (YG BRAND)
-    assert row.fields["ZSHCO"] == "L"                           # in() 판정 — 471/507 아님
-    assert row.fields["ZPKRE2"] == "S-Y,B-Y"
-    assert row.fields["WAERK"] == "JPY"
+    assert row.fields["BSTKD"] == "10972"                       # 기본: doc 그대로
+    assert row.fields["WAERK"] == "JPY"                         # 기본: currency 규칙
     assert row.fields["KUNNR1"] == row.fields["KUNNR3"] == "3200"
+    assert row.fields["KUNNR2"] == "3200"                       # 기본: KUNNR 과 동일
 
 
-def test_in_operator_picks_the_other_branch(masters_dir):
-    """contains 로 쓰면 brand_code='1' 도 참이 됐다 (SCHEMA §4.7.3)."""
-    master = load_customer("ygjp", masters_dir)
-    raw = raw_po(
-        header=POHeader(po_number=ev("1"), po_date=ev("2026-01-01"),
-                        brand_text=ev("YG BRAND (COMINIX)")),
-        lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("1"))],
-    )
-    row = build(raw, master, masters_dir).rows[0]
-    assert row.fields["ZBRAND"] == "471"
-    assert row.fields["ZSHCO"] == "A"
-
-
-def test_line_level_rule_and_doc_posex(masters_dir):
+def test_line_level_format_still_applies_without_customer_overrides(masters_dir):
+    """예외 규칙(pack_remark 등)을 걷어내도 **기본 포맷 검증**은 그대로 동작한다."""
     master = load_customer("kl", masters_dir)
     raw = raw_po(
-        header=POHeader(po_number=ev("4507628839"), brand_text=ev("WIDIA GTD")),
-        lines=[POLine(line_no=1, posex=ev("00001"), quantity=ev("24"),
-                      brand_text=ev("KENNAMETAL"))],
+        header=POHeader(po_number=ev("4507628839")),
+        lines=[POLine(line_no=1, posex=ev("00001"), quantity=ev("24"))],
     )
     row = build(raw, master, masters_dir).rows[0]
-    assert row.fields["POSEX"] == "1"                 # format: integer
-    assert row.fields["ZPKRE2"] == row.fields["EMPST"] == "KMT"   # 라인 브랜드 우선
-    assert row.fields["ZBRAND"] == "2"
+    assert row.fields["BSTKD"] == "4507628839"
+    assert row.fields["KWMENG"] == "24"
 
 
-def test_required_missing_blocks_sending(masters_dir):
+def test_required_true_still_blocks_sending(masters_dir):
+    """KWMENG 은 프로필에서도 `required: true` 다 — 예외가 없어도 막는다."""
     master = load_customer("msc", masters_dir)
     raw = raw_po(
-        header=POHeader(po_number=ev("PO-1"), brand_text=ev("HERTEL")),
-        lines=[POLine(line_no=1, quantity=ev("1"))],          # item_code 없음
-        shipments=[POShipment(ship_to_text=ev("ELKHART"),
-                              lines=[POLine(line_no=1, quantity=ev("1"))])],
+        header=POHeader(po_number=ev("PO-1")),
+        lines=[POLine(line_no=1, item_code=ev("X"))],          # quantity 없음
     )
     row = build(raw, master, masters_dir).rows[0]
     codes = {(i.field, i.code) for i in row.issues}
-    assert ("MATNR", "REQUIRED_MISSING") in codes
+    assert ("KWMENG", "REQUIRED_MISSING") in codes
     assert row.error_count >= 1
 
 
-def test_table_no_match_is_an_error(masters_dir):
-    """on_no_match: error — 출하처 도시를 못 읽으면 오더가 잘못 나간다."""
+def test_required_warn_does_not_block_sending(masters_dir):
+    """MATNR 은 공용 프로필에서 `required: warn` 이다 — 없어도 막지 않는다.
+
+    거래처 전용 예외(옛 msc.yaml 의 `required: true`)를 걷어낸 결과다.
+    확정되면 그 거래처 파일에서 다시 `true` 로 올린다(CLAUDE.md §5).
+    """
     master = load_customer("msc", masters_dir)
     raw = raw_po(
-        header=POHeader(po_number=ev("PO-1"), brand_text=ev("HERTEL")),
-        lines=[],
-        shipments=[POShipment(ship_to_text=ev("어디에도 없는 창고"),
-                              lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("1"))])],
+        header=POHeader(po_number=ev("PO-1")),
+        lines=[POLine(line_no=1, quantity=ev("1"))],            # item_code 없음
     )
     row = build(raw, master, masters_dir).rows[0]
-    assert any(i.code == "TABLE_NO_MATCH" and i.severity == "error" for i in row.issues)
-
-
-def test_rule_no_match_is_an_error(masters_dir):
-    master = load_customer("msc", masters_dir)
-    raw = raw_po(
-        header=POHeader(po_number=ev("PO-1"), brand_text=ev("모르는 브랜드")),
-        lines=[],
-        shipments=[POShipment(ship_to_text=ev("ELKHART"),
-                              lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("1"))])],
-    )
-    row = build(raw, master, masters_dir).rows[0]
-    assert any(i.code == "RULE_NO_MATCH" and i.severity == "error" for i in row.issues)
+    codes = {(i.field, i.code, i.severity) for i in row.issues}
+    assert ("MATNR", "REQUIRED_MISSING", "warn") in codes
+    assert row.error_count == 0
 
 
 def test_format_error_is_reported_not_swallowed(masters_dir):
     """수량이 숫자가 아니면 ""로 넘기지 않는다 — 사람이 봐야 한다."""
     master = load_customer("ygjp", masters_dir)
     raw = raw_po(
-        header=POHeader(po_number=ev("1"), po_date=ev("2026-01-01"), brand_text=ev("YG BRAND")),
+        header=POHeader(po_number=ev("1")),
         lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("스물다섯"))],
     )
     row = build(raw, master, masters_dir).rows[0]
     assert any(i.field == "KWMENG" and i.code == "FORMAT_ERROR" for i in row.issues)
-
-
-def test_bad_date_surfaces_as_an_error(masters_dir):
-    master = load_customer("ygjp", masters_dir)
-    raw = raw_po(
-        header=POHeader(po_number=ev("1"), po_date=ev("언젠가"), brand_text=ev("YG BRAND")),
-        lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("1"))],
-    )
-    row = build(raw, master, masters_dir).rows[0]
-    assert any(i.field == "BSTKD" and i.severity == "error" for i in row.issues)
-
-
-def test_shipment_total_mismatch_is_caught(masters_dir):
-    """블록을 놓치면 화면에 아예 안 나타난다 — 합계로만 잡을 수 있다."""
-    master = load_customer("msc", masters_dir)
-    raw = raw_po(
-        header=POHeader(po_number=ev("PO-1"), brand_text=ev("HERTEL")),
-        lines=[],
-        shipments=[POShipment(ship_to_text=ev("ELKHART"),
-                              lines=[POLine(line_no=1, item_code=ev("X"), quantity=ev("10"))])],
-        totals=POTotals(total_qty="25"),                       # 요약표는 25인데 10만 들어옴
-    )
-    result = build(raw, master, masters_dir)
-    assert any(i.code == "TOTAL_MISMATCH" for r in result.rows for i in r.issues)

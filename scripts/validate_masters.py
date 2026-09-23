@@ -65,12 +65,14 @@ FIELD_OPTIONS = {
 }
 FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim"}
 GENERATORS = {"line_no_x10"}
-RULE_KINDS = {"keyword_map", "value_map", "csv_map", "lookup", "regex_extract", "fixed"}  # §4.5
+RULE_KINDS = {
+    "keyword_map", "value_map", "csv_map", "csv_choice", "lookup", "regex_extract", "fixed",
+}  # §4.5
 RULE_OPTIONS = {
     "kind", "label", "description", "source", "fallback_source",
-    "case_insensitive", "normalize", "entries", "on_no_match",
+    "case_insensitive", "normalize", "entries", "on_no_match", "on_many",
     "table_file", "key", "key_column", "return", "optional",
-    "value_column", "mode_column", "filter_column", "value_check",
+    "value_column", "mode_column", "filter_column", "label_column", "value_check",
     "pattern", "group", "value",
 }
 NORMALIZE_OPS = {"trim", "collapse_spaces", "upper", "lower"}
@@ -409,6 +411,8 @@ def check_rules(
                               rule.get("key_column") or "")
         elif kind == "csv_map":
             check_csv_map(report, where, rule, master, masters_dir)
+        elif kind == "csv_choice":
+            check_csv_choice(report, where, rule, masters_dir)
         elif kind in {"keyword_map", "value_map"}:
             entries = rule.get("entries") or []
             if not entries:
@@ -532,6 +536,57 @@ def check_csv_map(
             report.todos.append(f"{table_file} [{row.get(value_col)}] {text}: {row['note'].strip()}")
 
     check_value_registry(report, where, rule, master, masters_dir, mine, value_col)
+
+
+def check_csv_choice(
+    report: Report, where: str, rule: dict[str, Any], masters_dir: Path
+) -> None:
+    """SCHEMA §4.5 `csv_choice` — 원문이 아니라 이 고객의 후보 수로 판정한다."""
+    table_file = rule.get("table_file")
+    if not table_file:
+        report.error(2, f"{where}: csv_choice 인데 table_file 이 없습니다")
+        return
+
+    path = masters_dir / table_file
+    if not path.exists():
+        report.error(10, f"{where}: 참조표 파일이 없습니다: {table_file}")
+        return
+
+    _, header = _read_csv(path)
+
+    required = {"filter_column": rule.get("filter_column"), "value_column": rule.get("value_column")}
+    for name, col in required.items():
+        if not col:
+            report.error(2, f"{where}: csv_choice 인데 {name} 이 없습니다")
+        elif col not in header:
+            report.error(
+                10,
+                f"{where}.{name}: {table_file} 에 없는 컬럼입니다: {col} "
+                f"(있는 컬럼: {', '.join(header)})",
+            )
+
+    label_col = rule.get("label_column")
+    if label_col and label_col not in header:
+        report.error(
+            10,
+            f"{where}.label_column: {table_file} 에 없는 컬럼입니다: {label_col} "
+            f"(있는 컬럼: {', '.join(header)})",
+        )
+
+    on_many = rule.get("on_many") or {}
+    action = on_many.get("action")
+    if action == "default":
+        report.error(
+            13,
+            f"{where}.on_many.action: default 는 쓸 수 없습니다 — 후보 여럿 중 "
+            "하나를 마스터가 짐작해 고르는 것은 추측입니다",
+        )
+    elif action is not None and action not in NO_MATCH_ACTIONS:
+        report.error(
+            2,
+            f"{where}.on_many: action 이 허용 목록 밖입니다: {action!r} "
+            f"(허용: {', '.join(sorted(NO_MATCH_ACTIONS))})",
+        )
 
 
 def check_value_registry(

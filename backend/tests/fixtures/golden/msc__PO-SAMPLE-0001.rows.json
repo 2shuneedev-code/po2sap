@@ -3,7 +3,7 @@
     {
       "row_id": "r_0001",
       "file": "PO-SAMPLE-0001.htm",
-      "group": "ELKHART",
+      "group": "ELK",
       "line_no": 1,
       "fields": {
         "AUART": "ZEXP",
@@ -11,17 +11,17 @@
         "KUNNR1": "100249",
         "KUNNR2": "100249",
         "KUNNR3": "100249",
-        "BSTKD": "PO-SAMPLE-0001(ELKHART)",
+        "BSTKD": "PO-SAMPLE-0001",
         "VDATU": "",
         "ZTERM": "",
         "INCO1": "",
         "INCO2": "",
-        "ZBRAND": "38",
-        "ZSHCO": "A",
+        "ZBRAND": "",
+        "ZSHCO": "",
         "MATNR": "YG-EM0600",
         "KWMENG": "10",
         "ETDAT": "",
-        "ZPKRE2": "C,B12,C7",
+        "ZPKRE2": "",
         "EMPST": "",
         "VSART": "04",
         "PRICE": "",
@@ -35,30 +35,49 @@
         "VGBEL": "",
         "VGPOS": ""
       },
-      "issues": []
+      "issues": [
+        {
+          "field": "",
+          "severity": "warn",
+          "code": "RULE_NO_MATCH",
+          "message": "브랜드 후보가 7개입니다 — 검수 화면에서 고르세요"
+        },
+        {
+          "field": "ZBRAND",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "브랜드(ZBRAND) 이 비어 있습니다. 확인하세요."
+        },
+        {
+          "field": "ZSHCO",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "출하조건(ZSHCO) 이 비어 있습니다. 확인하세요."
+        }
+      ]
     },
     {
       "row_id": "r_0002",
       "file": "PO-SAMPLE-0001.htm",
-      "group": "HARRISBURG",
+      "group": "HAR",
       "line_no": 1,
       "fields": {
         "AUART": "ZEXP",
         "VKORG": "1000",
         "KUNNR1": "100249",
-        "KUNNR2": "319677",
+        "KUNNR2": "100249",
         "KUNNR3": "100249",
-        "BSTKD": "PO-SAMPLE-0001(HARRISBURG)",
+        "BSTKD": "PO-SAMPLE-0001",
         "VDATU": "",
         "ZTERM": "",
         "INCO1": "",
         "INCO2": "",
-        "ZBRAND": "38",
-        "ZSHCO": "A",
+        "ZBRAND": "",
+        "ZSHCO": "",
         "MATNR": "YG-DR0800",
         "KWMENG": "15",
         "ETDAT": "",
-        "ZPKRE2": "N,B12",
+        "ZPKRE2": "",
         "EMPST": "",
         "VSART": "04",
         "PRICE": "",
@@ -72,7 +91,26 @@
         "VGBEL": "",
         "VGPOS": ""
       },
-      "issues": []
+      "issues": [
+        {
+          "field": "",
+          "severity": "warn",
+          "code": "RULE_NO_MATCH",
+          "message": "브랜드 후보가 7개입니다 — 검수 화면에서 고르세요"
+        },
+        {
+          "field": "ZBRAND",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "브랜드(ZBRAND) 이 비어 있습니다. 확인하세요."
+        },
+        {
+          "field": "ZSHCO",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "출하조건(ZSHCO) 이 비어 있습니다. 확인하세요."
+        }
+      ]
     }
   ],
   "columns": [
@@ -108,7 +146,6 @@
   "grid": {
     "pinned": [
       "BSTKD",
-      "KUNNR2",
       "MATNR",
       "KWMENG"
     ],
@@ -118,11 +155,9 @@
       "INCO1",
       "INCO2",
       "ETDAT",
-      "EMPST",
       "PRICE",
       "WAERK",
       "BSTDK_E",
-      "POSEX",
       "DELCO",
       "AUGRU",
       "VKAUS",
@@ -131,9 +166,7 @@
       "VGPOS"
     ],
     "width": {
-      "MATNR": 140,
-      "ZPKRE2": 180,
-      "BSTKD": 180
+      "MATNR": 140
     }
   }
 }

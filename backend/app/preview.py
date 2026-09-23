@@ -149,6 +149,8 @@ def _rules(master: CustomerMaster, settings: Settings) -> list[dict]:
 
         if kind == "csv_map":
             columns, rows = _csv_map_rows(rule, master, settings)
+        elif kind == "csv_choice":
+            columns, rows = _csv_choice_rows(rule, master, settings)
         elif kind in ("value_map", "keyword_map"):
             columns, rows = _entry_rows(rule)
         else:  # lookup 등 — 참조표 내용을 화면에 펼치지 않는다
@@ -221,6 +223,39 @@ def _csv_map_rows(
     width = max((len(r) for r in rows), default=2)
     columns = (["원문", "→ 코드"] + (["비교"] if mode_col else []) + ["비고"])[:width]
     return columns, [r + [""] * (width - len(r)) for r in rows]
+
+
+def _csv_choice_rows(
+    rule: dict, master: CustomerMaster, settings: Settings
+) -> tuple[list[str], list[list[str]]]:
+    """`csv_choice` — 원문 대조표가 아니라 **이 거래처의 후보 목록** 자체를 보여준다.
+
+    검수 화면의 드롭다운이 될 목록과 같다 (SCHEMA §4.5).
+    """
+    filter_col = str(rule.get("filter_column") or "")
+    value_col = str(rule.get("value_column") or "")
+    label_col = rule.get("label_column")
+
+    try:
+        table = reftable.load(settings.masters_dir, str(rule.get("table_file") or ""),
+                              optional=True)
+    except reftable.RefTableError:
+        return [], []
+
+    seen: set[str] = set()
+    rows = []
+    for entry in table:
+        if filter_col and entry.get(filter_col) != master.customer_no:
+            continue
+        value = entry.get(value_col, "")
+        if value in seen:
+            continue
+        seen.add(value)
+        row = [value] + ([entry.get(str(label_col), "")] if label_col else [])
+        rows.append(row)
+
+    columns = ["코드"] + (["이름"] if label_col else [])
+    return columns, rows
 
 
 # ── split · todos ────────────────────────────────────────────────────

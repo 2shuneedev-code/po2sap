@@ -1,6 +1,11 @@
 # ═══════════════════════════════════════════════════════════════
 #  MSC Industrial Supply  (고객코드 100249)
 #  스키마: masters/SCHEMA.md
+#
+#  2026-09-23: 거래처 전용 규칙(ORDERED FROM 문구로 브랜드 판별 · 출하처별
+#  KUNNR2 결정표 · 출하처별 오더 분할 · 참조표 포장비고 조회)을 걷어내고
+#  기본(profiles/standard)만 쓴다. **의도적으로 비웠다** — 나중에 정리해서
+#  다시 얹는다. 지운 규칙은 git 이력(이 커밋 이전)에 그대로 남아 있다.
 # ═══════════════════════════════════════════════════════════════
 version: 2
 
@@ -70,90 +75,7 @@ extraction:
 split:
   by: shipment
   label: "출하처(Shipment)별로 오더를 나눈다"
-  group_label: _city        # 그리드 구분선에 쓸 라벨 (계약 §5 의 _group)
   description: |
-    MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다.
-    화면에는 한 그리드로 통합해 보여주고 BSTKD·KUNNR2 만 달라진다.
-
-tables:
-  ship_to_routing:
-    label: "출하처(Ship To) 분기"
-    scope: shipment
-    when:
-      - source: shipment.ship_to_text
-        fallback_source: header.ship_to_text
-        op: contains_ci
-        label: "출하처 블록에 포함"
-    then: [KUNNR2, _city, _pack_base]
-    rows:
-      - {when: ["ELKHART"], then: ["100249", "ELKHART", "C"]}
-      - {when: ["HARRISBURG"], then: ["319677", "HARRISBURG", "N"]}
-      - {when: ["RENO"], then: ["319678", "RENO", "O"]}
-      - {when: ["ATLANTA"], then: ["319679", "ATLANTA", "A"]}
-    on_no_match:
-      action: error
-      message: "출하처 도시를 인식하지 못했습니다 (ATLANTA / ELKHART / HARRISBURG / RENO)"
-
-rules:
-  brand_code:
-    kind: csv_map
-    label: "브랜드 판별"
-    description: |
-      발주서 원문을 참조표 refs/brand_keys.csv 의 이 거래처(kunnr) 행과 대조한다.
-      매핑 추가·수정은 이 파일이 아니라 CSV 에서 한다 — 브랜드 관리 화면의 원천이다.
-    source: header.brand_text
-    table_file: refs/brand_keys.csv
-    filter_column: kunnr
-    key_column: text
-    mode_column: match
-    value_column: zbrand
-    case_insensitive: true
-    value_check:
-      table_file: refs/brand_master.csv
-      value_column: zbrand
-      filter_column: kunnr
-    on_no_match:
-      action: error
-      message: "브랜드를 인식하지 못했습니다: {brand_text}"
-  ref_codes:
-    kind: lookup
-    label: "MSC 참조표 조회"
-    description: |
-      MSC 품번으로 참조표를 조회해 포장 추가비고를 가져온다 (예: "Blue RING").
-      → ZPKRE2 에 출하처 기본값 뒤로 콤마 연결.
-      참조표 파일이 없거나 비어 있으면 기본값만 적용되고 정상 동작한다.
-    table_file: refs/msc_ref.csv
-    optional: true
-    key: line.our_item
-    key_column: our_item
-    return: [b_code, c_code]
-    on_no_match:
-      action: warn
-      message: "참조표에 없는 품번입니다: {our_item}"
-
-fields:
-  # ── 표준 프로필(profiles/standard.yaml)과 **다른 것만** 선언한다 ──
-  KUNNR2: {from: table, table: ship_to_routing}
-  BSTKD:
-    from: expr
-    expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)'
-    explain: '발주번호 뒤에 출하처 도시명을 괄호로 붙입니다 (예: 7588650(ATLANTA))'
-    required: true
-  ZBRAND: {from: rule, rule: brand_code, required: true}
-  ZSHCO: {from: const, value: "A"}
-  MATNR: {from: doc, path: line.item_code, required: true}
-  ZPKRE2:
-    from: expr
-    expr: 'join(",", compact([_pack_base, ref_codes.b_code, ref_codes.c_code]))'
-    explain: '출하처 기본값(C/N/O/A) 뒤에 참조표 값을 쉼표로 연결 (예: "C,Blue RING")'
-
-grid:
-  pinned: [BSTKD, KUNNR2, MATNR, KWMENG]
-  hidden: [VDATU, ZTERM, INCO1, INCO2, ETDAT, EMPST, PRICE, WAERK, BSTDK_E, POSEX, DELCO, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
-  width: {MATNR: 140, ZPKRE2: 180, BSTKD: 180}
-
-checks:
-  - id: shipment_total_match
-    label: "출하처별 수량 합계 = 상단 요약표 합계"
-    severity: error
-    description: "복수 출하처일 때 shipment 블록을 하나라도 놓치면 여기서 걸린다"
+    MSC 발주서 1부가 출하처 수만큼의 오더로 쪼개진다. 화면에는 한 그리드로
+    통합해 보여준다. (출하처별 KUNNR2·BSTKD 결정 로직은 걷어냈다 — 나중에
+    정리해서 다시 얹는다. 지금은 둘 다 전 출하처에서 같은 기본값이다.)

@@ -1,62 +1,42 @@
 """전용 규칙이 없는 거래처 — 공용 프로필로 브랜드까지 뽑아낸다.
 
 SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 YAML 없이도 발주서를 읽어
-**브랜드·발주번호·품번·수량**이 나와야 한다. 전 거래처 테스트 배포가 그래야
-가능하다.
+**발주번호·품번·수량**이 나와야 한다. 브랜드는 후보 수로 판정한다
+(`csv_choice`, SCHEMA §4.5) — 후보가 1개면 자동으로 채우고, 여럿이면 비운다.
+원문 문구는 보지 않는다. 전 거래처 테스트 배포가 그래야 가능하다.
 
 **막지는 않는다.** 이 프로그램의 본업은 발주서 내용을 표로 옮기는 것이다.
 모르는 값은 노랗게 표시만 하고 전송을 막지 않는다 — 거래처 규칙이 확정되면
 그 거래처 파일에서 `required: true` 로 올려 막으면 된다.
 
-다만 **추측해서 채우지는 않는다.** 출하처를 판매처로 넣는 식은 그럴듯해서
-사람이 확인 없이 넘긴다. 비워 두면 최소한 빈 칸이 보인다.
+다만 **추측해서 채우지는 않는다.** 그럴듯해서 사람이 확인 없이 넘기는 값은
+만들지 않는다. 비워 두면 최소한 빈 칸이 보인다.
 """
 
 from __future__ import annotations
 
-import csv
-import shutil
-
 import pytest
 from app.domain.models import ExtractedValue, POHeader, POLine, RawPO
-from app.masters import brands as brand_store
 from app.masters import load_customer
 from app.rules.engine import build
 
-# 전용 규칙이 없고 브랜드는 등록된 고객 (SOCIETE OTELO)
-KUNNR = "100251"
-ZBRAND = "86"
-BRAND_TEXT = "OTELO BRAND"
-
-
-@pytest.fixture
-def workspace(tmp_path, masters_dir):
-    dst = tmp_path / "masters"
-    shutil.copytree(masters_dir, dst)
-    return dst
-
-
-@pytest.fixture
-def mapped(workspace):
-    """현업이 브랜드 매핑 화면에서 문구를 등록한 상태."""
-    brand_store.set_keys(workspace, KUNNR, ZBRAND, [
-        brand_store.BrandKey(kunnr=KUNNR, zbrand=ZBRAND, match="contains",
-                             text=BRAND_TEXT, note="테스트"),
-    ])
-    return workspace
+# 전용 규칙이 없고 브랜드 후보가 **여럿**인 고객 (SOCIETE OTELO — 13개)
+MANY_KUNNR = "100251"
+# 전용 규칙이 없고 브랜드 후보가 **하나뿐**인 고객 (INGERSOLL CUTTING TOOL — 1개)
+ONE_KUNNR = "100203"
+ONE_ZBRAND = "002"
 
 
 def value(text: str) -> ExtractedValue:
     return ExtractedValue(value=text, confidence=0.95)
 
 
-def raw_po(brand_text: str = BRAND_TEXT) -> RawPO:
+def raw_po(kunnr: str) -> RawPO:
     return RawPO(
-        customer_code=KUNNR,
+        customer_code=kunnr,
         source_file="po.pdf",
         header=POHeader(
             po_number=value("PO-77001"),
-            brand_text=value(brand_text),
             ship_to_text=value("SOME WAREHOUSE, LYON"),
         ),
         lines=[
@@ -66,109 +46,92 @@ def raw_po(brand_text: str = BRAND_TEXT) -> RawPO:
     )
 
 
-def rows_for(masters, brand_text: str = BRAND_TEXT):
-    master = load_customer(KUNNR, masters)
-    return master, build(raw_po(brand_text), master, masters, file_name="po.pdf")
+def rows_for(masters, kunnr: str):
+    master = load_customer(kunnr, masters)
+    return master, build(raw_po(kunnr), master, masters, file_name="po.pdf")
 
 
 # ── 공용 프로필이 붙는가 ──────────────────────────────────────────────
-def test_customer_without_rules_still_loads(workspace):
-    master = load_customer(KUNNR, workspace)
-    assert master.customer_no == KUNNR
+def test_customer_without_rules_still_loads(masters_dir):
+    master = load_customer(MANY_KUNNR, masters_dir)
+    assert master.customer_no == MANY_KUNNR
     assert master.raw["meta"]["generic"] is True, "공용 설정임을 표시해야 화면이 알린다"
 
 
-def test_generic_customer_declares_every_send_field(workspace):
+def test_generic_customer_declares_every_send_field(masters_dir):
     """전송 필드는 `_base` 가 정한다 — 공용이라고 일부만 나가면 안 된다."""
-    master = load_customer(KUNNR, workspace)
+    master = load_customer(MANY_KUNNR, masters_dir)
     assert set(master.fields) == set(master.raw["field_specs"])
 
 
-def test_customer_with_no_brands_at_all_is_an_error(workspace):
+def test_customer_with_no_brands_at_all_is_an_error(masters_dir):
     """브랜드가 없으면 판정할 근거가 없다 — 조용히 넘어가지 않는다."""
     from app.masters import MasterError
 
     with pytest.raises(MasterError):
-        load_customer("999999", workspace)
+        load_customer("999999", masters_dir)
 
 
-# ── 브랜드가 실제로 나오는가 ──────────────────────────────────────────
-def test_brand_comes_out_for_a_customer_without_rules(mapped):
-    """★ 이 테스트가 이번 변경의 핵심이다."""
-    _, result = rows_for(mapped)
+# ── 브랜드가 후보 수로 판정되는가 (csv_choice, SCHEMA §4.5) ─────────────
+def test_brand_auto_fills_when_only_one_candidate(masters_dir):
+    """★ 후보가 1개면 원문을 보지 않고도 자동으로 채운다."""
+    _, result = rows_for(masters_dir, ONE_KUNNR)
 
     assert len(result.rows) == 2
     for row in result.rows:
-        assert row.fields["ZBRAND"] == ZBRAND, "전용 규칙 없이도 브랜드가 나와야 한다"
+        assert row.fields["ZBRAND"] == ONE_ZBRAND, "후보가 하나뿐이면 자동으로 채워야 한다"
+        assert not [i for i in row.issues if i.field == "ZBRAND"]
 
 
-def test_document_values_come_out(mapped):
-    _, result = rows_for(mapped)
+def test_brand_stays_blank_when_many_candidates(masters_dir):
+    """★ 후보가 여럿이면 원문과 무관하게 비워 두고 사람이 고르게 한다.
+
+    추측해서 하나를 집으면 그럴듯해서 사람이 확인 없이 넘긴다 — 그래서 비운다.
+    """
+    _, result = rows_for(masters_dir, MANY_KUNNR)
+
+    for row in result.rows:
+        assert row.fields["ZBRAND"] == "", "후보가 여럿이면 비워 둬야 한다"
+        assert any(i.field == "" and i.severity == "warn" for i in row.issues), \
+            "후보가 여럿인데 아무 표시도 없으면 조용히 나간다"
+        assert not [i for i in row.issues if i.severity == "error"], \
+            "값을 옮기는 것이 본업이다 — 브랜드 미확정으로 전송을 막지 않는다"
+
+
+def test_document_values_come_out(masters_dir):
+    _, result = rows_for(masters_dir, MANY_KUNNR)
     assert [r.fields["MATNR"] for r in result.rows] == ["YG-EM1000", "YG-DR2000"]
     assert [r.fields["KWMENG"] for r in result.rows] == ["12", "5"]
     assert all(r.fields["BSTKD"] == "PO-77001" for r in result.rows)
 
 
-def test_customer_number_fills_sold_to(mapped):
-    _, result = rows_for(mapped)
-    assert all(r.fields["KUNNR1"] == KUNNR for r in result.rows)
+def test_customer_number_fills_sold_to(masters_dir):
+    _, result = rows_for(masters_dir, MANY_KUNNR)
+    assert all(r.fields["KUNNR1"] == MANY_KUNNR for r in result.rows)
+
+
+def test_kunnr2_defaults_to_the_same_customer_number(masters_dir):
+    """KUNNR1/2/3 은 기본이 전부 같은 값이다 — 조건이 생기면 거래처 파일이 덮어쓴다."""
+    _, result = rows_for(masters_dir, MANY_KUNNR)
+    assert all(r.fields["KUNNR2"] == MANY_KUNNR for r in result.rows)
 
 
 # ── 모르는 값은 막는가 ───────────────────────────────────────────────
-def test_ship_to_is_blank_but_does_not_block(mapped):
-    """★ 모르는 출하처를 추측해 채우지 않는다. 다만 막지도 않는다.
+def test_shipping_condition_is_blank_but_does_not_block(masters_dir):
+    """★ 출하조건(ZSHCO) 참조표가 없으면 추측해 채우지 않는다. 다만 막지도 않는다.
 
     추측값은 그럴듯해서 사람이 확인 없이 넘긴다. 빈 칸은 최소한 눈에 띈다.
     """
-    _, result = rows_for(mapped)
+    _, result = rows_for(masters_dir, MANY_KUNNR)
 
     for row in result.rows:
-        assert row.fields["KUNNR2"] == "", "모르는 출하처를 채워 넣으면 안 된다"
-        assert any(i.field == "KUNNR2" and i.severity == "warn" for i in row.issues), \
-            "빈 출하처가 아무 표시도 없으면 조용히 나간다"
+        assert row.fields["ZSHCO"] == "", "미확보 참조표 값을 채워 넣으면 안 된다"
         assert not [i for i in row.issues if i.severity == "error"], \
-            "값을 옮기는 것이 본업이다 — 빈 출하처로 전송을 막지 않는다"
-
-
-def test_unmapped_brand_text_warns_without_blocking(workspace):
-    """매핑 안 된 문구는 노랗게 알리되 막지 않는다 — 나머지 값은 다 나와야 한다."""
-    _, result = rows_for(workspace, brand_text="듣도 보도 못한 브랜드")
-
-    for row in result.rows:
-        assert any(i.field == "ZBRAND" for i in row.issues), "미매칭을 숨기면 안 된다"
-        assert not [i for i in row.issues if i.severity == "error"]
-        assert row.fields["MATNR"], "브랜드를 몰라도 품번은 나와야 한다"
-
-
-def test_brand_resolves_from_the_sap_brand_name(workspace):
-    """★ SAP 브랜드명이 그대로 매핑 문구로 쓰인다 (seed_brand_keys.py 초벌).
-
-    현업이 78곳 300건을 손으로 치지 않아도 브랜드가 나오는 근거다.
-    """
-    _, result = rows_for(workspace, brand_text="OTELO BRAND")
-    assert all(r.fields["ZBRAND"] == ZBRAND for r in result.rows)
-
-
-def test_brand_not_registered_for_this_customer_is_refused(workspace):
-    """다른 고객 코드를 끌어다 쓰면 `value_check` 가 막는다 (SAP 이 거부할 값)."""
-    with pytest.raises(brand_store.BrandError):
-        brand_store.set_keys(workspace, KUNNR, "99999", [
-            brand_store.BrandKey(kunnr=KUNNR, zbrand="99999", match="contains",
-                                 text="X", note=""),
-        ])
+            "값을 옮기는 것이 본업이다 — 빈 출하조건으로 전송을 막지 않는다"
 
 
 # ── 전용 규칙이 생기면 그쪽이 이긴다 ──────────────────────────────────
-def test_a_dedicated_rules_file_wins_over_the_generic_profile(workspace):
-    master = load_customer("MSC", workspace)
+def test_a_dedicated_rules_file_wins_over_the_generic_profile(masters_dir):
+    master = load_customer("MSC", masters_dir)
     assert master.raw["meta"].get("generic") is not True
     assert master.code == "MSC"
-
-
-def test_mapped_count_is_visible(mapped):
-    """화면이 '몇 개나 매핑됐는지'를 보여줄 수 있어야 한다."""
-    path = mapped / "refs" / "brand_keys.csv"
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        rows = [r for r in csv.DictReader(f) if r["kunnr"] == KUNNR]
-    assert rows, '초벌 시드로 이 고객의 매핑이 채워져 있어야 한다'
-    assert any(r['zbrand'] == ZBRAND for r in rows)

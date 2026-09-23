@@ -107,7 +107,7 @@ def test_detail_joins_sap_codes_with_human_keys(client, workspace):
     assert mapped == expected
 
     # 사람이 채운 것은 그대로 남아 있어야 한다
-    assert mapped["38"] == ["HERTEL"]
+    assert mapped["038"] == ["HERTEL"]
 
 
 def test_unmapped_brands_are_still_listed(client):
@@ -116,22 +116,26 @@ def test_unmapped_brands_are_still_listed(client):
     데이터에 미매핑이 남아 있기를 기대하지 않는다 — 초벌 시드가 다 채우면
     그건 정상이다. 하나를 비워 놓고 그게 보이는지만 본다.
     """
-    r = client.put(f"/api/brands/customers/{MSC}/38", json={"keys": []})
+    r = client.put(f"/api/brands/customers/{MSC}/038", json={"keys": []})
     assert r.status_code == 200
 
     body = client.get(f"/api/brands/customers/{MSC}").json()
-    empty = [b for b in body["brands"] if b["zbrand"] == "38"]
+    empty = [b for b in body["brands"] if b["zbrand"] == "038"]
     assert empty and empty[0]["status"] == "unmapped"
     assert empty[0]["keys"] == []
 
 
 def test_detail_includes_logic_for_configured_customer(client):
+    """MSC 는 이제 거래처 전용 규칙이 없다(2026-09-23) — 공용 기본만 붙는다.
+
+    그래도 split 은 문서 구조(출하처별 분할)라 그대로 남아 있다.
+    """
     logic = client.get(f"/api/brands/customers/{MSC}").json()["logic"]
     assert logic["split"]["by"] == "shipment"
-    assert [t["id"] for t in logic["tables"]] == ["ship_to_routing"]
-    # **거래처 고유 규칙이 있는가**를 본다. 정확히 일치를 요구하면 공용
+    assert logic["tables"] == []
+    # **공용 기본 규칙은 붙어 있는가**를 본다. 정확히 일치를 요구하면 공용
     # 프로필에 규칙이 하나 늘 때마다(예: 통화 변환) 멀쩡한 테스트가 죽는다.
-    assert {r["id"] for r in logic["rules"]} >= {"brand_code", "ref_codes"}
+    assert {r["id"] for r in logic["rules"]} >= {"brand_code", "currency"}
     assert any(f["field"] == "BSTKD" for f in logic["fields"])
 
 
@@ -165,8 +169,8 @@ def test_saves_keys_and_persists(client, workspace):
 
 
 def test_empty_list_clears_the_mapping(client, workspace):
-    client.put(f"/api/brands/customers/{MSC}/38", json={"keys": []})
-    assert not [x for x in keys_rows(workspace) if x["kunnr"] == MSC and x["zbrand"] == "38"]
+    client.put(f"/api/brands/customers/{MSC}/038", json={"keys": []})
+    assert not [x for x in keys_rows(workspace) if x["kunnr"] == MSC and x["zbrand"] == "038"]
 
 
 def test_rejects_code_not_registered_in_sap(client, workspace):
@@ -180,17 +184,17 @@ def test_rejects_code_not_registered_in_sap(client, workspace):
 def test_rejects_text_already_used_by_another_code(client):
     r = client.put(f"/api/brands/customers/{MSC}/205", json={"keys": [{"text": "HERTEL"}]})
     assert r.status_code == 400
-    assert "이미 브랜드 코드 38" in r.json()["error"]["message"]
+    assert "이미 브랜드 코드 038" in r.json()["error"]["message"]
 
 
 def test_rejects_duplicate_text_within_one_request(client):
-    r = client.put(f"/api/brands/customers/{MSC}/38",
+    r = client.put(f"/api/brands/customers/{MSC}/038",
                    json={"keys": [{"text": "A"}, {"text": "a"}]})
     assert r.status_code == 400 and "두 번" in r.json()["error"]["message"]
 
 
 def test_rejects_bad_match_mode(client):
-    r = client.put(f"/api/brands/customers/{MSC}/38",
+    r = client.put(f"/api/brands/customers/{MSC}/038",
                    json={"keys": [{"text": "A", "match": "fuzzy"}]})
     assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_INPUT"
 

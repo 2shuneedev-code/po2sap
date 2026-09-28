@@ -24,10 +24,21 @@ _SORT = "name"
 
 # 스트림릿 버튼 라벨은 기본이 **가운데 정렬**이다. 거래처가 수백 곳이면
 # 이름 시작 위치가 제각각이라 눈으로 훑기 어렵다. 왼쪽으로 붙인다.
+# 목록은 **촘촘하게**: 기본 버튼(40px) + 행 간격(16px)이면 한 화면에 9곳밖에 안 보인다.
+# `help=` 툴팁 래퍼가 버튼을 오른쪽으로 미는 것도 여기서 편다 (스트림릿 1.6x).
 _LEFT_ALIGN = """
 <style>
-section[data-testid="stSidebar"] .stButton button { justify-content: flex-start; }
-section[data-testid="stSidebar"] .stButton button p { text-align: left; }
+section[data-testid="stSidebar"] .st-key-customer_list,
+section[data-testid="stSidebar"] .st-key-customer_list [data-testid="stVerticalBlock"] { gap: 2px; }
+.st-key-customer_list [data-testid="stTooltipHoverTarget"] { width: 100%; justify-content: flex-start; }
+.st-key-customer_list .stButton button {
+  width: 100%; min-height: 0; height: auto; padding: 4px 8px; justify-content: flex-start;
+}
+.st-key-customer_list .stButton button > div,
+.st-key-customer_list .stButton button [data-testid="stMarkdownContainer"] {
+  width: 100%; justify-content: flex-start; text-align: left;
+}
+.st-key-customer_list .stButton button p { text-align: left; font-size: 0.85rem; line-height: 1.3; }
 </style>
 """
 
@@ -66,7 +77,7 @@ def customer_picker(key: str) -> CatalogEntry | None:
 
         st.markdown(_LEFT_ALIGN, unsafe_allow_html=True)
         # 목록이 사이드바의 대부분을 쓰게 한다 — 한 화면에 20곳 넘게 보인다.
-        with st.container(height=640, border=False):
+        with st.container(height=640, border=False, key="customer_list"):
             for row in rows:
                 _entry_button(row, state_key, active=row.kunnr == selected)
 

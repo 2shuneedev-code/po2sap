@@ -27,8 +27,9 @@ section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
   padding-top: 0.25rem; padding-bottom: 0; height: 2.25rem; min-height: 0;
 }
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 0; }
-section[data-testid="stSidebar"] hr { margin: 0.5rem 0; }
-section[data-testid="stSidebar"] h3 { padding-top: 0; }
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
+section[data-testid="stSidebar"] hr { margin: 0.25rem 0; }
+section[data-testid="stSidebar"] h3 { padding: 0; margin: 0 0 0.25rem; }
 </style>
 """
 

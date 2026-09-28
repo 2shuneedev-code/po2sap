@@ -32,7 +32,7 @@ section[data-testid="stSidebar"] .st-key-customer_list,
 section[data-testid="stSidebar"] .st-key-customer_list [data-testid="stVerticalBlock"] { gap: 2px; }
 .st-key-customer_list [data-testid="stTooltipHoverTarget"] { width: 100%; justify-content: flex-start; }
 .st-key-customer_list .stButton button {
-  width: 100%; min-height: 0; height: auto; padding: 4px 8px; justify-content: flex-start;
+  width: 100%; min-height: 0; height: auto; padding: 6px 8px; justify-content: flex-start;
 }
 .st-key-customer_list .stButton button > div,
 .st-key-customer_list .stButton button [data-testid="stMarkdownContainer"] {

@@ -20,16 +20,21 @@ PAGES = {
     "Brand Master": brands.render,
 }
 
-# 사이드바 머리의 빈 공간(스트림릿 기본 ≈ 6rem)을 걷어 거래처 목록을 위로 올린다.
+# 사이드바 머리(접기 버튼 줄)를 띄워서 PO2SAP 제목이 맨 위에 오게 한다.
+# 대신 제목·메뉴·거래처 구역 사이는 넉넉히 — 붙어 있으면 어디서 구역이 바뀌는지 안 보인다.
 _SIDEBAR_TIGHT = """
 <style>
 section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
-  padding-top: 0.25rem; padding-bottom: 0; height: 2.25rem; min-height: 0;
+  position: absolute; top: 0; right: 0; z-index: 2;
+  padding: 0.5rem 0.5rem 0 0; height: auto; min-height: 0;
 }
-section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 0; }
-section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0.5rem; }
-section[data-testid="stSidebar"] hr { margin: 0.25rem 0; }
-section[data-testid="stSidebar"] h3 { padding: 0; margin: 0 0 0.25rem; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 1.25rem; }
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0.75rem; }
+section[data-testid="stSidebar"] hr { margin: 0.75rem 0; }
+section[data-testid="stSidebar"] h3 { padding: 0 !important; margin: 0 0 1rem !important; font-size: 1.4rem; }
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]:has(h3) { margin-bottom: 0.75rem; }
+section[data-testid="stSidebar"] [data-testid="stRadioGroup"] { gap: 0.5rem; }
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { margin-top: 0.25rem; }
 </style>
 """
 

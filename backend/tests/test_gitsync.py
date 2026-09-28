@@ -27,7 +27,7 @@ def repo(tmp_path: Path) -> Path:
     _run(r.parent, "init", "-q", "-b", "main", str(r))
     _run(r, "config", "user.email", "t@example.com")
     _run(r, "config", "user.name", "t")
-    keys = r / "masters" / "refs" / "brand_keys.csv"
+    keys = r / "masters" / "refs" / "brand_master_manual.csv"
     keys.write_text("kunnr,zbrand,match,text,note\n", encoding="utf-8")
     _run(r, "add", "-A")
     _run(r, "commit", "-qm", "init")
@@ -35,7 +35,7 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _keys(repo: Path) -> Path:
-    return repo / "masters" / "refs" / "brand_keys.csv"
+    return repo / "masters" / "refs" / "brand_master_manual.csv"
 
 
 def test_clean_repo_reads_as_synced(repo: Path) -> None:
@@ -62,7 +62,7 @@ def test_commit_stages_only_the_given_path(repo: Path) -> None:
 
     assert result.ok, result.detail
     committed = _run(repo, "show", "--name-only", "--format=", "HEAD").split()
-    assert committed == ["masters/refs/brand_keys.csv"]
+    assert committed == ["masters/refs/brand_master_manual.csv"]
     assert stray.exists()                     # 남의 파일은 건드리지 않는다
 
 

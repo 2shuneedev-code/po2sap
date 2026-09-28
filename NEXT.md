@@ -71,15 +71,21 @@ HARRISBURG→319677 · RENO→319678 · ATLANTA→319679, `on_no_match: error`)�
 `pytest`·`ruff`·`validate_masters` 전부 0 오류. **이제 실물 발주서로 테스트할
 차례.**
 
-### 안 한 것 (§4.5-A·"거래처 전용 예외" 예시는 설계만, 구현은 다음 차례)
+### 2026-09-28 — `brand_keys.csv` 완전 폐기 · 보정 오버레이 구현 (SCHEMA §4.5-A)
 
-- `masters/refs/brand_master_manual.csv` 오버레이(사람이 SAP 원본 옆에 손으로
-  고치는 파일) — SCHEMA.md §4.5-A 에 설계는 있으나 로더·화면 어느 쪽도
-  아직 안 읽는다.
-- `ui/views/brands.py` 는 그대로다 — 지금도 `brand_keys.csv`(문구→코드) 를
-  편집하는 화면이라, `csv_choice` 로 넘어간 기본 판정 경로와는 이미
-  분리돼 있다(고쳐도 기본 판정에 반영 안 됨). §4.5-A 대로 "이 고객의
-  `brand_master_manual.csv` 행 편집" 화면으로 바꾸는 건 남은 일이다.
+- `refs/brand_keys.csv` · `scripts/seed_brand_keys.py` 삭제. 엑셀 도구의
+  `브랜드매핑` 시트도 뺐다.
+- `refs/brand_master_manual.csv`(add·override·suppress) 신설. 병합은
+  `rules/reftable.py::merge_brand_overlay` 한 곳 — `csv_choice` 와 화면이 같은
+  후보를 본다.
+- 화면 메뉴 `브랜드 매핑` → `브랜드 후보`: 병합된 후보(출처 표시) + 보정 표.
+  API 는 `PUT /api/brands/customers/{kunnr}/manual`, 목록의 `mapped_count` →
+  `manual_count` (계약 §10).
+- `import_brand_master.py` 는 보정표를 건드리지 않고 대조만 한다 (override
+  대상이 사라지면 거부).
+
+### 안 한 것
+
 - MSC(ORDERED FROM 문구)·YGJP(SAP 브랜드명 대조)·KL(고정값 2) 의 확정된
   예외 로직 — SCHEMA.md §4.5 "거래처 전용 예외" A·B·C 에 그대로 적어 뒀다.
   그 문구 그대로 `masters/customers/{code}.yaml` 에 옮기면 된다.

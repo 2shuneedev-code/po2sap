@@ -16,7 +16,7 @@ from ui.views import brands, convert  # noqa: E402
 
 PAGES = {
     "P/O 변환": convert.render,
-    "브랜드 매핑": brands.render,
+    "브랜드 후보": brands.render,
 }
 
 

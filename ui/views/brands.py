@@ -1,15 +1,17 @@
-"""브랜드 매핑 — 발주서 원문 문구 → SAP 브랜드 코드(ZBRAND).
+"""브랜드 후보 — 고객별 ZBRAND 후보 목록과 그 보정 (SCHEMA §4.5-A).
 
-SAP 이 주는 것은 `코드 → 이름` 뿐이고 **원문 키는 어디에도 없다.** 사람이 채운다.
-그래서 이 화면은 `brand_master.csv` 를 읽기만 하고 `brand_keys.csv` 만 쓴다.
+ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다. 1개면 자동, 여럿이면
+검수 표의 드롭다운에서 사람이 고른다. 발주서 문구는 보지 않는다.
 
-화면은 **참조표와 같은 모양의 표 하나**다 — 1행 = 매핑 1건. 브랜드마다 칸을
-따로 여는 것보다, 지금 뭐가 어디에 걸려 있는지 한눈에 보인다.
-**행 순서가 곧 판정 우선순위다** (SCHEMA §4.5).
+후보 = SAP 원본(`brand_master.csv`, 읽기 전용) ∪ 사람이 얹은 보정
+(`brand_master_manual.csv`). 이 화면은 **보정만 쓴다.**
 
-저장 전 검증은 서버가 한다 — 그 고객에 없는 코드, 다른 코드가 이미 쓰는 문구는
-거부된다. **저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로**
-암호로 잠가 둔다 (`ui/auth.py`). 변경 이력은 CSV 의 Git 이력이 남긴다.
+  add       SAP 에 아직 없는 후보를 더한다 (재추출 전 임시)
+  override  SAP 행의 브랜드명을 고친다 (오탈자 등)
+  suppress  잘못된 후보를 뺀다
+
+저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로 암호로 잠가 둔다
+(`ui/auth.py`). 변경 이력은 CSV 의 Git 이력이 남긴다.
 """
 
 from __future__ import annotations
@@ -26,17 +28,18 @@ from ui.service import MasterError, brand_store, catalog, preview_for, settings
 from ui.views.picker import customer_header, customer_picker
 from ui.views.rules import rule_preview
 
-MATCHES = ["contains", "equals"]
-COLS = ["브랜드코드", "브랜드명", "원문 문구", "비교", "비고"]
+ACTIONS = list(brand_store.ACTIONS)
+COLS = ["동작", "코드", "브랜드명", "비고"]
+SOURCE_LABEL = {"sap": "SAP", "override": "SAP · 이름 보정", "add": "수동 추가"}
 
 
 def render() -> None:
     entry = customer_picker("brands")
 
-    st.title("브랜드 매핑")
+    st.title("브랜드 후보")
     st.caption(
-        "발주서에 적힌 문구를 SAP 브랜드 코드로 잇습니다. "
-        "코드·이름은 SAP 원본이라 고칠 수 없고, 채우는 것은 **원문 문구**뿐입니다."
+        "고객별 ZBRAND 후보입니다. **후보가 1개면 자동으로 채우고, 여럿이면 검수 표에서 "
+        "고릅니다.** SAP 원본은 고칠 수 없고, 아래 보정 표로 더하거나 빼거나 이름을 고칩니다."
     )
 
     if entry is None:
@@ -45,45 +48,42 @@ def render() -> None:
 
     customer_header(entry)
 
-    tab_keys, tab_logic = st.tabs(["매핑 표", "적용 로직"])
+    tab_keys, tab_logic = st.tabs(["후보 표", "적용 로직"])
     with tab_keys:
-        _mapping(entry)
+        _candidates(entry)
     with tab_logic:
         _logic(entry)
 
 
-def _mapping(entry) -> None:
+def _candidates(entry) -> None:
     cfg = settings()
-    brands = [b for b in brand_store.load_master(cfg.masters_dir) if b.kunnr == entry.kunnr]
-    keys = [k for k in brand_store.load_keys(cfg.masters_dir) if k.kunnr == entry.kunnr]
+    merged = [b for b in brand_store.load_master(cfg.masters_dir) if b.kunnr == entry.kunnr]
+    manual = [m for m in brand_store.load_manual(cfg.masters_dir) if m.kunnr == entry.kunnr]
 
-    if not brands:
-        st.warning("이 고객은 SAP 브랜드 마스터에 등록된 코드가 없습니다.", icon="⚠️")
-        return
+    if merged:
+        verdict = "자동으로 채웁니다" if len(merged) == 1 else "검수 표에서 고릅니다"
+        st.markdown(f"**판정 후보 {len(merged)}개** — {verdict}")
+        st.dataframe(
+            pd.DataFrame([
+                {"코드": b.zbrand, "브랜드명": b.name, "출처": SOURCE_LABEL.get(b.source, b.source)}
+                for b in merged
+            ]),
+            width="stretch", hide_index=True,
+        )
+    else:
+        st.warning("이 고객은 판정 후보가 없습니다. 발주서를 읽을 수 없습니다.", icon="⚠️")
 
-    names = {b.zbrand: b.name for b in brands}
-    codes = [b.zbrand for b in brands]
-
+    st.markdown("**보정**")
     st.caption(
-        "1행 = 매핑 1건. **위에서부터 순서대로** 판정하므로 행 순서가 곧 우선순위입니다. "
-        "행을 추가하려면 맨 아래 빈 줄에 입력하고, 지우려면 행을 선택해 삭제하세요."
+        "add = SAP 에 없는 후보 추가 · override = SAP 행의 브랜드명 교체 · "
+        "suppress = 후보에서 제외. **비고는 필수**입니다 — 왜 고쳤는지 남깁니다."
     )
 
     frame = pd.DataFrame(
-        [
-            {
-                "브랜드코드": k.zbrand,
-                "브랜드명": names.get(k.zbrand, "(SAP 에 없는 코드)"),
-                "원문 문구": k.text,
-                "비교": k.match,
-                "비고": k.note,
-            }
-            for k in keys
-        ],
+        [{"동작": m.action, "코드": m.zbrand, "브랜드명": m.zbrant, "비고": m.note} for m in manual],
         columns=COLS,
     )
-
-    unlocked = gate(cfg.master_edit_password, what="브랜드 매핑")
+    unlocked = gate(cfg.master_edit_password, what="브랜드 후보")
 
     edited = st.data_editor(
         frame,
@@ -91,126 +91,70 @@ def _mapping(entry) -> None:
         num_rows="dynamic" if unlocked else "fixed",
         width="stretch",
         hide_index=True,
-        key=f"brandmap_{entry.kunnr}",
+        key=f"brandmanual_{entry.kunnr}",
         column_config={
-            "브랜드코드": st.column_config.SelectboxColumn(
-                "코드", options=codes, required=True, width="small",
-                help="이 고객에게 SAP 이 등록한 브랜드 코드만 고를 수 있습니다",
+            "동작": st.column_config.SelectboxColumn(
+                "동작", options=ACTIONS, required=True, width="small",
+            ),
+            "코드": st.column_config.TextColumn(
+                "코드", required=True, width="small",
+                help="override·suppress 는 SAP 에 있는 코드, add 는 SAP 에 없는 코드",
             ),
             "브랜드명": st.column_config.TextColumn(
-                "브랜드명 (SAP)", disabled=True, width="medium",
-                help="SAP 원본입니다. 저장할 때 코드로 다시 채워집니다",
+                "브랜드명", width="medium", help="suppress 면 비워도 됩니다",
             ),
-            "원문 문구": st.column_config.TextColumn(
-                "발주서 원문 문구", required=True, width="medium",
-                help="발주서에 실제로 찍히는 글자",
-            ),
-            "비교": st.column_config.SelectboxColumn(
-                "비교", options=MATCHES, default="contains", width="small",
-                help="contains = 포함 · equals = 완전일치",
-            ),
-            "비고": st.column_config.TextColumn("비고", help="왜 이렇게 뒀는지"),
+            "비고": st.column_config.TextColumn("비고 (필수)", required=True),
         },
     )
 
-    left, right = st.columns([1, 4])
-    if left.button("저장", type="primary", key=f"save_{entry.kunnr}", disabled=not unlocked):
-        _save(entry, keys, edited)
-    right.caption(f"현재 {len(keys)}건 · 브랜드 {entry.mapped_count}/{entry.brand_count} 매핑됨")
+    if st.button("저장", type="primary", key=f"save_{entry.kunnr}", disabled=not unlocked):
+        _save(entry, edited)
 
-    _unmapped(brands, keys, names)
+    if any(m.action == "add" for m in manual):
+        st.caption("⚠️ add 한 코드는 SAP 재추출 전까지 SAP 이 모르는 코드일 수 있습니다.")
     _git_panel(entry, unlocked=unlocked)
 
 
-def _unmapped(brands, keys, names: dict) -> None:
-    mapped = {k.zbrand for k in keys}
-    rest = [b for b in brands if b.zbrand not in mapped]
-    if not rest:
-        st.success("이 고객의 브랜드가 모두 매핑되어 있습니다.", icon="✅")
-        return
-    with st.expander(f"아직 매핑 안 된 브랜드 ({len(rest)})"):
-        st.caption("발주서에서 이 브랜드 문구를 만나면 판정이 실패합니다. 위 표에 추가하세요.")
-        st.dataframe(
-            pd.DataFrame([{"코드": b.zbrand, "브랜드명": b.name} for b in rest]),
-            width="stretch", hide_index=True,
-        )
-
-
-def group_for_save(kunnr: str, before, records: list[dict]) -> dict[str, list]:
-    """표의 행들을 **코드별 묶음**으로 만든다.
-
-    `set_keys` 는 (고객, 코드) 한 묶음을 통째로 교체한다. 그래서 표에서 사라진
-    코드는 **빈 묶음으로 명시해 지워야** 한다 — 안 그러면 화면에서 지운 매핑이
-    파일에 남아 조용히 계속 판정된다. 화면에는 없는데 발주서는 그 문구로 계속
-    판정되는 상태가 가장 나쁘다.
+def rows_for_save(kunnr: str, records: list[dict]) -> list:
+    """표의 행 → 보정 행. 빈 줄은 없는 것으로 본다.
 
     화면에서 떼어놨다 — 순수 함수라 테스트가 잡을 수 있다.
     """
-    grouped: dict[str, list] = {}
+    rows = []
     for record in records:
-        code = str(record.get("브랜드코드") or "").strip()
-        text = str(record.get("원문 문구") or "").strip()
-        if not code or not text:
-            continue                       # 빈 줄은 없는 것으로 본다
-        grouped.setdefault(code, []).append(
-            brand_store.BrandKey(
-                kunnr=kunnr, zbrand=code,
-                match=str(record.get("비교") or "contains"),
-                text=text, note=str(record.get("비고") or ""),
-            )
-        )
-
-    for code in {k.zbrand for k in before} - set(grouped):
-        grouped[code] = []
-    return grouped
+        code = str(record.get("코드") or "").strip()
+        action = str(record.get("동작") or "").strip()
+        if not code and not action:
+            continue
+        rows.append(brand_store.ManualRow(
+            kunnr=kunnr, zbrand=code, action=action,
+            zbrant=str(record.get("브랜드명") or "").strip(),
+            note=str(record.get("비고") or "").strip(),
+        ))
+    return rows
 
 
-def _save(entry, before, edited: pd.DataFrame) -> None:
-    kunnr = entry.kunnr
-    grouped = group_for_save(kunnr, before, edited.to_dict("records"))
-
-    if not grouped:
-        st.info("바뀐 내용이 없습니다.")
-        return
-
+def _save(entry, edited: pd.DataFrame) -> None:
     cfg = settings()
-
-    # 저장 버튼 한 번에 코드가 여러 개 바뀐다. 사본은 **누르기 1회당 1개**면 된다
-    # — 코드마다 남기면 되돌릴 지점이 아니라 잡음이 쌓인다.
-    keys_path = cfg.masters_dir / brand_store.KEYS_FILE
+    rows = rows_for_save(entry.kunnr, edited.to_dict("records"))
     try:
-        backup.snapshot(keys_path, cfg.storage_dir, keep=cfg.master_backup_keep)
+        brand_store.set_manual(
+            cfg.masters_dir, entry.kunnr, rows,
+            storage_dir=cfg.storage_dir, backup_keep=cfg.master_backup_keep,
+        )
+    except (brand_store.BrandError, MasterError, ValueError) as exc:
+        st.error(f"저장하지 않았습니다 — {exc}", icon="🚫")
+        return
     except OSError as exc:
         st.error(
             f"사본을 남기지 못해 저장을 멈췄습니다 — {exc}\n\n"
-            "되돌릴 수단 없이 덮어쓰지 않습니다. 디스크 여유와 "
-            f"`{cfg.storage_dir}` 쓰기 권한을 확인하세요.",
+            f"디스크 여유와 `{cfg.storage_dir}` 쓰기 권한을 확인하세요.",
             icon="🚫",
         )
         return
 
-    saved = failed = 0
-    for code, rows in grouped.items():
-        try:
-            brand_store.set_keys(cfg.masters_dir, kunnr, code, rows)
-            saved += 1
-        except (brand_store.BrandError, MasterError, ValueError) as exc:
-            # 거부 사유를 그대로 보여준다. 그 코드의 파일 내용은 바뀌지 않았다.
-            st.error(f"`{code}` — {exc}", icon="🚫")
-            failed += 1
-
-    if failed:
-        st.warning(
-            f"{saved}개 코드는 저장했고 {failed}개는 거부됐습니다. "
-            "거부된 코드는 이전 값 그대로입니다.",
-            icon="⚠️",
-        )
-    else:
-        st.success(f"저장했습니다 — 코드 {saved}개.", icon="✅")
-
-    if saved:
-        _autopush(entry)
-
+    st.success(f"저장했습니다 — 보정 {len(rows)}행.", icon="✅")
+    _autopush(entry)
     catalog.clear()
     preview_for.clear()
     st.rerun()
@@ -235,10 +179,10 @@ def _sync_message(kunnr: str, name: str) -> str:
     """`rules:` 커밋은 본문에 근거를 남긴다 (CLAUDE.md §6)."""
     when = datetime.now().strftime("%Y-%m-%d %H:%M")
     return (
-        f"rules: 브랜드 매핑 수정 — {name} ({kunnr})\n\n"
-        f"브랜드 매핑 화면에서 저장했다. 일시: {when}\n"
-        f"영향 범위: 고객 {kunnr} 의 브랜드 판정.\n"
-        "원문 문구 → ZBRAND 대조표(refs/brand_keys.csv)만 바뀐다."
+        f"rules: 브랜드 후보 보정 — {name} ({kunnr})\n\n"
+        f"브랜드 후보 화면에서 저장했다. 일시: {when}\n"
+        f"영향 범위: 고객 {kunnr} 의 ZBRAND 후보.\n"
+        f"보정표({brand_store.MANUAL_FILE})만 바뀐다. SAP 원본은 그대로다."
     )
 
 
@@ -249,7 +193,7 @@ def _autopush(entry) -> None:
         return
     result = gitsync.commit_and_push(
         cfg.project_root,
-        [cfg.masters_dir / brand_store.KEYS_FILE],
+        [cfg.masters_dir / brand_store.MANUAL_FILE],
         _sync_message(entry.kunnr, entry.name),
     )
     if result.ok:
@@ -268,14 +212,14 @@ def _git_panel(entry, *, unlocked: bool) -> None:
     화면이 조용히 되돌리는 것이 가장 나쁘다.
     """
     cfg = settings()
-    keys_path = cfg.masters_dir / brand_store.KEYS_FILE
-    st_ = gitsync.status(cfg.project_root, [keys_path])
+    path = cfg.masters_dir / brand_store.MANUAL_FILE
+    st_ = gitsync.status(cfg.project_root, [path])
 
     if not st_.repo:
         return          # Git 밖에서 돌리는 설치라면 갈릴 일 자체가 없다
 
     if st_.synced:
-        head = "🔄 Git 과 같음 — 이 서버의 매핑이 저장소에 반영돼 있습니다"
+        head = "🔄 Git 과 같음 — 이 서버의 보정이 저장소에 반영돼 있습니다"
     elif st_.dirty:
         head = "🔄 커밋 안 된 변경이 있습니다 — `git pull` 이 막힐 수 있습니다"
     else:
@@ -283,7 +227,7 @@ def _git_panel(entry, *, unlocked: bool) -> None:
 
     with st.expander(head, expanded=not st_.synced):
         st.caption(
-            f"브랜치 `{st_.branch}` · 파일 `{brand_store.KEYS_FILE}`"
+            f"브랜치 `{st_.branch}` · 파일 `{brand_store.MANUAL_FILE}`"
             + ("" if st_.tracked else " · **아직 Git 에 추적되지 않는 파일입니다**")
         )
         if not st_.synced:
@@ -292,13 +236,13 @@ def _git_panel(entry, *, unlocked: bool) -> None:
                 "`git pull` 을 하면 막히고, 막힌 것을 푼다고 `git checkout .` 을 "
                 "누르면 **여기서 채운 값이 사라집니다.** 아래로 맞춰 두세요."
             )
-        backups = backup.history(keys_path, cfg.storage_dir)
+        backups = backup.history(path, cfg.storage_dir)
         if backups:
             st.caption(f"되돌릴 사본 {len(backups)}개 · 최근 `{backups[0].name}`")
 
         if st.button("커밋하고 푸시", key=f"gitpush_{entry.kunnr}", disabled=not unlocked or st_.synced):
             result = gitsync.commit_and_push(
-                cfg.project_root, [keys_path], _sync_message(entry.kunnr, entry.name)
+                cfg.project_root, [path], _sync_message(entry.kunnr, entry.name)
             )
             (st.success if result.ok else st.error)(result.detail)
             if result.ok:

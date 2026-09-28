@@ -77,9 +77,9 @@ def _generic_notice(entry) -> None:
         "**전용 규칙이 없는 거래처입니다.** 공용 설정으로 읽으므로 "
         "브랜드·발주번호·품번·수량까지는 뽑아내지만, **출하처 같은 값은 "
         "비어 있고 검수 화면이 빨갛게 막습니다.** 읽어낸 값을 반드시 확인하세요."
-        + (f"\n\n브랜드 매핑이 `{entry.mapped_count}/{entry.brand_count}` 건입니다 — "
-           "발주서 문구가 아직 등록되지 않았다면 **브랜드 매핑** 탭에서 먼저 채우세요."
-           if entry.mapped_count < entry.brand_count else ""),
+        + (f"\n\n브랜드 후보가 `{entry.brand_count}`개라 자동으로 정하지 않습니다 — "
+           "검수 표의 ZBRAND 드롭다운에서 고르세요."
+           if entry.brand_count > 1 else ""),
         icon="🚧",
     )
 

@@ -29,12 +29,10 @@ from _console import use_utf8  # noqa: E402
 
 use_utf8()   # 윈도우(cp949)에서 파이프로 넘길 때 한글·— 가 죽지 않게
 
-from app.masters import brands as brand_store  # noqa: E402
 from master_sheets import (  # noqa: E402
     ALLOWED,
     COLUMNS,
     READ_ONLY,
-    S_BRAND,
     S_CUSTOMER,
     S_DOC,
     S_FIXED,
@@ -118,36 +116,6 @@ def validate(sheets: dict[str, list[dict]]) -> list[str]:
                     "(masters/_base/sap_defaults.yaml 에 있는 이름만 됩니다)."
                 )
 
-    errors += _validate_brands(sheets.get(S_BRAND, []))
-    return errors
-
-
-def _validate_brands(rows: list[dict]) -> list[str]:
-    """그 고객에 SAP 이 등록한 코드인지 · 같은 문구가 두 코드에 가지 않는지."""
-    errors: list[str] = []
-    grouped: dict[tuple[str, str], list] = {}
-
-    for index, row in enumerate(rows, start=2):
-        kunnr, zbrand = row.get("고객코드", ""), row.get("브랜드코드", "")
-        text, match = row.get("발주서 원문 문구", ""), row.get("비교", "contains")
-        if not (kunnr and zbrand and text):
-            if kunnr or zbrand or text:
-                errors.append(f"[{S_BRAND}] {index}행 — 고객코드·브랜드코드·원문 문구는 모두 필요합니다.")
-            continue
-        if match not in ALLOWED[(S_BRAND, "비교")]:
-            errors.append(f"[{S_BRAND}] {index}행 — 비교 '{match}' 는 허용되지 않습니다.")
-            continue
-        grouped.setdefault((kunnr, zbrand), []).append(
-            brand_store.BrandKey(kunnr=kunnr, zbrand=zbrand, match=match,
-                                 text=text, note=row.get("비고", ""))
-        )
-
-    for (kunnr, zbrand), keys in grouped.items():
-        try:
-            # 다른 코드가 쓰는 문구인지도 여기서 걸린다 — 저장 로직과 같은 검사다.
-            brand_store.validate_keys(MASTERS, kunnr, zbrand, keys)
-        except (brand_store.BrandError, ValueError) as exc:
-            errors.append(f"[{S_BRAND}] 고객 {kunnr} / 코드 {zbrand} — {exc}")
     return errors
 
 
@@ -300,40 +268,7 @@ def apply(changes: dict[str, dict], sheets: dict[str, list[dict]],
         buf.replace(path)
         touched.append(str(path.relative_to(ROOT)))
 
-    touched += _apply_brands(sheets.get(S_BRAND, []))
     return touched
-
-
-def _apply_brands(rows: list[dict]) -> list[str]:
-    """`set_keys` 로 코드 묶음씩 저장한다 — 참조표의 행 순서가 판정 우선순위다."""
-    grouped: dict[tuple[str, str], list] = {}
-    for row in rows:
-        kunnr, zbrand, text = row.get("고객코드"), row.get("브랜드코드"), row.get("발주서 원문 문구")
-        if not (kunnr and zbrand and text):
-            continue
-        grouped.setdefault((kunnr, zbrand), []).append(
-            brand_store.BrandKey(kunnr=kunnr, zbrand=zbrand,
-                                 match=row.get("비교", "contains"),
-                                 text=text, note=row.get("비고", ""))
-        )
-
-    current = brand_store.load_keys(MASTERS)
-    before: dict[tuple[str, str], list] = {}
-    for k in current:
-        before.setdefault((k.kunnr, k.zbrand), []).append(k)
-
-    for pair in set(before) - set(grouped):     # 엑셀에서 통째로 빠진 코드는 지운다
-        grouped[pair] = []
-
-    changed = 0
-    for (kunnr, zbrand), keys in grouped.items():
-        was = [(k.text, k.match, k.note) for k in before.get((kunnr, zbrand), [])]
-        now = [(k.text, k.match, k.note) for k in keys]
-        if was == now:
-            continue                            # 같으면 파일을 다시 쓰지 않는다
-        brand_store.set_keys(MASTERS, kunnr, zbrand, keys)
-        changed += 1
-    return [f"masters/refs/brand_keys.csv ({changed}개 코드)"] if changed else []
 
 
 def main() -> int:
@@ -370,7 +305,7 @@ def main() -> int:
 
     changes, warnings = plan(sheets)
     print(f"거래처 {len(changes)}곳 · 고정값 {len(sheets.get(S_FIXED, []))} · "
-          f"문서매핑 {len(sheets.get(S_DOC, []))} · 브랜드 {len(sheets.get(S_BRAND, []))}")
+          f"문서매핑 {len(sheets.get(S_DOC, []))}")
     for line in warnings:
         print("  ⚠", line)
 

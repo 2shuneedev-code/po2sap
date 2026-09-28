@@ -30,7 +30,7 @@
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
 | 전용 규칙 없는 거래처의 동작 | `masters/profiles/generic.yaml` | 고객코드만 있으면 브랜드까지 나온다 |
-| 브랜드 매핑 (원문 → 코드) | `masters/refs/brand_keys.csv` | YAML에 `entries`로 다시 두지 않는다 |
+| 브랜드 후보 (고객 → 코드) | `masters/refs/brand_master.csv`(SAP) ∪ `brand_master_manual.csv`(보정) | 병합은 `reftable.load()` 한 곳. 발주서 문구로 가리지 않는다 (`csv_choice`) |
 | 거래처 값 (고정값·문서매핑·결정표) | `masters/customers/{code}.yaml` | 엑셀은 **편집 입구**일 뿐 원천이 아니다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |
 | 업무 흐름·화면 정의 | `process.md` §4 | — |
@@ -78,11 +78,7 @@ cd backend && uvicorn app.main:app --reload        # → /api/health
 python scripts/mock_eai_server.py
 python scripts/mock_eai_server.py --fail 500       # 재시도 확인
 
-# 브랜드 매핑 초벌 채우기 — SAP 브랜드명을 발주서 원문 문구로 (사람이 채운 건 안 건드림)
-python scripts/seed_brand_keys.py --dry-run
-python scripts/seed_brand_keys.py
-
-# SAP 브랜드 마스터 재추출본 반영 — 깨지는 매핑이 있으면 쓰지 않는다
+# SAP 브랜드 마스터 재추출본 반영 — 보정(override) 대상이 사라지면 쓰지 않는다
 python scripts/import_brand_master.py <SAP추출.csv> --dry-run   # 무엇이 달라지는지
 python scripts/import_brand_master.py <SAP추출.csv>             # 확인 후 교체
 
@@ -112,7 +108,7 @@ streamlit run po2sap.py --server.address 0.0.0.0 --server.port 8501   # 사내 �
 
 # 화면 실동작 확인 — 스트림릿·모의 EAI 를 띄운 뒤. LLM 호출 없음 = 비용 0
 npm i -D playwright && node ui/e2e/flow.mjs       # 업로드→검수→전송 관통
-node ui/e2e/brandflow.mjs                         # 브랜드 매핑 표
+node ui/e2e/brandflow.mjs                         # 브랜드 후보 표
 
 # 테스트 (CI 2단계) — LLM 호출 없음. 픽스처 재생이라 키 불필요
 pytest
@@ -135,7 +131,7 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
 ├── refs/           참조표 CSV
 │   ├── brand_master.csv   SAP 원본 (읽기 전용 — `import_brand_master.py` 로 교체)
-│   └── brand_keys.csv     발주서 원문 → 브랜드 코드 (사람이 채운다)
+│   └── brand_master_manual.csv  SAP 원본 위의 보정 (add·override·suppress, 화면에서 편집)
 └── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
 
@@ -159,7 +155,7 @@ ui/               ★ 스트림릿 화면 — 사내 서버에서 이것만 띄�
 ├── service.py      backend/app 모듈을 **직접** 부른다 (HTTP 경유 없음)
 ├── views/
 │   ├── convert.py    P/O 변환 — 업로드 → 전송표 → 검수 → 전송
-│   ├── brands.py     브랜드 매핑 — 참조표와 같은 모양의 표 하나
+│   ├── brands.py     브랜드 후보 — 병합된 후보 + 보정 표
 │   ├── picker.py     좌측 거래처 검색·정렬 (✅전용규칙 · 🟡공용설정 · ·브랜드없음)
 │   └── rules.py      규칙 카드 — build_preview 응답을 모양 그대로
 └── e2e/            브라우저 실동작 확인 (flow · brandflow · st)
@@ -227,7 +223,7 @@ storage/          런타임 산출물 — Git 제외
 | 사내 프록시·CA 를 `.env` 의 `HTTPS_PROXY` 로 | `.env` 는 Settings 로만 읽히고 `os.environ` 에 안 나간다 — HTTP 클라이언트가 영영 못 본다. `LLM_PROXY` · `LLM_CA_BUNDLE` 을 쓴다 |
 | `LLM_BASE_URL` 끝에 `/v1` 붙이기 | SDK 가 붙인다. `/v1/v1/messages` 로 나가 404 가 난다 |
 | 새 스크립트에서 `use_utf8()` 생략 | 윈도우 한국어(cp949)에서 출력을 파이프로 넘기면 `—` 에서 죽는다. `test_windows_compat.py` 가 잡는다 |
-| 서버에서 `git checkout .` · `git clean -xdf` | 현업이 몇 달 채운 브랜드 매핑이 사라진다. 되돌릴 사본까지 같이 지워진다. 화면의 Git 동기화로 맞춘다 |
+| 서버에서 `git checkout .` · `git clean -xdf` | 현업이 채운 브랜드 보정이 사라진다. 되돌릴 사본까지 같이 지워진다. 화면의 Git 동기화로 맞춘다 |
 | 화면·엔진이 `pull` · `reset` · `checkout` 실행 | 합칠 것이 있으면 사람이 판단할 일이다. 조용히 되돌리는 것이 가장 나쁘다. `gitsync` 는 `add`·`commit`·`push` 만 한다 |
 | 마스터 저장 경로에서 사본 생략 | 되돌리기 버튼이 없는 값이다. 운영 경로(화면·API)는 `storage_dir` 을 넘겨 덮어쓰기 전 사본을 남긴다 |
 | 테스트에서 `storage_dir` 방치 | 마스터 사본이 **실물 `storage/`** 에 쌓인다. `conftest` 가 `STORAGE_DIR` 을 임시 경로로 박는다 |
@@ -287,14 +283,11 @@ storage/          런타임 산출물 — Git 제외
 >   전송은 열려 있다. 값을 옮기는 게 본업이고, 규칙은 쓰면서 확정해 나간다
 > · 다만 **추측해서 채우지 않는다.** 출하처를 판매처로 넣으면 그럴듯해서
 >   사람이 확인 없이 넘긴다. 빈 칸은 최소한 눈에 띈다
-> · 브랜드 매핑 초벌은 **SAP 브랜드명**으로 기계가 채운다 (`seed_brand_keys.py`,
->   329건/78곳). 사람이 채운 것은 건드리지 않고, 초벌에는 `note` 를 남긴다
+> · 브랜드는 **후보 수로만** 정한다 (`csv_choice`) — 1개면 자동, 여럿이면 검수 표 드롭다운.
+>   `brand_keys.csv`(문구 → 코드)는 2026-09-28 에 폐기했다
 
 **중요**
 
-- **브랜드 매핑 301건이 자동 초벌이다** — SAP 브랜드명을 그대로 원문 문구로 쓴 것이라
-  실제 발주서 표기와 다를 수 있다 (MSC 는 `ACCUPRO BRAND` 가 아니라 `ACCUPRO` 였다).
-  `validate_masters.py` 가 TODO 로 띄운다. 현업 확인이 필요한 목록이다
 - **CBO 업서트 키가 미확정인데 "중복 전송 무해"를 전제하고 있다** (MSC·YGJP는 `POSEX: const ""`라 행 식별자 없음). 키가 없으면 재전송이 덮어쓰기가 아니라 **중복 적재**다. 감사 로그가 `send`/`resend`를 구분하므로 사후 추적은 된다
 - **EAI 응답 본문 규격이 백지다.** 판정을 HTTP 상태 코드에만 걸었다 — "200인데 본문에 실패가 적힌" 경우를 못 잡는다 (계약 §7.1)
 - `prompt.py`·`schema_builder.py`가 LLM에게 날짜 변환을 지시한다 (P1 위반)

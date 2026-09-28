@@ -1,8 +1,8 @@
-"""SAP 브랜드 마스터 재추출본 반영 — 매핑을 깨뜨리면 쓰지 않는다.
+"""SAP 브랜드 마스터 재추출본 반영 — 사람이 얹은 보정을 깨뜨리면 쓰지 않는다.
 
-`brand_master.csv` 는 SAP 원본이라 통째로 갈아끼운다. 그냥 덮어쓰면, 지금
-`brand_keys.csv` 가 매핑해 둔 코드가 새 목록에서 빠졌을 때 그 거래처 발주서가
-브랜드 판정에 실패한다 — 그것도 **다음 발주서가 들어올 때에야** 알게 된다.
+`brand_master.csv` 는 SAP 원본이라 통째로 갈아끼운다. 보정표
+(`brand_master_manual.csv`)는 건드리지 않고 대조만 한다 — override 대상이
+새 추출에서 사라지면 고칠 원본이 없어진 것이라 쓰지 않는다.
 """
 
 from __future__ import annotations
@@ -48,10 +48,12 @@ def current_master(workspace: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def current_keys(workspace: Path) -> list[dict]:
-    path = workspace / "refs" / "brand_keys.csv"
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+def write_manual(workspace: Path, rows: list[dict]) -> None:
+    path = workspace / "refs" / "brand_master_manual.csv"
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["kunnr", "name1", "zbrand", "zbrant", "action", "note"])
+        w.writeheader()
+        w.writerows(rows)
 
 
 def test_table_aliases_are_stripped(tmp_path, workspace):
@@ -73,13 +75,13 @@ def test_missing_column_is_refused(tmp_path, workspace):
     assert "필요한 컬럼이 없습니다" in (result.stdout + result.stderr)
 
 
-def test_refuses_when_a_live_mapping_would_break(tmp_path, workspace):
-    """★ 지금 매핑된 코드가 새 목록에 없으면 쓰지 않는다."""
-    keys = current_keys(workspace)
-    assert keys, "매핑이 없으면 이 테스트가 아무것도 지키지 못한다"
-    victim = keys[0]
-
-    # 그 코드만 빼고 나머지를 그대로 넣는다.
+def test_refuses_when_an_override_target_disappears(tmp_path, workspace):
+    """★ override 대상 코드가 새 추출에 없으면 쓰지 않는다."""
+    victim = current_master(workspace)[0]
+    write_manual(workspace, [{
+        "kunnr": victim["kunnr"], "name1": "", "zbrand": victim["zbrand"],
+        "zbrant": "FIXED", "action": "override", "note": "오탈자",
+    }])
     rows = [
         (r["kunnr"], r["name1"], r["zbrand"], r["zbrant"])
         for r in current_master(workspace)
@@ -92,9 +94,22 @@ def test_refuses_when_a_live_mapping_would_break(tmp_path, workspace):
     result = run(workspace, export, "--yes")
 
     assert result.returncode == 1
-    assert victim["text"] in result.stdout
-    assert (workspace / "refs" / "brand_master.csv").read_bytes() == before, \
-        "거부했으면 파일을 건드리지 않아야 한다"
+    assert "FIXED" in result.stdout
+    assert (workspace / "refs" / "brand_master.csv").read_bytes() == before,         "거부했으면 파일을 건드리지 않아야 한다"
+
+
+def test_add_that_landed_in_sap_is_reported(tmp_path, workspace):
+    write_manual(workspace, [{
+        "kunnr": "100249", "name1": "", "zbrand": "9999",
+        "zbrant": "NEW", "action": "add", "note": "등록 대기",
+    }])
+    rows = [(r["kunnr"], r["name1"], r["zbrand"], r["zbrant"]) for r in current_master(workspace)]
+    rows.append(("100249", "SID TOOL", "9999", "NEW"))
+    export = tmp_path / "sap.csv"
+    write_export(export, rows)
+    result = run(workspace, export, "--dry-run")
+    assert result.returncode == 0
+    assert "정식 등록" in result.stdout
 
 
 def test_dry_run_never_writes(tmp_path, workspace):
@@ -116,4 +131,4 @@ def test_report_counts_what_changes(tmp_path, workspace):
     result = run(workspace, export, "--dry-run")
     assert result.returncode == 0
     assert "고객 추가    1곳" in result.stdout or "고객 추가" in result.stdout
-    assert "깨지는 매핑 없음" in result.stdout
+    assert "보정표와 충돌 없음" in result.stdout

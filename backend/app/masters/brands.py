@@ -1,13 +1,15 @@
-"""브랜드 참조표 읽기·쓰기 — masters/refs/*.csv.
+"""브랜드 참조표 — SAP 원본 + 사람이 얹는 보정(오버레이). SCHEMA §4.5-A.
 
-두 파일의 성격이 다르다 (SCHEMA §1).
+  brand_master.csv         SAP 원본. **이 모듈은 읽기만 한다.** 재추출로 통째 교체된다
+                           (`scripts/import_brand_master.py`).
+  brand_master_manual.csv  사람이 얹는 보정. 재추출 사이의 유일한 보정 창구다.
+                           `add`(후보 추가) · `override`(브랜드명 교체) · `suppress`(후보 제외)
 
-  brand_master.csv  SAP 원본. **이 모듈은 읽기만 한다.** 재추출로 통째 교체된다.
-  brand_keys.csv    발주서 원문 → 코드. 사람이 채우는 값이라 화면에서 편집한다.
+**판정에 쓰이는 것은 언제나 둘을 합친 목록이다.** 병합은 `rules/reftable.py` 한
+곳에만 있고(`merge_brand_overlay`), 여기 `load_master()` 는 그걸 부르는 얇은
+래퍼다 — 규칙엔진과 화면이 서로 다른 후보를 보는 일이 없게.
 
-쓰기는 brand_keys.csv 에만, 그것도 (거래처, 코드) 한 묶음씩 일어난다.
-쓰기 전에 **그 코드가 SAP 에 등록돼 있는지 확인한다** — 등록되지 않은 코드를
-저장하면 나중에 SAP 이 오더를 거부하고, 원인을 찾기 어려워진다.
+쓰기는 오버레이에만, 그것도 고객 한 곳의 행 묶음 단위로 일어난다.
 """
 
 from __future__ import annotations
@@ -18,12 +20,13 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..rules import reftable
 from . import backup
 
-MASTER_FILE = "refs/brand_master.csv"
-KEYS_FILE = "refs/brand_keys.csv"
-KEY_COLUMNS = ["kunnr", "zbrand", "match", "text", "note"]
-MATCH_MODES = ("contains", "equals")
+MASTER_FILE = reftable.BRAND_MASTER
+MANUAL_FILE = reftable.BRAND_MANUAL
+MANUAL_COLUMNS = ["kunnr", "name1", "zbrand", "zbrant", "action", "note"]
+ACTIONS = ("add", "override", "suppress")
 
 
 class BrandError(ValueError):
@@ -36,144 +39,151 @@ class Brand:
     zbrand: str
     name: str
     customer_name: str
+    source: str = "sap"            # sap | add | override — 화면이 출처를 보여준다
 
 
 @dataclass(frozen=True)
-class BrandKey:
+class ManualRow:
     kunnr: str
     zbrand: str
-    match: str
-    text: str
-    note: str = ""
+    zbrant: str
+    action: str
+    note: str
+    name1: str = ""
 
 
 def _read(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
-    with path.open(encoding="utf-8", newline="") as f:
+    with path.open(encoding="utf-8-sig", newline="") as f:
         return [{k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)]
 
 
+def _to_brand(r: dict[str, str]) -> Brand:
+    return Brand(
+        kunnr=r["kunnr"], zbrand=r["zbrand"],
+        name=r.get("zbrant", ""), customer_name=r.get("name1", ""),
+        source=r.get(reftable.SOURCE_COLUMN) or "sap",
+    )
+
+
+def load_sap(masters_dir: Path) -> list[Brand]:
+    """SAP 원본만. 오버레이 검증(override/suppress 대상 확인)에 쓴다."""
+    return [_to_brand(r) for r in _read(masters_dir / MASTER_FILE) if r.get("kunnr")]
+
+
 def load_master(masters_dir: Path) -> list[Brand]:
-    """SAP 브랜드 마스터 전량. 순서는 파일 순서를 따른다."""
+    """판정에 쓰이는 후보 전량 = SAP ∪ 오버레이. 순서는 병합 결과를 따른다."""
     return [
-        Brand(
-            kunnr=r["kunnr"], zbrand=r["zbrand"],
-            name=r.get("zbrant", ""), customer_name=r.get("name1", ""),
-        )
-        for r in _read(masters_dir / MASTER_FILE)
+        _to_brand(r)
+        for r in reftable.load(masters_dir, MASTER_FILE, optional=True)
         if r.get("kunnr")
     ]
 
 
-def load_keys(masters_dir: Path) -> list[BrandKey]:
+def load_manual(masters_dir: Path) -> list[ManualRow]:
     return [
-        BrandKey(
-            kunnr=r["kunnr"], zbrand=r["zbrand"],
-            match=r.get("match") or "contains",
-            text=r.get("text", ""), note=r.get("note", ""),
+        ManualRow(
+            kunnr=r["kunnr"], zbrand=r.get("zbrand", ""), zbrant=r.get("zbrant", ""),
+            action=r.get("action", ""), note=r.get("note", ""), name1=r.get("name1", ""),
         )
-        for r in _read(masters_dir / KEYS_FILE)
+        for r in _read(masters_dir / MANUAL_FILE)
         if r.get("kunnr")
     ]
 
 
 def registered_codes(masters_dir: Path, kunnr: str) -> set[str]:
+    """이 고객의 판정 후보 코드 (병합 후)."""
     return {b.zbrand for b in load_master(masters_dir) if b.kunnr == kunnr}
 
 
-def validate_keys(masters_dir: Path, kunnr: str, zbrand: str, keys: list[BrandKey]) -> None:
-    """저장 전 검사. 통과하지 못하면 파일을 건드리지 않는다."""
-    known = registered_codes(masters_dir, kunnr)
-    if not known:
-        raise BrandError(f"고객 {kunnr} 이 브랜드 마스터에 없습니다.")
-    if zbrand not in known:
-        raise BrandError(
-            f"브랜드 코드 {zbrand} 는 고객 {kunnr} 에 등록돼 있지 않습니다. "
-            "SAP 이 거부할 코드라 저장하지 않습니다."
-        )
+def validate_manual(masters_dir: Path, kunnr: str, rows: list[ManualRow]) -> None:
+    """저장 전 검사 (SCHEMA §4.5-A "저장 전 검증"). 통과 못 하면 파일을 건드리지 않는다."""
+    sap = {b.zbrand: b for b in load_sap(masters_dir) if b.kunnr == kunnr}
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        where = f"코드 {row.zbrand or '(빈값)'}"
+        if not row.zbrand:
+            raise BrandError("브랜드 코드가 비어 있습니다.")
+        if row.action not in ACTIONS:
+            raise BrandError(f"{where} — 동작은 {' · '.join(ACTIONS)} 중 하나여야 합니다: {row.action!r}")
+        if not row.note.strip():
+            raise BrandError(f"{where} — 비고(왜 고쳤는지)는 필수입니다.")
+        if row.action in ("add", "override") and not row.zbrant.strip():
+            raise BrandError(f"{where} — 브랜드명이 비어 있습니다.")
+        pair = (row.zbrand, row.action)
+        if pair in seen:
+            raise BrandError(f"{where} — 같은 동작({row.action})이 두 번 있습니다.")
+        seen.add(pair)
 
-    seen: set[str] = set()
-    for key in keys:
-        if not key.text.strip():
-            raise BrandError("원문 키가 비어 있습니다.")
-        if key.match not in MATCH_MODES:
+        if row.action in ("override", "suppress") and row.zbrand not in sap:
             raise BrandError(
-                f"판정 방식이 올바르지 않습니다: {key.match} "
-                f"({' 또는 '.join(MATCH_MODES)})"
+                f"{where} — SAP 원본에 없는 코드는 {row.action} 할 수 없습니다. "
+                "새 후보라면 add 를 쓰세요."
             )
-        folded = key.text.strip().casefold()
-        if folded in seen:
-            raise BrandError(f"같은 원문 키가 두 번 있습니다: {key.text}")
-        seen.add(folded)
-
-    # 다른 코드가 이미 쓰고 있는 문구면 어느 쪽으로 판정될지 알 수 없다.
-    for other in load_keys(masters_dir):
-        if other.kunnr != kunnr or other.zbrand == zbrand:
-            continue
-        if other.text.strip().casefold() in seen:
+        if row.action == "add" and row.zbrand in sap:
             raise BrandError(
-                f"원문 키 {other.text!r} 는 이미 브랜드 코드 {other.zbrand} 가 쓰고 있습니다. "
-                "같은 문구를 두 코드에 둘 수 없습니다."
+                f"{where} — 이미 SAP 에 등록된 코드입니다. 이름을 고치려면 override 를 쓰세요."
             )
 
 
-def set_keys(
+def set_manual(
     masters_dir: Path,
     kunnr: str,
-    zbrand: str,
-    keys: list[BrandKey],
+    rows: list[ManualRow],
     *,
     storage_dir: Path | None = None,
     backup_keep: int = 30,
-) -> list[BrandKey]:
-    """(거래처, 코드) 한 묶음을 통째로 교체한다. 빈 목록이면 매핑을 지운다.
+) -> list[ManualRow]:
+    """고객 한 곳의 오버레이 행을 통째로 교체한다. 빈 목록이면 그 고객 보정을 지운다.
 
-    같은 묶음이 있던 자리를 지켜 파일 순서를 보존한다 — 행 순서가 곧
-    판정 우선순위이므로(SCHEMA §4.5) 저장할 때마다 순서가 흔들리면 안 된다.
-
-    `storage_dir` 을 주면 **덮어쓰기 전에 사본을 남긴다**
-    (`storage/master_backups/`). 운영 경로(화면·API)는 반드시 넘긴다 —
-    현업이 몇 달 채운 값이라 되돌릴 수단이 있어야 한다. 테스트처럼 사본이
-    필요 없는 자리에서만 생략한다.
+    그 고객 블록이 있던 자리를 지킨다 — 파일 순서가 흔들리면 diff 가 읽히지 않는다.
+    `storage_dir` 을 주면 **덮어쓰기 전에 사본을 남긴다.** 운영 경로(화면·API)는
+    반드시 넘긴다.
     """
-    validate_keys(masters_dir, kunnr, zbrand, keys)
+    if not any(b.kunnr == kunnr for b in load_sap(masters_dir)) and any(
+        r.action != "add" for r in rows
+    ):
+        raise BrandError(f"고객 {kunnr} 이 SAP 브랜드 마스터에 없습니다. add 만 쓸 수 있습니다.")
+    validate_manual(masters_dir, kunnr, rows)
 
-    rows = load_keys(masters_dir)
-    target = [i for i, r in enumerate(rows) if r.kunnr == kunnr and r.zbrand == zbrand]
+    customer_name = next(
+        (b.customer_name for b in load_sap(masters_dir) if b.kunnr == kunnr and b.customer_name),
+        "",
+    )
     replacement = [
-        BrandKey(kunnr=kunnr, zbrand=zbrand, match=k.match, text=k.text.strip(), note=k.note)
-        for k in keys
+        ManualRow(
+            kunnr=kunnr, zbrand=r.zbrand.strip(), zbrant=r.zbrant.strip(),
+            action=r.action, note=r.note.strip(), name1=r.name1 or customer_name,
+        )
+        for r in rows
     ]
 
-    if target:
-        at = target[0]
-        rows = [r for i, r in enumerate(rows) if i not in set(target)]
-        rows[at:at] = replacement
-    else:
-        same_customer = [i for i, r in enumerate(rows) if r.kunnr == kunnr]
-        at = same_customer[-1] + 1 if same_customer else len(rows)
-        rows[at:at] = replacement
+    current = load_manual(masters_dir)
+    target = [i for i, r in enumerate(current) if r.kunnr == kunnr]
+    kept = [r for r in current if r.kunnr != kunnr]
+    at = target[0] if target else len(kept)
+    kept[at:at] = replacement
 
-    path = masters_dir / KEYS_FILE
+    path = masters_dir / MANUAL_FILE
     if storage_dir is not None:
         backup.snapshot(path, storage_dir, keep=backup_keep)
-    _write(path, rows)
+    _write(path, kept)
     return replacement
 
 
-def _write(path: Path, rows: list[BrandKey]) -> None:
+def _write(path: Path, rows: list[ManualRow]) -> None:
     """임시 파일에 쓰고 원자적으로 바꾼다 — 쓰다 죽어도 반쪽 파일이 남지 않는다."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".brand_keys.", suffix=".tmp")
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".brand_manual.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=KEY_COLUMNS)
+            writer = csv.DictWriter(f, fieldnames=MANUAL_COLUMNS)
             writer.writeheader()
             for r in rows:
                 writer.writerow({
-                    "kunnr": r.kunnr, "zbrand": r.zbrand,
-                    "match": r.match, "text": r.text, "note": r.note,
+                    "kunnr": r.kunnr, "name1": r.name1, "zbrand": r.zbrand,
+                    "zbrant": r.zbrant, "action": r.action, "note": r.note,
                 })
         os.replace(tmp, path)
     except BaseException:

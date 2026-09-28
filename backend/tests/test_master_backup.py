@@ -1,6 +1,6 @@
 """덮어쓰기 전 사본 — 되돌릴 수단이 있는가.
 
-브랜드 매핑은 현업이 몇 달에 걸쳐 채우고 되돌리기 버튼이 없다. Git 동기화는
+브랜드 후보 보정은 현업이 채우고 되돌리기 버튼이 없다. Git 동기화는
 네트워크·계정에 기대지만 이 사본은 아무것도 필요 없이 항상 돈다. 그래서
 여기가 마지막 안전망이고, 조용히 안 도는 일이 없어야 한다.
 """
@@ -15,18 +15,18 @@ from app.masters import brands as brand_store
 
 
 def _keys_file(masters: Path) -> Path:
-    return masters / brand_store.KEYS_FILE
+    return masters / brand_store.MANUAL_FILE
 
 
 def _seed(masters: Path, rows: list[tuple[str, str, str]]) -> None:
     path = _keys_file(masters)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=brand_store.KEY_COLUMNS)
+        w = csv.DictWriter(f, fieldnames=brand_store.MANUAL_COLUMNS)
         w.writeheader()
-        for kunnr, zbrand, text in rows:
-            w.writerow({"kunnr": kunnr, "zbrand": zbrand, "match": "contains",
-                        "text": text, "note": ""})
+        for kunnr, zbrand, name in rows:
+            w.writerow({"kunnr": kunnr, "name1": "", "zbrand": zbrand, "zbrant": name,
+                        "action": "override", "note": "n"})
 
 
 def test_snapshot_keeps_the_previous_content(tmp_path: Path) -> None:
@@ -42,7 +42,7 @@ def test_snapshot_keeps_the_previous_content(tmp_path: Path) -> None:
 
 def test_first_save_has_nothing_to_back_up(tmp_path: Path) -> None:
     """파일이 아직 없으면 남길 것이 없다 — 오류가 아니다."""
-    assert backup.snapshot(tmp_path / "masters" / brand_store.KEYS_FILE,
+    assert backup.snapshot(tmp_path / "masters" / brand_store.MANUAL_FILE,
                            tmp_path / "storage") is None
 
 
@@ -79,19 +79,20 @@ def test_keep_zero_never_prunes(tmp_path: Path) -> None:
     assert len(backup.history(_keys_file(masters), storage)) == 4
 
 
-def test_set_keys_backs_up_before_overwriting(tmp_path: Path) -> None:
+def test_set_manual_backs_up_before_overwriting(tmp_path: Path) -> None:
     """**운영 경로의 핵심.** storage_dir 을 주면 덮어쓰기 전에 사본이 남는다."""
     masters, storage = tmp_path / "masters", tmp_path / "storage"
     (masters / "refs").mkdir(parents=True)
-    # value_check 를 지나려면 그 코드가 SAP 마스터에 있어야 한다
+    # override 하려면 그 코드가 SAP 마스터에 있어야 한다
     (masters / brand_store.MASTER_FILE).write_text(
         "kunnr,zbrand,zbrant,name1\n100249,B1,브랜드1,고객\n", encoding="utf-8",
     )
     _seed(masters, [("100249", "B1", "예전문구")])
 
-    brand_store.set_keys(
-        masters, "100249", "B1",
-        [brand_store.BrandKey(kunnr="100249", zbrand="B1", match="contains", text="새문구")],
+    brand_store.set_manual(
+        masters, "100249",
+        [brand_store.ManualRow(kunnr="100249", zbrand="B1", zbrant="새문구",
+                               action="override", note="n")],
         storage_dir=storage,
     )
 
@@ -101,7 +102,7 @@ def test_set_keys_backs_up_before_overwriting(tmp_path: Path) -> None:
     assert "예전문구" in saved[0].read_text(encoding="utf-8")
 
 
-def test_set_keys_without_storage_dir_writes_but_keeps_no_copy(tmp_path: Path) -> None:
+def test_set_manual_without_storage_dir_writes_but_keeps_no_copy(tmp_path: Path) -> None:
     """사본은 선택이다 — 테스트·스크립트 경로까지 storage 를 요구하지 않는다."""
     masters, storage = tmp_path / "masters", tmp_path / "storage"
     (masters / "refs").mkdir(parents=True)
@@ -110,9 +111,10 @@ def test_set_keys_without_storage_dir_writes_but_keeps_no_copy(tmp_path: Path) -
     )
     _seed(masters, [("100249", "B1", "예전문구")])
 
-    brand_store.set_keys(
-        masters, "100249", "B1",
-        [brand_store.BrandKey(kunnr="100249", zbrand="B1", match="contains", text="새문구")],
+    brand_store.set_manual(
+        masters, "100249",
+        [brand_store.ManualRow(kunnr="100249", zbrand="B1", zbrant="새문구",
+                               action="override", note="n")],
     )
     assert backup.history(_keys_file(masters), storage) == []
 

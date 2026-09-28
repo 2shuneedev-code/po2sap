@@ -6,9 +6,12 @@
     python scripts/import_brand_master.py <SAP추출.csv> --yes      # 확인 없이
 
 이 파일은 **SAP 원본이라 읽기 전용**이다. 사람이 손으로 고치지 않고 재추출본으로
-통째로 갈아끼운다. 다만 그냥 덮어쓰면 안 된다 — 지금 `brand_keys.csv` 가
-매핑해 둔 코드가 새 목록에서 빠지면, 그 거래처 발주서는 브랜드 판정에 실패한다.
-**깨지는 매핑이 하나라도 있으면 쓰지 않는다.**
+통째로 갈아끼운다. 사람이 얹은 보정(`brand_master_manual.csv`)은 **건드리지
+않는다** — 대신 새 추출과 대조해 보고한다 (SCHEMA §4.5-A):
+
+  override  대상 코드가 새 추출에 없음  → 고칠 원본이 사라졌다 (★ 막는다)
+  suppress  대상 코드가 새 추출에 없음  → 보정 행을 지워도 된다 (안내)
+  add       같은 코드가 새 추출에 등록됨 → SAP 정식 등록, 보정 행을 지워도 된다 (안내)
 
 SAP 추출기가 컬럼 이름을 `A~KUNNR` 처럼 테이블 별칭과 함께 뱉는다. 별칭은
 추출 조건에 따라 달라지므로 접두를 떼고 이름만 본다.
@@ -76,15 +79,15 @@ def read_current() -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
-def read_keys() -> list[dict[str, str]]:
-    path = MASTERS / "refs" / "brand_keys.csv"
+def read_manual() -> list[dict[str, str]]:
+    path = MASTERS / "refs" / "brand_master_manual.csv"
     if not path.exists():
         return []
     with path.open(encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
 
 
-def report(new: list[dict], current: list[dict], keys: list[dict]) -> list[str]:
+def report(new: list[dict], current: list[dict], manual: list[dict]) -> list[str]:
     """무엇이 달라지는지, 그래서 무엇이 깨지는지."""
     new_pairs = {(r["kunnr"], r["zbrand"]) for r in new}
     cur_pairs = {(r["kunnr"], r["zbrand"]) for r in current}
@@ -105,16 +108,24 @@ def report(new: list[dict], current: list[dict], keys: list[dict]) -> list[str]:
     if renamed:
         print(f"  브랜드명 변경 {renamed}건")
 
-    broken = [k for k in keys if (k.get("kunnr"), k.get("zbrand")) not in new_pairs]
+    def pair(m: dict) -> tuple[str, str]:
+        return (m.get("kunnr", ""), m.get("zbrand", ""))
+
+    broken = [m for m in manual if m.get("action") == "override" and pair(m) not in new_pairs]
+    stale = [m for m in manual if m.get("action") == "suppress" and pair(m) not in new_pairs]
+    landed = [m for m in manual if m.get("action") == "add" and pair(m) in new_pairs]
+
     if broken:
-        print(f"\n★ 지금 매핑된 {len(broken)}건이 새 목록에 없습니다 — 그 발주서는 브랜드 판정에 실패합니다:")
-        for k in broken[:20]:
-            print(f"    고객 {k.get('kunnr')} 코드 {k.get('zbrand')} — {k.get('text')!r}")
-        if len(broken) > 20:
-            print(f"    … 외 {len(broken) - 20}건")
-    else:
-        print(f"\n  깨지는 매핑 없음 (현재 {len(keys)}건 전부 유효)")
-    return [f"{k.get('kunnr')}/{k.get('zbrand')}" for k in broken]
+        print(f"\n★ 이름 보정(override) {len(broken)}건의 대상이 새 추출에 없습니다 — 고칠 원본이 사라졌습니다:")
+        for m in broken[:20]:
+            print(f"    고객 {m.get('kunnr')} 코드 {m.get('zbrand')} — {m.get('zbrant')!r}")
+    for m in stale:
+        print(f"  안내: suppress {m.get('kunnr')}/{m.get('zbrand')} — 이미 빠졌으니 보정 행을 지워도 됩니다")
+    for m in landed:
+        print(f"  안내: add {m.get('kunnr')}/{m.get('zbrand')} — SAP 에 정식 등록됐습니다. 보정 행을 지워도 됩니다")
+    if not (broken or stale or landed):
+        print(f"\n  보정표와 충돌 없음 (보정 {len(manual)}건)")
+    return [f"{m.get('kunnr')}/{m.get('zbrand')}" for m in broken]
 
 
 def write(rows: list[dict[str, str]]) -> None:
@@ -136,8 +147,8 @@ def main() -> int:
     parser.add_argument("--yes", action="store_true", help="확인 없이 반영")
     parser.add_argument(
         "--force", action="store_true",
-        help="매핑이 깨져도 반영한다. 깨진 거래처는 브랜드 판정에 실패하므로 "
-             "brand_keys.csv 를 먼저 고치는 편이 낫다",
+        help="이름 보정(override) 대상이 사라져도 반영한다. "
+             "brand_master_manual.csv 를 먼저 정리하는 편이 낫다",
     )
     args = parser.parse_args()
 
@@ -156,10 +167,10 @@ def main() -> int:
         print("읽어낸 행이 없습니다. 컬럼 이름을 확인하세요.")
         return 1
 
-    broken = report(new, read_current(), read_keys())
+    broken = report(new, read_current(), read_manual())
 
     if broken and not args.force:
-        print("\n반영하지 않았습니다. brand_keys.csv 에서 위 매핑을 먼저 정리하거나, "
+        print("\n반영하지 않았습니다. brand_master_manual.csv 에서 위 보정을 먼저 정리하거나, "
               "정말 괜찮다면 --force 를 쓰세요.")
         return 1
     if args.dry_run:

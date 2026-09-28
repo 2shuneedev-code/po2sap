@@ -1,4 +1,4 @@
-"""브랜드 매핑 콘솔 API — contracts/api-contract.md §10.
+"""브랜드 후보 콘솔 API — contracts/api-contract.md §10.
 
 쓰기가 있는 첫 엔드포인트다. 테스트는 **masters 사본**을 향하게 해서
 저장소의 실제 참조표를 건드리지 않는다.
@@ -40,10 +40,14 @@ def master_rows(workspace):
         return list(csv.DictReader(f))
 
 
-def keys_rows(workspace):
-    path = workspace / "refs" / "brand_keys.csv"
+def manual_rows(workspace):
+    path = workspace / "refs" / "brand_master_manual.csv"
     with path.open(encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
+
+
+def msc_codes(workspace):
+    return [r["zbrand"] for r in master_rows(workspace) if r["kunnr"] == MSC]
 
 
 # ── 목록 ───────────────────────────────────────────────────────────────
@@ -88,41 +92,15 @@ def test_pagination(client):
 def test_counts_are_strings(client):
     """계약 §0 — 숫자도 문자열로 내보낸다 (앞자리 0 보존)."""
     row = client.get("/api/brands/customers", params={"q": "SID TOOL"}).json()["customers"][0]
-    assert isinstance(row["brand_count"], str) and isinstance(row["mapped_count"], str)
+    assert isinstance(row["brand_count"], str) and isinstance(row["manual_count"], str)
 
 
 # ── 상세 ───────────────────────────────────────────────────────────────
-def test_detail_joins_sap_codes_with_human_keys(client, workspace):
+def test_detail_lists_sap_candidates_with_source(client, workspace):
     body = client.get(f"/api/brands/customers/{MSC}").json()
-    assert body["code"] == "MSC" and body["configured"] == "true"
-
-    mapped = {b["zbrand"]: [k["text"] for k in b["keys"]] for b in body["brands"] if b["keys"]}
-
-    # 기대치를 참조표에서 끌어온다. 초벌 시드(seed_brand_keys.py)로 매핑이
-    # 늘어나도 죽지 않아야 한다 — 검사하려는 건 **코드와 문구가 이어졌는가**다.
-    expected = {}
-    for row in keys_rows(workspace):
-        if row["kunnr"] == MSC:
-            expected.setdefault(row["zbrand"], []).append(row["text"])
-    assert mapped == expected
-
-    # 사람이 채운 것은 그대로 남아 있어야 한다
-    assert mapped["038"] == ["HERTEL"]
-
-
-def test_unmapped_brands_are_still_listed(client):
-    """매핑이 없는 코드도 목록에 나와야 현업이 무엇을 채울지 안다.
-
-    데이터에 미매핑이 남아 있기를 기대하지 않는다 — 초벌 시드가 다 채우면
-    그건 정상이다. 하나를 비워 놓고 그게 보이는지만 본다.
-    """
-    r = client.put(f"/api/brands/customers/{MSC}/038", json={"keys": []})
-    assert r.status_code == 200
-
-    body = client.get(f"/api/brands/customers/{MSC}").json()
-    empty = [b for b in body["brands"] if b["zbrand"] == "038"]
-    assert empty and empty[0]["status"] == "unmapped"
-    assert empty[0]["keys"] == []
+    assert [b["zbrand"] for b in body["brands"]] == msc_codes(workspace)
+    assert {b["source"] for b in body["brands"]} == {"sap"}
+    assert body["manual"] == []
 
 
 def test_detail_includes_logic_for_configured_customer(client):
@@ -156,61 +134,55 @@ def test_unknown_customer_is_404(client):
     assert r.json()["error"]["code"] == "NOT_FOUND"
 
 
-# ── 저장 ───────────────────────────────────────────────────────────────
-def test_saves_keys_and_persists(client, workspace):
-    r = client.put(f"/api/brands/customers/{MSC}/501",
-                   json={"keys": [{"text": "UNBRANDED", "match": "contains"}]})
-    assert r.status_code == 200 and r.json()["status"] == "mapped"
-
-    saved = [x for x in keys_rows(workspace) if x["kunnr"] == MSC and x["zbrand"] == "501"]
-    assert [x["text"] for x in saved] == ["UNBRANDED"]
-    again = client.get(f"/api/brands/customers/{MSC}").json()
-    assert any(b["zbrand"] == "501" and b["keys"] for b in again["brands"])
+# ── 저장 (보정) ─────────────────────────────────────────────────────────
+def put(client, rows):
+    return client.put(f"/api/brands/customers/{MSC}/manual", json={"rows": rows})
 
 
-def test_empty_list_clears_the_mapping(client, workspace):
-    client.put(f"/api/brands/customers/{MSC}/038", json={"keys": []})
-    assert not [x for x in keys_rows(workspace) if x["kunnr"] == MSC and x["zbrand"] == "038"]
+def test_add_override_suppress_change_the_candidates(client, workspace):
+    first, second = msc_codes(workspace)[:2]
+    r = put(client, [
+        {"zbrand": "9999", "zbrant": "NEW BRAND", "action": "add", "note": "SAP 등록 대기"},
+        {"zbrand": first, "zbrant": "FIXED NAME", "action": "override", "note": "오탈자"},
+        {"zbrand": second, "action": "suppress", "note": "단종"},
+    ])
+    assert r.status_code == 200, r.text
+    assert len(manual_rows(workspace)) == 3
+
+    brands = {b["zbrand"]: b for b in client.get(f"/api/brands/customers/{MSC}").json()["brands"]}
+    assert brands["9999"]["source"] == "add"
+    assert brands[first]["name"] == "FIXED NAME" and brands[first]["source"] == "override"
+    assert second not in brands
 
 
-def test_rejects_code_not_registered_in_sap(client, workspace):
-    before = keys_rows(workspace)
-    r = client.put(f"/api/brands/customers/{MSC}/99999", json={"keys": [{"text": "X"}]})
+def test_empty_rows_clear_the_customer_overlay(client, workspace):
+    put(client, [{"zbrand": "9999", "zbrant": "X", "action": "add", "note": "n"}])
+    assert put(client, []).status_code == 200
+    assert manual_rows(workspace) == []
+
+
+@pytest.mark.parametrize("row, why", [
+    ({"zbrand": "99999", "zbrant": "X", "action": "override", "note": "n"}, "SAP 원본에 없는"),
+    ({"zbrand": "99999", "action": "suppress", "note": "n"}, "SAP 원본에 없는"),
+    ({"zbrand": "__FIRST__", "zbrant": "X", "action": "add", "note": "n"}, "이미 SAP 에"),
+    ({"zbrand": "9999", "zbrant": "", "action": "add", "note": "n"}, "브랜드명"),
+])
+def test_rejected_rows_leave_the_file_alone(client, workspace, row, why):
+    row = {**row, "zbrand": msc_codes(workspace)[0] if row["zbrand"] == "__FIRST__" else row["zbrand"]}
+    before = manual_rows(workspace)
+    r = put(client, [row])
     assert r.status_code == 400
-    assert "등록돼 있지 않" in r.json()["error"]["message"]
-    assert keys_rows(workspace) == before, "거부했으면 파일을 건드리지 않아야 한다"
+    assert why in r.json()["error"]["message"]
+    assert manual_rows(workspace) == before
 
 
-def test_rejects_text_already_used_by_another_code(client):
-    r = client.put(f"/api/brands/customers/{MSC}/205", json={"keys": [{"text": "HERTEL"}]})
-    assert r.status_code == 400
-    assert "이미 브랜드 코드 038" in r.json()["error"]["message"]
-
-
-def test_rejects_duplicate_text_within_one_request(client):
-    r = client.put(f"/api/brands/customers/{MSC}/038",
-                   json={"keys": [{"text": "A"}, {"text": "a"}]})
-    assert r.status_code == 400 and "두 번" in r.json()["error"]["message"]
-
-
-def test_rejects_bad_match_mode(client):
-    r = client.put(f"/api/brands/customers/{MSC}/038",
-                   json={"keys": [{"text": "A", "match": "fuzzy"}]})
-    assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_INPUT"
-
-
-def test_row_order_is_preserved(client, workspace):
-    """행 순서가 곧 판정 우선순위다 (SCHEMA §4.5) — 저장이 순서를 흔들면 안 된다."""
-    before = [(x["kunnr"], x["zbrand"]) for x in keys_rows(workspace)]
-    client.put(f"/api/brands/customers/{MSC}/127",
-               json={"keys": [{"text": "INTERSTATE"}, {"text": "INTRSTATE"}]})
-    after = [(x["kunnr"], x["zbrand"]) for x in keys_rows(workspace)]
-    assert after.index((MSC, "127")) == before.index((MSC, "127"))
-    assert after.count((MSC, "127")) == 2
+def test_note_and_action_are_required(client):
+    assert put(client, [{"zbrand": "9999", "zbrant": "X", "action": "add", "note": ""}]).status_code == 422
+    assert put(client, [{"zbrand": "9999", "zbrant": "X", "action": "rename", "note": "n"}]).status_code == 422
 
 
 def test_saved_file_still_passes_the_validator(client, workspace, validate_masters):
     """화면에서 저장한 결과가 CI 를 깨면 안 된다."""
-    client.put(f"/api/brands/customers/{MSC}/501", json={"keys": [{"text": "UNBRANDED"}]})
+    put(client, [{"zbrand": "9999", "zbrant": "NEW", "action": "add", "note": "n"}])
     base = validate_masters.load_base_fields(workspace)
     assert validate_masters.validate_customer("msc", base, workspace).errors == []

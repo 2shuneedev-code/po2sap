@@ -83,7 +83,8 @@ def _entry_button(row: CatalogEntry, state_key: str, *, active: bool) -> None:
         type="primary" if active else "tertiary",
         help=f"{row.kunnr}"
              + (f" · {row.code}" if row.code else " · 전용 규칙 없음 (공용 설정으로 읽음)")
-             + f" · 브랜드 {row.mapped_count}/{row.brand_count}",
+             + f" · 브랜드 후보 {row.brand_count}"
+             + (f" (보정 {row.manual_count})" if row.manual_count else ""),
         on_click=lambda k=row.kunnr: st.session_state.__setitem__(state_key, k),
     )
 
@@ -97,5 +98,6 @@ def customer_header(entry: CatalogEntry) -> None:
         bits.append(f"SAP 명 {entry.sap_name}")
     if entry.file_types:
         bits.append("/".join(t.upper() for t in entry.file_types))
-    bits.append(f"브랜드 매핑 {entry.mapped_count}/{entry.brand_count}")
+    bits.append(f"브랜드 후보 {entry.brand_count}"
+                + (f" (보정 {entry.manual_count})" if entry.manual_count else ""))
     st.caption(" · ".join(bits))

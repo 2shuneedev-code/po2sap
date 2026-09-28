@@ -38,7 +38,6 @@ from master_sheets import (  # noqa: E402
     COLUMNS,
     GUIDE,
     READ_ONLY,
-    S_BRAND,
     S_CUSTOMER,
     S_DOC,
     S_EXPR,
@@ -79,10 +78,6 @@ def read_csv(rel: str) -> list[dict]:
 def collect() -> dict[str, list[list]]:
     """시트별 행 목록을 만든다."""
     rows: dict[str, list[list]] = {name: [] for name in COLUMNS}
-    brand_names = {
-        (r.get("kunnr", ""), r.get("zbrand", "")): r.get("zbrant", "")
-        for r in read_csv("refs/brand_master.csv")
-    }
 
     for path in customer_files():
         d = load(path)
@@ -141,12 +136,6 @@ def collect() -> dict[str, list[list]]:
         if hints:
             rows[S_HINTS].append([code, hints])
 
-    for key in read_csv("refs/brand_keys.csv"):
-        kunnr, zbrand = key.get("kunnr", ""), key.get("zbrand", "")
-        rows[S_BRAND].append([
-            kunnr, zbrand, brand_names.get((kunnr, zbrand), ""),
-            key.get("text", ""), key.get("match", "contains"), key.get("note", ""),
-        ])
 
     return rows
 

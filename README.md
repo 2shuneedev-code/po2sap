@@ -223,9 +223,9 @@ python scripts\parse_one.py <발주서> --customer MSC --rows
 
 ---
 
-## 브랜드 매핑 편집 잠금
+## 브랜드 후보 편집 잠금
 
-브랜드 매핑 화면의 **저장은 서버 디스크의 `masters/refs/brand_keys.csv` 를 고친다.**
+브랜드 후보 화면의 **저장은 서버 디스크의 `masters/refs/brand_master_manual.csv` 를 고친다.**
 그 서버에 접속한 모든 사람의 판정이 그 자리에서 함께 바뀐다. 그래서 암호로 잠근다.
 
 ```ini
@@ -258,15 +258,15 @@ MASTER_EDIT_PASSWORD=사내에서-정한-암호
 
 ```powershell
 dir storage\master_backups          # 되돌릴 지점 목록
-copy storage\master_backups\brand_keys.20260921-143022-418233.csv ^
-     masters\refs\brand_keys.csv    # 되돌리기
+copy storage\master_backups\brand_master_manual.20260921-143022-418233.csv ^
+     masters\refs\brand_master_manual.csv    # 되돌리기
 ```
 
 > 서버에서 `git clean -xdf` 를 쓰지 않는다 — 이 사본까지 지운다.
 
 **② 화면의 Git 동기화 패널**
 
-브랜드 매핑 화면 아래에 지금 저장소와 같은지 그대로 뜬다. 갈려 있으면 **커밋하고
+브랜드 후보 화면 아래에 지금 저장소와 같은지 그대로 뜬다. 갈려 있으면 **커밋하고
 푸시** 버튼 하나로 맞춘다 (편집 잠금과 같은 암호를 쓴다). 화면은 `pull` · `reset` ·
 `checkout` 을 **하지 않는다** — 합칠 것이 있으면 사람이 판단할 일이고, 화면이
 조용히 되돌리는 것이 가장 나쁘다.
@@ -285,8 +285,8 @@ MASTER_GIT_AUTOPUSH=true
   실패"라고 구분해서 알려준다
 - 자격증명을 서버에 두기 어려우면 꺼 두고 ②로 주기적으로 맞춘다
 
-> **`brand_keys.csv` 의 주인은 서버다.** 개발 PC 에서 이 파일을 고치지 않는다.
-> 양쪽에서 고치면 합칠 때 행 순서가 뒤섞이는데, 행 순서가 곧 판정 우선순위다.
+> **`brand_master_manual.csv` 의 주인은 서버다.** 개발 PC 에서 이 파일을 고치지 않는다.
+> 양쪽에서 고치면 합칠 때 서로의 보정을 덮어쓴다.
 
 ---
 
@@ -295,7 +295,7 @@ MASTER_GIT_AUTOPUSH=true
 - [x] 설계 — 규칙 아키텍처 · API 계약 · 거래처 YAML · 문서 정리
 - [x] D1 전처리 · Claude 추출 · 환각 차단 · 마스터 로더 · CLI
 - [x] D2 규칙엔진 · 행 생성 · 검증
-- [x] D3 화면 (스트림릿) — P/O 변환 · 브랜드 매핑
+- [x] D3 화면 (스트림릿) — P/O 변환 · 브랜드 후보
 - [x] D4 EAI 전송 · 모의 서버 · 감사 로그
 - [x] 마스터 도구 — 거래처 엑셀 · SAP 브랜드 마스터 · 매핑 초벌
 - [ ] **D5 실물 발주서 검증** ← 남은 것. 절차는 `samples/README.md` §3

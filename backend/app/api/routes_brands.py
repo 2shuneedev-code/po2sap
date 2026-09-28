@@ -1,8 +1,8 @@
-"""브랜드 매핑 콘솔 API — contracts/api-contract.md §10.
+"""브랜드 후보 콘솔 API — contracts/api-contract.md §10.
 
-화면의 일은 하나다: **발주서 원문 문구 → SAP 브랜드 코드** 를 잇는 것.
-SAP 이 주는 것은 `코드 → 이름`뿐이고 원문 키는 어디에도 없다. 사람이 채운다.
-그래서 이 라우터는 brand_master 를 읽기만 하고 brand_keys 만 쓴다.
+ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다 (SCHEMA §4.5). 후보 목록은
+SAP 원본(`brand_master.csv`, 읽기 전용)에 사람이 얹은 보정
+(`brand_master_manual.csv`)을 합친 것이다. 이 라우터는 보정만 쓴다.
 """
 
 from __future__ import annotations
@@ -26,14 +26,15 @@ MAX_LIMIT = 500
 
 
 # ── 요청 본문 ──────────────────────────────────────────────────────────
-class KeyIn(BaseModel):
-    text: str = Field(min_length=1, max_length=200)
-    match: Literal["contains", "equals"] = "contains"
-    note: str = ""
+class ManualIn(BaseModel):
+    zbrand: str = Field(min_length=1, max_length=10)
+    zbrant: str = Field(default="", max_length=200)
+    action: Literal["add", "override", "suppress"]
+    note: str = Field(min_length=1, max_length=500)
 
 
-class KeysIn(BaseModel):
-    keys: list[KeyIn] = Field(default_factory=list, max_length=100)
+class ManualRowsIn(BaseModel):
+    rows: list[ManualIn] = Field(default_factory=list, max_length=200)
 
 
 # ── 조회 헬퍼 ──────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ def _customers_by_no(settings: Settings) -> dict[str, CustomerMaster]:
 
 def _index(settings: Settings) -> tuple[dict[str, list], dict[str, str], dict[str, list]]:
     master = brand_store.load_master(settings.masters_dir)
-    keys = brand_store.load_keys(settings.masters_dir)
+    manual = brand_store.load_manual(settings.masters_dir)
 
     by_customer: dict[str, list] = {}
     names: dict[str, str] = {}
@@ -56,10 +57,10 @@ def _index(settings: Settings) -> tuple[dict[str, list], dict[str, str], dict[st
         if b.customer_name:
             names[b.kunnr] = b.customer_name
 
-    keys_by: dict[str, list] = {}
-    for k in keys:
-        keys_by.setdefault(f"{k.kunnr}:{k.zbrand}", []).append(k)
-    return by_customer, names, keys_by
+    manual_by: dict[str, list] = {}
+    for m in manual:
+        manual_by.setdefault(m.kunnr, []).append(m)
+    return by_customer, names, manual_by
 
 
 # ── 목록 ───────────────────────────────────────────────────────────────
@@ -71,9 +72,8 @@ def list_brand_customers(
     limit: int = Query(200, ge=1, le=MAX_LIMIT),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    """좌측 고객 목록. 규칙이 없는 고객도 **전부** 나온다 — 브랜드부터 채워두면
-    나중에 규칙을 만들 때 그대로 쓰인다."""
-    by_customer, names, keys_by = _index(settings)
+    """좌측 고객 목록. 규칙이 없는 고객도 **전부** 나온다."""
+    by_customer, names, manual_by = _index(settings)
     configured = _customers_by_no(settings)
 
     rows = []
@@ -104,7 +104,7 @@ def list_brand_customers(
             "code": cfg.code if cfg else "",
             "file_types": cfg.file_types if cfg else [],
             "brand_count": str(len(brands)),
-            "mapped_count": str(sum(1 for b in brands if keys_by.get(f"{kunnr}:{b.zbrand}"))),
+            "manual_count": str(len(manual_by.get(kunnr, []))),
         })
 
     return {
@@ -118,22 +118,15 @@ def list_brand_customers(
 # ── 상세 ───────────────────────────────────────────────────────────────
 @router.get("/customers/{kunnr}")
 def get_brand_customer(kunnr: str, settings: Injected) -> dict[str, Any]:
-    by_customer, names, keys_by = _index(settings)
+    by_customer, names, manual_by = _index(settings)
     if kunnr not in by_customer:
         raise HTTPException(404, f"브랜드 마스터에 없는 고객입니다: {kunnr}")
 
     cfg = _customers_by_no(settings).get(kunnr)
-    brands = []
-    for b in by_customer[kunnr]:
-        found = keys_by.get(f"{kunnr}:{b.zbrand}", [])
-        brands.append({
-            "zbrand": b.zbrand,
-            "name": b.name,
-            "keys": [
-                {"text": k.text, "match": k.match, "note": k.note} for k in found
-            ],
-            "status": "mapped" if found else "unmapped",
-        })
+    brands = [
+        {"zbrand": b.zbrand, "name": b.name, "source": b.source}
+        for b in by_customer[kunnr]
+    ]
 
     sap_name = names.get(kunnr, "")
     return {
@@ -145,6 +138,7 @@ def get_brand_customer(kunnr: str, settings: Injected) -> dict[str, Any]:
         "owner": (cfg.raw.get("meta", {}).get("owner", "") if cfg else ""),
         "configured": "true" if cfg else "false",
         "brands": brands,
+        "manual": [_manual_out(m) for m in manual_by.get(kunnr, [])],
         "logic": _logic(cfg) if cfg else None,
     }
 
@@ -254,28 +248,25 @@ def _source(spec: dict[str, Any]) -> str:
 
 
 # ── 저장 ───────────────────────────────────────────────────────────────
-@router.put("/customers/{kunnr}/{zbrand}")
-def put_brand_keys(
-    kunnr: str, zbrand: str, body: KeysIn, settings: Injected
-) -> dict[str, Any]:
-    """원문 키 한 묶음을 통째로 교체한다. 빈 목록이면 매핑을 지운다."""
-    keys = [
-        brand_store.BrandKey(kunnr=kunnr, zbrand=zbrand, match=k.match,
-                             text=k.text, note=k.note)
-        for k in body.keys
+def _manual_out(m: brand_store.ManualRow) -> dict[str, str]:
+    return {"zbrand": m.zbrand, "zbrant": m.zbrant, "action": m.action, "note": m.note}
+
+
+@router.put("/customers/{kunnr}/manual")
+def put_brand_manual(kunnr: str, body: ManualRowsIn, settings: Injected) -> dict[str, Any]:
+    """그 고객의 보정 행을 통째로 교체한다. `rows: []` 면 보정을 지운다."""
+    rows = [
+        brand_store.ManualRow(kunnr=kunnr, zbrand=r.zbrand, zbrant=r.zbrant,
+                              action=r.action, note=r.note)
+        for r in body.rows
     ]
     try:
-        saved = brand_store.set_keys(
-            settings.masters_dir, kunnr, zbrand, keys,
+        saved = brand_store.set_manual(
+            settings.masters_dir, kunnr, rows,
             storage_dir=settings.storage_dir,
             backup_keep=settings.master_backup_keep,
         )
     except brand_store.BrandError as exc:
         raise HTTPException(400, str(exc)) from exc
 
-    return {
-        "kunnr": kunnr,
-        "zbrand": zbrand,
-        "keys": [{"text": k.text, "match": k.match, "note": k.note} for k in saved],
-        "status": "mapped" if saved else "unmapped",
-    }
+    return {"kunnr": kunnr, "manual": [_manual_out(m) for m in saved]}

@@ -5,7 +5,7 @@
   · `masters/refs/brand_master.csv` — SAP 브랜드 마스터의 전 고객 (430곳)
 
 화면은 **후자를 보여주고 전자를 표시**한다. 규칙이 없는 고객도 목록에 있어야
-브랜드 원문 키를 미리 채워둘 수 있고, 어디까지 왔는지 한눈에 보인다.
+브랜드 후보를 미리 보정해 둘 수 있고, 어디까지 왔는지 한눈에 보인다.
 
 규칙이 없는 고객은 **파싱할 수 없다.** 프로필로 대충 채우면 빈 필드가 그대로
 전송되는데, 그건 아무도 모르게 틀린 오더가 나가는 길이다. `ready` 가 False 면
@@ -31,7 +31,7 @@ class CatalogEntry:
     code: str = ""
     file_types: list[str] = field(default_factory=list)
     brand_count: int = 0
-    mapped_count: int = 0
+    manual_count: int = 0          # 사람이 얹은 보정 행 수 (brand_master_manual.csv)
 
     @property
     def configured(self) -> bool:
@@ -69,7 +69,7 @@ class CatalogEntry:
             "code": self.code,
             "file_types": self.file_types,
             "brand_count": str(self.brand_count),
-            "mapped_count": str(self.mapped_count),
+            "manual_count": str(self.manual_count),
             "configured": "true" if self.configured else "false",
             "ready": "true" if self.ready else "false",
         }
@@ -96,7 +96,7 @@ def load_catalog(
     이 축약형인 경우가 있어서(`107525` = `"KL"`) 한쪽만 봐서는 못 찾는다.
     """
     master = brand_store.load_master(settings.masters_dir)
-    keys = brand_store.load_keys(settings.masters_dir)
+    manual = brand_store.load_manual(settings.masters_dir)
     configured = _configured(settings)
 
     by_customer: dict[str, list] = {}
@@ -106,7 +106,9 @@ def load_catalog(
         if b.customer_name:
             sap_names.setdefault(b.kunnr, b.customer_name)
 
-    mapped: set[str] = {f"{k.kunnr}:{k.zbrand}" for k in keys}
+    manual_by: dict[str, int] = {}
+    for m in manual:
+        manual_by[m.kunnr] = manual_by.get(m.kunnr, 0) + 1
 
     needle = q.strip().lower()
     out: list[CatalogEntry] = []
@@ -128,7 +130,7 @@ def load_catalog(
             code=cfg.code if cfg else "",
             file_types=list(cfg.file_types) if cfg else [],
             brand_count=len(brands),
-            mapped_count=sum(1 for b in brands if f"{kunnr}:{b.zbrand}" in mapped),
+            manual_count=manual_by.get(kunnr, 0),
         )
 
         if needle and not any(

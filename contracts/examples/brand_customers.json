@@ -1,44 +1,8 @@
 {
-  "total": "430",
+  "total": "78",
   "limit": "6",
   "offset": "0",
   "customers": [
-    {
-      "kunnr": "2000",
-      "name": "QNCT(Qingdao New Century Tool Co.,L",
-      "sap_name": "QNCT(Qingdao New Century Tool Co.,L",
-      "code": "",
-      "file_types": [],
-      "brand_count": "9",
-      "mapped_count": "0"
-    },
-    {
-      "kunnr": "2100",
-      "name": "QINGDAO YG-1 TOOL CO.,LTD",
-      "sap_name": "QINGDAO YG-1 TOOL CO.,LTD",
-      "code": "",
-      "file_types": [],
-      "brand_count": "32",
-      "mapped_count": "0"
-    },
-    {
-      "kunnr": "2300",
-      "name": "YG-1 (CHINA) HOLDINGS LIMITED",
-      "sap_name": "YG-1 (CHINA) HOLDINGS LIMITED",
-      "code": "",
-      "file_types": [],
-      "brand_count": "16",
-      "mapped_count": "0"
-    },
-    {
-      "kunnr": "2400",
-      "name": "YG-1 (THAILAND) COMPANY LIMITED",
-      "sap_name": "YG-1 (THAILAND) COMPANY LIMITED",
-      "code": "",
-      "file_types": [],
-      "brand_count": "7",
-      "mapped_count": "0"
-    },
     {
       "kunnr": "2500",
       "name": "YG-1 (MALAYSIA) SDN. BHD.",
@@ -46,16 +10,54 @@
       "code": "",
       "file_types": [],
       "brand_count": "8",
-      "mapped_count": "0"
+      "manual_count": "0"
     },
     {
-      "kunnr": "2600",
-      "name": "Qingdao Schneider Co.,Ltd",
-      "sap_name": "Qingdao Schneider Co.,Ltd",
+      "kunnr": "3000",
+      "name": "YG Cutting Tools Corporation Pvt Lt",
+      "sap_name": "YG Cutting Tools Corporation Pvt Lt",
       "code": "",
       "file_types": [],
-      "brand_count": "1",
-      "mapped_count": "0"
+      "brand_count": "4",
+      "manual_count": "0"
+    },
+    {
+      "kunnr": "3200",
+      "name": "YG-1 Japan",
+      "sap_name": "YG-1 JAPAN CO., LTD.",
+      "code": "YGJP",
+      "file_types": [
+        "pdf"
+      ],
+      "brand_count": "7",
+      "manual_count": "0"
+    },
+    {
+      "kunnr": "3400",
+      "name": "YG-1 TOOLS ASIA PTE. LTD.",
+      "sap_name": "YG-1 TOOLS ASIA PTE. LTD.",
+      "code": "",
+      "file_types": [],
+      "brand_count": "13",
+      "manual_count": "0"
+    },
+    {
+      "kunnr": "4300",
+      "name": "YG-1 Poland Sp. z o.o.",
+      "sap_name": "YG-1 Poland Sp. z o.o.",
+      "code": "",
+      "file_types": [],
+      "brand_count": "5",
+      "manual_count": "0"
+    },
+    {
+      "kunnr": "4600",
+      "name": "SCHUMACHER PRECISION TOOLS GMBH",
+      "sap_name": "SCHUMACHER PRECISION TOOLS GMBH",
+      "code": "",
+      "file_types": [],
+      "brand_count": "38",
+      "manual_count": "0"
     }
   ]
 }

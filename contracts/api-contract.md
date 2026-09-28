@@ -326,7 +326,7 @@ contracts/examples/
 ├── fields.json             → §3
 ├── batch_msc.json          → §5  (49행 · 오류 1 · 경고 3 · 파일 2개 중 1개 실패)
 ├── send_ok.json            → §7
-├── brand_customers.json    → §10.1 (실제 응답에서 뽑은 6행)
+├── brand_customers.json    → §10.1
 └── brand_detail_msc.json   → §10.2 (실제 응답 전문)
 ```
 백엔드는 이 파일과 **동일한 형태**를 만들고, 프론트는 이 파일로 화면을 완성한다.
@@ -334,19 +334,19 @@ contracts/examples/
 
 ---
 
-## 10. 브랜드 매핑 콘솔 `/api/brands/*`
+## 10. 브랜드 후보 콘솔 `/api/brands/*`
 
 거래처 선택 화면(§1)과 **대상이 다르다.** §1 은 규칙이 설정된 거래처만 보여주지만,
-여기는 SAP 브랜드 마스터에 있는 **전 고객**을 다룬다 — 규칙이 아직 없는 고객도
-브랜드 원문 키부터 채워둘 수 있어야 하기 때문이다.
+여기는 SAP 브랜드 마스터에 있는 **전 고객**을 다룬다.
 
-화면이 하는 일은 하나다: **발주서 원문 문구 → SAP 브랜드 코드(ZBRAND)** 를 잇는 것.
-SAP 이 주는 것은 `코드 → 이름`뿐이고 **원문 키는 어디에도 없다.** 사람이 채운다.
+ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다 (`masters/SCHEMA.md` §4.5) —
+1개면 자동, 여럿이면 검수 표 드롭다운. 발주서 문구는 보지 않는다.
+후보 = SAP 원본 ∪ 사람이 얹은 보정 (SCHEMA §4.5-A).
 
 | 데이터 | 원천 | 편집 |
 |---|---|---|
-| 브랜드 코드·이름 | `masters/refs/brand_master.csv` (SAP 원본) | **읽기 전용** |
-| 발주서 원문 키 | `masters/refs/brand_keys.csv` | 이 API 로 편집 |
+| SAP 브랜드 코드·이름 | `masters/refs/brand_master.csv` | **읽기 전용** (`import_brand_master.py` 로 교체) |
+| 보정 (add · override · suppress) | `masters/refs/brand_master_manual.csv` | 이 API 로 편집 |
 
 ### 10.1 `GET /api/brands/customers`
 
@@ -355,17 +355,18 @@ SAP 이 주는 것은 `코드 → 이름`뿐이고 **원문 키는 어디에도 
 
 ```json
 {
-  "total": "430", "limit": "200", "offset": "0",
+  "total": "78", "limit": "200", "offset": "0",
   "customers": [
     { "kunnr": "100249", "name": "MSC Industrial Supply", "sap_name": "SID TOOL CO., INC.",
-      "code": "MSC", "file_types": ["htm","html"], "brand_count": "7", "mapped_count": "4" },
+      "code": "MSC", "file_types": ["htm","html"], "brand_count": "7", "manual_count": "1" },
     { "kunnr": "100157", "name": "AMAYA", "sap_name": "AMAYA",
-      "code": "", "file_types": [], "brand_count": "4", "mapped_count": "0" }
+      "code": "", "file_types": [], "brand_count": "4", "manual_count": "0" }
   ]
 }
 ```
 
-- `code` 가 `""` 면 **규칙 미설정** 고객이다. 화면은 브랜드만 보여주고 로직 패널을 접는다.
+- `brand_count` 는 **병합 후** 후보 수다. `manual_count` 는 그 고객의 보정 행 수.
+- `code` 가 `""` 면 **규칙 미설정** 고객이다. 화면은 후보만 보여주고 로직 패널을 접는다.
 - `name` 은 표시용이다. 거래처 마스터가 있으면 그 이름을, 없으면 `sap_name` 을 쓴다 —
   SAP 의 `name1` 이 축약형인 경우가 있다(`107525` = `"KL"`). 검색은 둘 다 본다.
 
@@ -377,62 +378,49 @@ SAP 이 주는 것은 `코드 → 이름`뿐이고 **원문 키는 어디에도 
   "code": "MSC", "file_types": ["htm","html"], "owner": "※ 지정 필요",
   "configured": "true",
   "brands": [
-    { "zbrand": "38", "name": "HERTEL BRAND", "status": "mapped",
-      "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] },
-    { "zbrand": "501", "name": "UNBRANDED", "status": "unmapped", "keys": [] }
+    { "zbrand": "038", "name": "HERTEL BRAND", "source": "sap" },
+    { "zbrand": "205", "name": "ACCUPRO", "source": "override" },
+    { "zbrand": "9999", "name": "NEW BRAND", "source": "add" }
   ],
-  "logic": {
-    "split":  { "by": "shipment", "label": "출하처별로 오더를 나눈다" },
-    "tables": [ { "id": "ship_to_routing", "label": "출하처(Ship To) 분기", "scope": "shipment",
-                  "columns": ["출하처 블록에 포함", "→ KUNNR2", "→ _city", "→ _pack_base"],
-                  "rows": [["ELKHART","100249","ELKHART","C"]],
-                  "on_no_match": { "action": "error", "message": "..." } } ],
-    "rules":  [ { "id": "brand_code", "kind": "csv_map", "label": "브랜드 판별",
-                  "source": "header.brand_text", "note": "참조표 … 로 판정합니다",
-                  "columns": [], "rows": [],
-                  "on_no_match": { "action": "error", "message": "..." } } ],
-    "fields": [ { "field": "BSTKD", "label": "고객발주번호", "max_len": "35",
-                  "source": "if(_city, concat(header.po_number, \"(\", _city, \")\"), header.po_number)",
-                  "explain": "발주번호 뒤에 출하처 도시명을 괄호로 붙입니다", "todo": "" } ],
-    "checks": [ { "id": "shipment_total_match", "label": "출하처별 수량 합계 = 요약표 합계",
-                  "severity": "error", "description": "..." } ]
-  }
+  "manual": [
+    { "zbrand": "205", "zbrant": "ACCUPRO", "action": "override", "note": "발주서엔 ACCUPRO 로만 찍힌다" },
+    { "zbrand": "9999", "zbrant": "NEW BRAND", "action": "add", "note": "SAP 등록 대기" }
+  ],
+  "logic": { "split": {}, "tables": [], "rules": [], "fields": [], "checks": [] }
 }
 ```
 
+- `brands` 는 **판정에 쓰이는 병합 후보** 그대로다. `source`: `sap` · `override`(이름 보정) · `add`(수동 추가).
+  `suppress` 된 코드는 빠져 있다.
 - `logic` 은 규칙이 없는 고객이면 **`null`** 이다 (§0 의 "null 을 쓰지 않는다"의 유일한 예외 —
-  "설정 없음"과 "빈 설정"은 화면에서 다르게 보여야 한다).
-- `kind: csv_map` 규칙은 `columns`·`rows` 가 비어 있다. **그 내용이 곧 위의 `brands` 표**라
-  같은 화면에 두 번 그리지 않는다.
+  "설정 없음"과 "빈 설정"은 화면에서 다르게 보여야 한다). 모양은 규칙 카드(§2)와 같다.
 - `logic.fields` 는 고정 빈값 필드를 뺀 목록이다 — 화면에서 볼 의미가 있는 것만 남긴다.
 
-### 10.3 `PUT /api/brands/customers/{kunnr}/{zbrand}`
+### 10.3 `PUT /api/brands/customers/{kunnr}/manual`
 
-원문 키 한 묶음을 **통째로 교체**한다. `keys: []` 를 보내면 매핑을 지운다.
-
-```json
-{ "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] }
-```
-
-`match` 는 `contains`(포함) 또는 `equals`(완전일치). **배열 순서가 곧 판정 우선순위다**
-(`masters/SCHEMA.md` §4.5) — 저장해도 파일에서의 위치가 유지된다.
-
-응답은 저장된 결과다.
+그 고객의 보정 행을 **통째로 교체**한다. `rows: []` 를 보내면 그 고객의 보정을 지운다.
 
 ```json
-{ "kunnr": "100249", "zbrand": "38", "status": "mapped",
-  "keys": [ { "text": "HERTEL", "match": "contains", "note": "" } ] }
+{ "rows": [ { "zbrand": "9999", "zbrant": "NEW BRAND", "action": "add", "note": "SAP 등록 대기" } ] }
 ```
+
+| `action` | 뜻 | `zbrand` 조건 |
+|---|---|---|
+| `add` | 후보 추가 | SAP 에 **없는** 코드 |
+| `override` | 브랜드명 교체 (자리는 그대로) | SAP 에 **있는** 코드 |
+| `suppress` | 후보에서 제외 (`zbrant` 는 비워도 된다) | SAP 에 **있는** 코드 |
+
+응답은 저장된 결과다: `{ "kunnr": "100249", "manual": [ ... ] }`
 
 **거부되는 경우** (파일을 건드리지 않는다):
 
-| 상황 | HTTP | 이유 |
-|---|---|---|
-| `zbrand` 가 그 고객에 등록돼 있지 않음 | 400 | SAP 이 거부할 코드다. 저장 자체를 막는다 |
-| 같은 문구를 다른 코드가 이미 씀 | 400 | 어느 쪽으로 판정될지 알 수 없다 |
-| 한 요청 안에 같은 문구가 두 번 | 400 | 아래 것이 도달 불가 |
-| `match` 가 허용 목록 밖 · `text` 가 빈 값 | 422 | — |
-| `kunnr` 가 브랜드 마스터에 없음 | 404 | — |
+| 상황 | HTTP |
+|---|---|
+| `override`·`suppress` 대상이 SAP 원본에 없음 | 400 |
+| `add` 인데 이미 SAP 에 있는 코드 | 400 |
+| `add`·`override` 인데 `zbrant` 가 빈 값 | 400 |
+| 같은 (`zbrand`, `action`) 이 두 번 | 400 |
+| `action` 이 허용 목록 밖 · `note` 가 빈 값 | 422 |
 
-> 인증·승인 흐름·감사 로그는 현재 범위 밖이다(사내망 무인증). 대신 저장 전 검증을
-> 서버에서 하고, 변경 이력은 `brand_keys.csv` 의 Git 이력이 남긴다.
+> 인증·승인 흐름·감사 로그는 현재 범위 밖이다(사내망, 화면은 `MASTER_EDIT_PASSWORD` 로 잠근다).
+> 저장 전 검증을 서버에서 하고, 변경 이력은 `brand_master_manual.csv` 의 Git 이력이 남긴다.

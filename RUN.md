@@ -9,7 +9,6 @@
 | 순서 | 파일 | 하는 일 |
 |---|---|---|
 | 최초 1회 | `setup.bat` | 가상환경 · 라이브러리 · `.env` 생성 |
-| 매번 | `check.bat` | API 연결 · 마스터 검증 (비용 0) |
 | 매번 | `run.bat` | 화면 실행 → 창에 뜬 주소를 브라우저에 직접 입력 |
 | 전송 시험 시 | `run-mock-eai.bat` | 모의 EAI (**다른 창에서** 함께 켜 둔다) |
 
@@ -23,7 +22,6 @@
 cd C:\vibe-coding\po2sap
 .\.venv\Scripts\Activate.ps1
 
-python scripts/check_llm.py            # 키·모델 ID 확인 (메시지 전송 없음 = 비용 0)
 streamlit run po2sap.py                # → http://localhost:8501
 ```
 
@@ -58,29 +56,23 @@ streamlit run po2sap.py                # → http://localhost:8501
 
 ---
 
-## 4. 실제 Claude API 로 시험할 때
+## 4. 실제 Claude API 로 시험
 
-`.env` 에서 이 줄들만 확인한다.
+`.env`:
 
 ```ini
-LLM_PROVIDER=anthropic         # mock 이면 저장된 응답만 재생 (비용 0)
-LLM_API_KEY=sk-ant-...         # 채팅·커밋에 절대 붙이지 않는다
+LLM_PROVIDER=anthropic
+LLM_API_KEY=sk-ant-...
 LLM_MODEL_EXTRACT=claude-opus-5
 LLM_EFFORT=medium
-EAI_ENDPOINT=http://127.0.0.1:9000/po2sap/order   # 모의 서버. 실서버로 바꾸지 않는다
 ```
 
-순서 — **돈이 드는 단계는 마지막**에:
+바로 돌린다:
 
 ```powershell
-python scripts/check_llm.py                                         # 1. 연결 (무료)
-python scripts/check_sample.py samples/<파일> --customer <코드>       # 2. hints 대조 (무료)
-python scripts/parse_one.py samples/<파일> --customer <코드> --text-only   # 3. 전처리 (무료)
-python scripts/parse_one.py samples/<파일> --customer <코드> --rows  # 4. 실제 호출 (과금)
-streamlit run po2sap.py                                             # 5. 화면에서 검수→전송
+python scripts/parse_one.py samples/<파일> --customer <코드> --rows   # 단건, 36필드 출력
+streamlit run po2sap.py                                             # 화면에서 업로드→검수→전송
 ```
 
-- 같은 문서는 두 번째부터 **응답 캐시**가 재생된다 (재호출·재과금 없음)
-- 모델을 `claude-opus-5-5` 로 바꾸면 **지금 코드로는 모든 추출이 400** 이다
-  (강제 `tool_choice` 미지원). 코드 수정 후에 바꾼다
-- 사람 앞에서 시연할 때는 라이브 호출 대신 `pin_fixture.py` 로 박은 픽스처를 쓴다
+- 같은 문서를 다시 넣으면 응답 캐시가 재생된다. 새로 부르고 싶으면 `LLM_PROMPT_VERSION` 을 올린다
+- `claude-opus-5-5` 는 지금 코드로는 400 이다 (강제 `tool_choice` 미지원) — 코드 수정 후에 바꾼다

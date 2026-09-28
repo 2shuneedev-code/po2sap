@@ -11,22 +11,40 @@ from __future__ import annotations
 
 import streamlit as st
 
+from backend.app.rules.reftable import RefTableError  # noqa: E402
 from ui.service import health  # noqa: E402
 from ui.views import brands, convert  # noqa: E402
 
 PAGES = {
-    "P/O 변환": convert.render,
-    "브랜드 후보": brands.render,
+    "P/O Transfer": convert.render,
+    "Brand Master": brands.render,
 }
+
+# 사이드바 머리의 빈 공간(스트림릿 기본 ≈ 6rem)을 걷어 거래처 목록을 위로 올린다.
+_SIDEBAR_TIGHT = """
+<style>
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
+  padding-top: 0.25rem; padding-bottom: 0; height: 2.25rem; min-height: 0;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 0; }
+section[data-testid="stSidebar"] hr { margin: 0.5rem 0; }
+section[data-testid="stSidebar"] h3 { padding-top: 0; }
+</style>
+"""
 
 
 def main() -> None:
     with st.sidebar:
+        st.markdown(_SIDEBAR_TIGHT, unsafe_allow_html=True)
         st.markdown("### 📄 PO2SAP")
         page = st.radio("메뉴", list(PAGES), label_visibility="collapsed")
         st.divider()
 
-    PAGES[page]()
+    try:
+        PAGES[page]()
+    except RefTableError as exc:
+        # 참조표가 깨지면 전 화면이 트레이스백이 된다 — 무엇을 고치면 되는지만 보여준다.
+        st.error(f"참조표를 읽지 못했습니다 — {exc}", icon="🚫")
 
     with st.sidebar:
         st.divider()

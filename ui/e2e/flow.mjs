@@ -82,8 +82,8 @@ const after = await text();
 console.log("전송 결과:", after.match(/\d+건이 EAI로 전송[^.]*\.|전송[^.]*실패[^.]*\./)?.[0] ?? after.slice(-220));
 await page.screenshot({ path: `${SHOT}/f3-sent.png`, fullPage: true });
 
-console.log("\n── 브랜드 후보 탭");
-await page.locator('[data-testid="stSidebar"]').getByText("브랜드 후보", { exact: true }).first().click();
+console.log("\n── Brand Master 탭");
+await page.locator('[data-testid="stSidebar"]').getByText("Brand Master", { exact: true }).first().click();
 await settle();
 console.log("본문:", (await text()).slice(0, 200));
 await page.screenshot({ path: `${SHOT}/f4-brands.png`, fullPage: true });

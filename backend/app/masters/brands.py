@@ -55,8 +55,11 @@ class ManualRow:
 def _read(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        return [{k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)]
+    try:
+        with path.open(encoding="utf-8-sig", newline="") as f:
+            return [{k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)]
+    except UnicodeDecodeError as exc:
+        raise reftable.not_utf8(path, exc) from exc
 
 
 def _to_brand(r: dict[str, str]) -> Brand:

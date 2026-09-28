@@ -25,7 +25,7 @@ const settle = async (ms = 2000) => page.waitForTimeout(ms);
 
 await page.goto("http://localhost:8501", { waitUntil: "networkidle" });
 await settle(3000);
-await page.locator('[data-testid="stSidebar"]').getByText("브랜드 후보", { exact: true }).first().click();
+await page.locator('[data-testid="stSidebar"]').getByText("Brand Master", { exact: true }).first().click();
 await settle(2500);
 console.log("고객 수:", await page.locator('[data-testid="stSidebar"]').getByText(/곳$/).first().textContent());
 

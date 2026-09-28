@@ -36,7 +36,7 @@ SOURCE_LABEL = {"sap": "SAP", "override": "SAP · 이름 보정", "add": "수동
 def render() -> None:
     entry = customer_picker("brands")
 
-    st.title("브랜드 후보")
+    st.title("Brand Master")
     st.caption(
         "고객별 ZBRAND 후보입니다. **후보가 1개면 자동으로 채우고, 여럿이면 검수 표에서 "
         "고릅니다.** SAP 원본은 고칠 수 없고, 아래 보정 표로 더하거나 빼거나 이름을 고칩니다."

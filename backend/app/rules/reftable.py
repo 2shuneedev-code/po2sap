@@ -26,15 +26,27 @@ class RefTableError(ValueError):
     pass
 
 
+def not_utf8(path: Path | str, exc: UnicodeDecodeError) -> RefTableError:
+    """엑셀의 "CSV (쉼표로 분리)" 저장은 cp949 다 — 트레이스백 대신 고칠 방법을 준다."""
+    return RefTableError(
+        f"{Path(path).name} 이(가) UTF-8 이 아닙니다 ({exc.start}번째 바이트). "
+        "엑셀에서 저장했다면 **'CSV UTF-8(쉼표로 분리)'** 형식으로 다시 저장하세요. "
+        "ü·한글 같은 글자가 ? 로 바뀌었는지도 확인하세요."
+    )
+
+
 @lru_cache(maxsize=64)
 def _read(path_str: str, mtime: float) -> tuple[dict[str, str], ...]:
-    with Path(path_str).open(encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        if not reader.fieldnames:
-            raise RefTableError(f"참조표에 머리글이 없습니다: {path_str}")
-        return tuple(
-            {(k or ""): (v or "").strip() for k, v in row.items()} for row in reader
-        )
+    try:
+        with Path(path_str).open(encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            if not reader.fieldnames:
+                raise RefTableError(f"참조표에 머리글이 없습니다: {path_str}")
+            return tuple(
+                {(k or ""): (v or "").strip() for k, v in row.items()} for row in reader
+            )
+    except UnicodeDecodeError as exc:
+        raise not_utf8(path_str, exc) from exc
 
 
 def load(masters_dir: Path, rel_path: str, *, optional: bool = False) -> list[dict[str, str]]:

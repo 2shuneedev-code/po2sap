@@ -44,7 +44,7 @@ def customer_picker(key: str) -> CatalogEntry | None:
     state_key = f"{key}_kunnr"
 
     with st.sidebar:
-        st.caption("거래처")
+        st.caption("Customer")
         q = st.text_input(
             "검색", key=f"{key}_q", placeholder="고객명 · 고객코드 (Enter)",
             help="고객명 · SAP 명 · 고객코드 · 거래처코드를 함께 찾습니다",
@@ -65,7 +65,8 @@ def customer_picker(key: str) -> CatalogEntry | None:
         current = next((r for r in rows if r.kunnr == selected), None)
 
         st.markdown(_LEFT_ALIGN, unsafe_allow_html=True)
-        with st.container(height=420, border=False):
+        # 목록이 사이드바의 대부분을 쓰게 한다 — 한 화면에 20곳 넘게 보인다.
+        with st.container(height=640, border=False):
             for row in rows:
                 _entry_button(row, state_key, active=row.kunnr == selected)
 

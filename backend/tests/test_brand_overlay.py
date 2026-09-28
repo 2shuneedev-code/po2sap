@@ -67,3 +67,17 @@ def test_engine_and_screen_see_the_same_candidates(masters_dir: Path):
     via_engine = codes(reftable.load(masters_dir, "refs/brand_master.csv"))
     via_screen = [(b.kunnr, b.zbrand) for b in brand_store.load_master(masters_dir)]
     assert via_engine == via_screen
+
+
+def test_non_utf8_csv_names_the_fix(tmp_path: Path):
+    """엑셀 기본 CSV 저장(cp949)이면 트레이스백 대신 고칠 방법을 알려준다."""
+    import pytest
+
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    (refs / "brand_master.csv").write_bytes(
+        "kunnr,name1,zbrand,zbrant\n4600,C,079,OEM(추가)\n".encode("cp949"))
+    with pytest.raises(reftable.RefTableError, match="CSV UTF-8"):
+        reftable.load(tmp_path, "refs/brand_master.csv")
+    with pytest.raises(reftable.RefTableError, match="CSV UTF-8"):
+        brand_store.load_sap(tmp_path)

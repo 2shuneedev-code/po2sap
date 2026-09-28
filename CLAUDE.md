@@ -154,8 +154,8 @@ backend/app/
 ui/               ★ 스트림릿 화면 — 사내 서버에서 이것만 띄운다      [완료]
 ├── service.py      backend/app 모듈을 **직접** 부른다 (HTTP 경유 없음)
 ├── views/
-│   ├── convert.py    P/O 변환 — 업로드 → 전송표 → 검수 → 전송
-│   ├── brands.py     브랜드 후보 — 병합된 후보 + 보정 표
+│   ├── convert.py    P/O Transfer — 업로드 → 전송표 → 검수 → 전송
+│   ├── brands.py     Brand Master — 병합된 후보 + 보정 표
 │   ├── picker.py     좌측 거래처 검색·정렬 (✅전용규칙 · 🟡공용설정 · ·브랜드없음)
 │   └── rules.py      규칙 카드 — build_preview 응답을 모양 그대로
 └── e2e/            브라우저 실동작 확인 (flow · brandflow · st)

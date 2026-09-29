@@ -46,8 +46,8 @@ def render() -> None:
     if not entry.ready:
         _no_brands(entry)
         return
-    if not entry.configured:
-        _generic_notice(entry)
+    if not entry.configured and entry.brand_count > 1:
+        _brand_choice_notice(entry)
 
     # 거래처를 바꾸면 이전 배치를 놓는다 — 다른 거래처 행이 섞이면 안 된다.
     if st.session_state.get("convert_customer") != entry.parse_code:
@@ -71,16 +71,16 @@ def _no_brands(entry) -> None:
     )
 
 
-def _generic_notice(entry) -> None:
-    """전용 규칙 없이 공용 프로필로 읽는 거래처 — 감추지 않고 알린다."""
-    st.warning(
-        "**전용 규칙이 없는 거래처입니다.** 공용 설정으로 읽으므로 "
-        "브랜드·발주번호·품번·수량까지는 뽑아내지만, **출하처 같은 값은 "
-        "비어 있고 검수 화면이 빨갛게 막습니다.** 읽어낸 값을 반드시 확인하세요."
-        + (f"\n\n브랜드 후보가 `{entry.brand_count}`개라 자동으로 정하지 않습니다 — "
-           "검수 표의 ZBRAND 드롭다운에서 고르세요."
-           if entry.brand_count > 1 else ""),
-        icon="🚧",
+def _brand_choice_notice(entry) -> None:
+    """공용 프로필 거래처의 브랜드 후보가 여럿 — 사람이 골라야 하는 것만 알린다.
+
+    판매처·출하처·최종고객은 기본이 고객코드라 따로 안내하지 않는다.
+    확인 중인 값은 검수 표의 노란 칸이 이미 보여준다.
+    """
+    st.info(
+        f"브랜드 후보가 `{entry.brand_count}`개라 자동으로 정하지 않습니다 — "
+        "검수 표의 ZBRAND 드롭다운에서 고르세요.",
+        icon="🏷️",
     )
 
 

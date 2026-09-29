@@ -46,8 +46,9 @@ class CatalogEntry:
         (`profiles/generic.yaml`)로 읽어낸다 — 브랜드까지는 나온다. 전 거래처
         테스트 배포가 그래야 가능하다.
 
-        모르는 값(출하처 등)은 채우지 않고 검수 화면에서 빨갛게 막는다.
-        그럴듯한 기본값을 넣으면 사람이 확인 없이 전송한다.
+        판매처·출하처·최종고객은 기본이 고객코드다(standard.yaml) — 다른
+        거래처만 전용 파일에서 예외로 덮어쓴다. 정해진 기본이 없는 값만 비워
+        두고 `required: warn` 으로 노랗게 띄운다.
         """
         return bool(self.code) or self.brand_count > 0
 

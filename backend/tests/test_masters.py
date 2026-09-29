@@ -386,7 +386,7 @@ def test_every_mapped_code_is_registered_in_sap(validate_masters, workspace):
 
     master = {
         (r["kunnr"], r["zbrand"])
-        for r in _csv.DictReader((workspace / "refs" / "brand_master.csv").open(encoding="utf-8"))
+        for r in _csv.DictReader((workspace / "refs" / "brand_master.csv").open(encoding="utf-8-sig"))
     }
     keys = list(_csv.DictReader((workspace / "refs" / "fx_keys.csv").open(encoding="utf-8")))
     assert keys, "fx_keys.csv 가 비어 있다"

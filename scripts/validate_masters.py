@@ -444,7 +444,7 @@ def check_rules(
 
 
 def _read_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
-    with path.open(encoding="utf-8", newline="") as f:
+    with path.open(encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         return list(reader), list(reader.fieldnames or [])
 

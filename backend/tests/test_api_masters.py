@@ -125,7 +125,7 @@ def test_brand_map_shows_only_this_customers_rows(client, workspace):
     """
     import csv
 
-    with (workspace / "refs" / "brand_master.csv").open(encoding="utf-8", newline="") as f:
+    with (workspace / "refs" / "brand_master.csv").open(encoding="utf-8-sig", newline="") as f:
         master_rows = list(csv.DictReader(f))
 
     def brand_rows(body):

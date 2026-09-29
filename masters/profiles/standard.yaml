@@ -52,6 +52,37 @@ rules:
       action: warn
       message: "통화를 인식하지 못했습니다: {currency_text} — refs/currency.csv 에 추가하세요"
 
+  shipping_condition:
+    kind: csv_choice
+    label: "출하조건 — Shipping Master"
+    description: |
+      refs/shipping_master.csv 에서 이 고객(kunnr) 행의 zshco 를 가져온다.
+      고객 1곳 = 행 1개. 행이 없으면 비워 둔다 (필드의 required: warn 이 띄운다).
+      값은 화면의 Shipping Master 메뉴에서 고친다.
+    table_file: refs/shipping_master.csv
+    filter_column: kunnr
+    value_column: zshco
+    on_many:
+      action: warn
+      message: "Shipping Master 에 이 고객 행이 {count}개입니다 — 하나로 정리하세요"
+    on_no_match:
+      action: empty     # 빈 칸은 ZSHCO 의 required: warn 이 노랗게 띄운다 (경고 두 번 안 낸다)
+  shipping_type:
+    kind: csv_choice
+    label: "운송수단 — Shipping Master"
+    description: |
+      refs/shipping_master.csv 에서 이 고객(kunnr) 행의 vsart 를 가져온다.
+      행이 없거나 비어 있으면 전 거래처 기본값 04.
+    table_file: refs/shipping_master.csv
+    filter_column: kunnr
+    value_column: vsart
+    on_many:
+      action: warn
+      message: "Shipping Master 에 이 고객 행이 {count}개입니다 — 하나로 정리하세요"
+    on_no_match:
+      action: default
+      value: "04"
+
 fields:
   # ── 전 거래처 공통 고정값 (_base/sap_defaults.yaml) ───────────
   AUART:   { from: base }
@@ -77,10 +108,8 @@ fields:
   # ── 규칙·마스터가 정한다 ──────────────────────────────────────
   WAERK:   { from: rule, rule: currency, required: warn }
   ZBRAND:  { from: rule, rule: brand_code, required: warn }
-  ZSHCO:   { from: const, value: "", required: warn,
-             todo: "refs/shipping.csv (고객 1:1:1) 조회로 바꾼다" }
-  VSART:   { from: const, value: "04", explain: "운송수단 — 전 거래처 04",
-             todo: "refs/shipping.csv (고객 1:1:1) 조회로 바꾼다" }
+  ZSHCO:   { from: rule, rule: shipping_condition, required: warn }
+  VSART:   { from: rule, rule: shipping_type, required: warn }
 
   # ── 공란 (템플릿 확정본 2026-09-21) ───────────────────────────
   # 양식에는 있으나 **채우지 않는다.** 필요해지면 거래처 파일에서 덮어쓰거나

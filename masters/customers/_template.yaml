@@ -48,13 +48,10 @@ split:
 fields:
   # ── profiles/standard.yaml 과 **다른 것만** 적는다 ────────────────
   #  36개를 다시 나열하지 않는다. 병합 결과가 전량을 채우면 검증을 통과한다.
-  #  아래 다섯 개는 거의 모든 거래처가 덮어써야 한다 — 그대로 두면
-  #  프로필의 todo 가 남아 validate_masters 리포트에 뜬다 (막지는 않는다).
+  #  판매처·출하처·최종고객(KUNNR1/2/3)은 기본이 고객코드, 브랜드는 SAP 후보,
+  #  출하조건·운송수단은 Shipping Master 에서 온다 — **예외일 때만** 덮어쓴다.
 
-  KUNNR2:  { from: const, value: "", todo: "출하처 코드" }
   BSTKD:   { from: doc,   path: header.po_number, required: true }
-  ZBRAND:  { from: const, value: "", todo: "브랜드 — 고정값이면 const, 원문 판정이면 rule" }
-  ZSHCO:   { from: const, value: "", todo: "출하조건" }
   MATNR:   { from: doc,   path: line.item_code, required: true }
 
   # 필요할 때만 추가로 덮어쓴다 (기본값은 프로필에 있다)

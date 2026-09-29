@@ -1067,7 +1067,13 @@ checks:
 브랜드·잘못된 후보를 고칠 창구가 없으면 그 기간 내내 잘못된 판정이 계속되기
 때문이다. `brand_master.csv` 자체는 여전히 SAP 원본이라 사람이 고치지 않는다.
 
-그 밖의 마스터(거래처 규칙·`shipping.csv` 등)를 위한 관리 UI는 아래 중
+**출하 마스터**(`refs/shipping_master.csv` — `kunnr · name1 · zshco · vsart`, 고객 1곳 = 행 1개)도
+화면(`ui/views/shipping.py`)에서 고친다. `profiles/standard.yaml` 의 `csv_choice` 두 개
+(`shipping_condition` → ZSHCO, `shipping_type` → VSART)가 읽는다. 행이 없으면 ZSHCO 는
+빈 칸(`required: warn`), VSART 는 `on_no_match: default` 로 `04`. `csv_choice` 는 **빈 값을
+후보로 세지 않는다** — 칸을 비운 행은 없는 행과 같다.
+
+그 밖의 마스터(거래처 규칙 등)를 위한 관리 UI는 아래 중
 **2개 이상** 해당하면 그때 다시 본다.
 
 - 거래처 20곳 초과에 **각각 전용 규칙이 필요**해짐

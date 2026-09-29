@@ -144,10 +144,18 @@ def test_brand_map_shows_only_this_customers_rows(client, workspace):
         assert shown == mine, f"{code} 화면에 다른 고객 행이 섞였다"
 
 
-def test_todos_surface_unconfirmed_values(client):
-    """P4 — 미확정 값은 개발을 막지 않지만 검수자는 알아야 한다."""
+def test_todos_surface_unconfirmed_values(client, workspace):
+    """P4 — 미확정 값은 개발을 막지 않지만 검수자는 알아야 한다.
+
+    실물 마스터의 todo 는 확정되면 사라진다 — 사본에 하나 심어서 본다.
+    """
+    kl = workspace / "customers" / "kl.yaml"
+    data = yaml.safe_load(kl.read_text("utf-8"))
+    data.setdefault("fields", {})["INCO1"] = {"from": "const", "value": "", "todo": "인코텀즈 확인"}
+    kl.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), "utf-8")
+
     body = client.get("/api/masters/customers/KL/preview").json()
-    assert [t for t in body["todos"] if t["field"] == "ZSHCO"]
+    assert [t for t in body["todos"] if t["field"] == "INCO1"]
 
 
 def test_split_tells_the_front_whether_orders_are_divided(client):

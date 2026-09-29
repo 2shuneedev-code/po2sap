@@ -13,11 +13,12 @@ import streamlit as st
 
 from backend.app.rules.reftable import RefTableError  # noqa: E402
 from ui.service import health  # noqa: E402
-from ui.views import brands, convert  # noqa: E402
+from ui.views import brands, convert, shipping  # noqa: E402
 
 PAGES = {
     "P/O Transfer": convert.render,
     "Brand Master": brands.render,
+    "Shipping Master": shipping.render,
 }
 
 # 사이드바 머리(접기 버튼 줄)를 띄워서 PO2SAP 제목이 맨 위에 오게 한다.

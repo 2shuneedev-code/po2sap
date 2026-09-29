@@ -30,6 +30,7 @@
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
 | 전용 규칙 없는 거래처의 동작 | `masters/profiles/generic.yaml` | 고객코드만 있으면 브랜드까지 나온다 |
+| 출하조건·운송수단 (고객 → ZSHCO·VSART) | `masters/refs/shipping_master.csv` | 화면 Shipping Master 에서 편집. 없으면 ZSHCO 빈 칸 · VSART 04 |
 | 브랜드 후보 (고객 → 코드) | `masters/refs/brand_master.csv`(SAP) ∪ `brand_master_manual.csv`(보정) | 병합은 `reftable.load()` 한 곳. 발주서 문구로 가리지 않는다 (`csv_choice`) |
 | 거래처 값 (고정값·문서매핑·결정표) | `masters/customers/{code}.yaml` | 엑셀은 **편집 입구**일 뿐 원천이 아니다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |
@@ -131,7 +132,8 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
 ├── refs/           참조표 CSV
 │   ├── brand_master.csv   SAP 원본 (읽기 전용 — `import_brand_master.py` 로 교체)
-│   └── brand_master_manual.csv  SAP 원본 위의 보정 (add·override·suppress, 화면에서 편집)
+│   ├── brand_master_manual.csv  SAP 원본 위의 보정 (add·override·suppress, 화면에서 편집)
+│   └── shipping_master.csv  고객별 ZSHCO·VSART (화면 Shipping Master 에서 편집)
 └── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)
 
@@ -156,6 +158,7 @@ ui/               ★ 스트림릿 화면 — 사내 서버에서 이것만 띄�
 ├── views/
 │   ├── convert.py    P/O Transfer — 업로드 → 전송표 → 검수 → 전송
 │   ├── brands.py     Brand Master — 병합된 후보 + 보정 표
+│   ├── shipping.py   Shipping Master — 고객별 출하조건·운송수단
 │   ├── picker.py     좌측 거래처 검색·정렬 (✅전용규칙 · 🟡공용설정 · ·브랜드없음)
 │   └── rules.py      규칙 카드 — build_preview 응답을 모양 그대로
 └── e2e/            브라우저 실동작 확인 (flow · brandflow · st)

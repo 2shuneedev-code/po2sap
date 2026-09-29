@@ -132,7 +132,7 @@ def _csv_choice(
     candidates: list[dict[str, str]] = []
     for row in rows:                       # 파일 순서 = 후보 순서 (SCHEMA §4.5)
         value = row.get(value_col, "")
-        if value in seen:
+        if not value or value in seen:     # 빈 값은 후보가 아니다 — 채운 척 넘어가면 안 된다
             continue
         seen.add(value)
         candidates.append(row)
@@ -160,6 +160,8 @@ def _choice_no_match(
         else ctx.render_message(raw_message)
     )
 
+    if action == "default" and key == "on_no_match":   # on_many 는 검증기가 막는다
+        return RuleOutcome(value=str(spec.get("value", "")), matched=False)
     if action == "empty":
         return RuleOutcome(value="", matched=False)
     return RuleOutcome(

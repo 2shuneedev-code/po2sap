@@ -23,7 +23,7 @@
         "ETDAT": "",
         "ZPKRE2": "",
         "EMPST": "",
-        "VSART": "04",
+        "VSART": "",
         "PRICE": "",
         "WAERK": "USD",
         "BSTDK_E": "",
@@ -53,6 +53,12 @@
           "severity": "warn",
           "code": "REQUIRED_MISSING",
           "message": "출하조건(ZSHCO) 이 비어 있습니다. 확인하세요."
+        },
+        {
+          "field": "VSART",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "운송수단(VSART) 이 비어 있습니다. 확인하세요."
         }
       ]
     },
@@ -79,7 +85,7 @@
         "ETDAT": "",
         "ZPKRE2": "",
         "EMPST": "",
-        "VSART": "04",
+        "VSART": "",
         "PRICE": "",
         "WAERK": "USD",
         "BSTDK_E": "",
@@ -109,6 +115,12 @@
           "severity": "warn",
           "code": "REQUIRED_MISSING",
           "message": "출하조건(ZSHCO) 이 비어 있습니다. 확인하세요."
+        },
+        {
+          "field": "VSART",
+          "severity": "warn",
+          "code": "REQUIRED_MISSING",
+          "message": "운송수단(VSART) 이 비어 있습니다. 확인하세요."
         }
       ]
     }
@@ -167,6 +179,9 @@
     ],
     "width": {
       "MATNR": 140
-    }
+    },
+    "send_only": [
+      "VKORG"
+    ]
   }
 }

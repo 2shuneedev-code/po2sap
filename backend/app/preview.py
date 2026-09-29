@@ -83,8 +83,8 @@ def _fixed(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
 
     out = []
     for name, rule in (master.fields or {}).items():
-        if not isinstance(rule, dict):
-            continue
+        if not isinstance(rule, dict) or (specs.get(name) or {}).get("send_only"):
+            continue            # send_only 는 전송에만 — 화면에 안 보인다
         source, value = rule.get("from"), None
 
         if source == "const":

@@ -134,7 +134,10 @@ def build(
         for row in rows:
             row.issues.append(issue)
 
-    return BuildResult(rows=rows, columns=field_order, grid=master.grid or {})
+    # `send_only` 필드는 행에 값이 들어가 전송되지만 검수 표에는 그리지 않는다.
+    send_only = [n for n, s in field_specs.items() if isinstance(s, dict) and s.get("send_only")]
+    grid = {**(master.grid or {}), "send_only": send_only}
+    return BuildResult(rows=rows, columns=field_order, grid=grid)
 
 
 def _run_tables(master: CustomerMaster, ctx: EvalContext, issues: list[RowIssue]) -> dict[str, str]:

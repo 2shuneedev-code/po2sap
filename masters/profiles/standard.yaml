@@ -72,7 +72,7 @@ rules:
     label: "운송수단 — Shipping Master"
     description: |
       refs/shipping_master.csv 에서 이 고객(kunnr) 행의 vsart 를 가져온다.
-      행이 없거나 비어 있으면 전 거래처 기본값 04.
+      행이 없거나 비어 있으면 비워 둔다 (필드의 required: warn 이 띄운다).
     table_file: refs/shipping_master.csv
     filter_column: kunnr
     value_column: vsart
@@ -80,8 +80,7 @@ rules:
       action: warn
       message: "Shipping Master 에 이 고객 행이 {count}개입니다 — 하나로 정리하세요"
     on_no_match:
-      action: default
-      value: "04"
+      action: empty     # 기본값 없음 — 빈 칸은 노랗게만, 전송은 막지 않는다
 
 fields:
   # ── 전 거래처 공통 고정값 (_base/sap_defaults.yaml) ───────────

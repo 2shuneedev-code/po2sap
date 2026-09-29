@@ -29,9 +29,12 @@ extraction_defaults:
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
+#
+#  `send_only: true` — 전송(EAI)에만 들어가고 검수 표·규칙 카드에는 안 보인다.
+#    사람이 볼 일도 고칠 일도 없는 값(판매조직 등)을 표에서 치운다.
 field_specs:
   AUART:   { label: "오더유형",          sheet: "SALES ORDER TYPE",     max_len: 4 }
-  VKORG:   { label: "판매조직",          sheet: "SALES ORG.",           max_len: 4 }
+  VKORG:   { label: "판매조직",          sheet: "SALES ORG.",           max_len: 4, send_only: true }
   KUNNR1:  { label: "판매처",            sheet: "SOLD-TO PARTY",        max_len: 10 }
   KUNNR2:  { label: "출하처",            sheet: "SHIP-TO PARTY",        max_len: 10 }
   KUNNR3:  { label: "최종고객",          sheet: "END CUSTOM",           max_len: 10 }

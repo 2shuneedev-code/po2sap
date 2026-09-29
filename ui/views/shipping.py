@@ -1,7 +1,7 @@
 """출하 마스터 — 고객별 출하조건(ZSHCO)·운송수단(VSART). `refs/shipping_master.csv`.
 
 고객 1곳 = 행 1개. 규칙엔진이 `csv_choice` 로 읽는다(profiles/standard.yaml).
-행이 없으면 ZSHCO 는 빈 칸(노랑), VSART 는 전 거래처 기본값이 나간다.
+행이 없으면 둘 다 빈 칸이다 — 검수 표에 노랗게 뜨지만 전송은 막지 않는다.
 
 저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로 브랜드와 같은
 암호로 잠근다. 덮어쓰기 전 사본을 남기고, 켜져 있으면 Git 에 올린다.
@@ -26,8 +26,8 @@ def render() -> None:
     st.title("Shipping Master")
     st.caption(
         "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 여기 적힌 값이 전송 행에 "
-        "그대로 들어갑니다. 행이 없으면 출하조건은 비어서 검수 표에 노랗게 뜨고, "
-        "운송수단은 기본값이 쓰입니다."
+        "그대로 들어갑니다. 행이 없으면 빈 칸으로 두고 검수 표에 노랗게 표시만 합니다 "
+        "(전송은 막지 않습니다)."
     )
 
     if entry is None:
@@ -56,7 +56,6 @@ def _editor(entry) -> None:
         vsart = right.text_input(
             "운송수단 (VSART)", value=current.vsart if current else "",
             disabled=not unlocked,
-            help="비워 두면 전 거래처 기본값이 쓰입니다",
         )
         st.caption("둘 다 비우고 저장하면 이 고객 행을 지웁니다.")
         submitted = st.form_submit_button("저장", type="primary", disabled=not unlocked)

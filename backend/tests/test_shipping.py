@@ -36,19 +36,22 @@ def test_registered_customer_gets_its_values(workspace, fixtures_dir):
         assert not [i for i in row.issues if i.field == "ZSHCO"]
 
 
-def test_unregistered_customer_leaves_zshco_blank_and_defaults_vsart(workspace, fixtures_dir):
+def test_unregistered_customer_is_blank_and_only_warned(workspace, fixtures_dir):
+    """기본값 없음 — 빈 칸은 노랗게만, 전송은 막지 않는다."""
     for row in _rows(fixtures_dir, workspace):
-        assert row.fields["ZSHCO"] == ""
-        assert any(i.field == "ZSHCO" and i.severity == "warn" for i in row.issues)
-        assert row.fields["VSART"] == "04"
+        for name in ("ZSHCO", "VSART"):
+            assert row.fields[name] == ""
+            assert any(i.field == name and i.severity == "warn" for i in row.issues)
+        assert not [i for i in row.issues if i.severity == "error"]
 
 
-def test_blank_vsart_in_a_row_falls_back_to_default(workspace, fixtures_dir):
-    """빈 값은 후보가 아니다 — 행이 있어도 빈 칸이면 기본값으로 간다."""
+def test_blank_value_in_a_row_counts_as_missing(workspace, fixtures_dir):
+    """빈 값은 후보가 아니다 — 행이 있어도 빈 칸이면 없는 것과 같다."""
     kunnr = load_customer("msc", workspace).customer_no
     shipping.set_row(workspace, shipping.ShippingRow(kunnr=kunnr, zshco="01"))
     for row in _rows(fixtures_dir, workspace):
-        assert row.fields["VSART"] == "04"
+        assert row.fields["ZSHCO"] == "01"
+        assert row.fields["VSART"] == ""
 
 
 def test_set_row_keeps_position_and_deletes_when_blank(workspace):
@@ -72,3 +75,14 @@ def test_save_leaves_a_backup(workspace, tmp_path):
     shipping.set_row(workspace, shipping.ShippingRow(kunnr="1", zshco="01"))
     shipping.set_row(workspace, shipping.ShippingRow(kunnr="1", zshco="02"), storage_dir=tmp_path / "st")
     assert list((tmp_path / "st").rglob("*shipping_master*"))
+
+
+def test_send_only_field_is_sent_but_not_drawn(workspace, fixtures_dir):
+    """판매조직처럼 `send_only` 인 필드는 행에 값이 있고(전송) 표 목록에는 빠진다."""
+    parsed = Extractor(Settings(llm_provider="mock")).parse_file(fixtures_dir / "msc" / SAMPLE, "MSC")
+    result = build(parsed.raw, load_customer("msc", workspace), workspace, file_name=SAMPLE)
+    send_only = result.grid["send_only"]
+    assert send_only
+    for name in send_only:
+        assert name in result.columns                   # 전송 컬럼에는 있다
+        assert all(row.fields[name] for row in result.rows)

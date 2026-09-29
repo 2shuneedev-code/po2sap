@@ -30,7 +30,7 @@
 | **추출 표준 키** | `masters/SCHEMA.md` §3.1 | 코드가 여기에 맞춘다 (반대 아님) |
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
 | 전용 규칙 없는 거래처의 동작 | `masters/profiles/generic.yaml` | 고객코드만 있으면 브랜드까지 나온다 |
-| 출하조건·운송수단 (고객 → ZSHCO·VSART) | `masters/refs/shipping_master.csv` | 화면 Shipping Master 에서 편집. 없으면 ZSHCO 빈 칸 · VSART 04 |
+| 출하조건·운송수단 (고객 → ZSHCO·VSART) | `masters/refs/shipping_master.csv` | 화면 Shipping Master 에서 편집. 없으면 둘 다 빈 칸(노랑·전송 가능) |
 | 브랜드 후보 (고객 → 코드) | `masters/refs/brand_master.csv`(SAP) ∪ `brand_master_manual.csv`(보정) | 병합은 `reftable.load()` 한 곳. 발주서 문구로 가리지 않는다 (`csv_choice`) |
 | 거래처 값 (고정값·문서매핑·결정표) | `masters/customers/{code}.yaml` | 엑셀은 **편집 입구**일 뿐 원천이 아니다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |

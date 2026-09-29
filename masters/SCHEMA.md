@@ -996,6 +996,11 @@ grid:
   width:  { MATNR: 140 }
 ```
 
+**`hidden` 과 `send_only` 는 다르다.** `hidden` 은 "숨김 컬럼까지 보기"로 펼칠 수 있고
+사람이 고칠 수도 있다. `send_only` 는 `_base` 의 `field_specs` 에 다는 플래그로
+(예: `VKORG`), 값은 행에 들어가 **EAI 전송에만** 실리고 검수 표·규칙 카드에는 아예
+그리지 않는다. 엔진이 `grid.send_only` 로 목록을 화면에 넘긴다.
+
 **드롭다운은 여기에 적지 않는다.** 필드의 `choices`(§4.6)가 정하고 화면은 그대로
 그린다 — 화면에 거래처별 분기 코드를 두지 않기 위해서다.
 
@@ -1069,8 +1074,8 @@ checks:
 
 **출하 마스터**(`refs/shipping_master.csv` — `kunnr · name1 · zshco · vsart`, 고객 1곳 = 행 1개)도
 화면(`ui/views/shipping.py`)에서 고친다. `profiles/standard.yaml` 의 `csv_choice` 두 개
-(`shipping_condition` → ZSHCO, `shipping_type` → VSART)가 읽는다. 행이 없으면 ZSHCO 는
-빈 칸(`required: warn`), VSART 는 `on_no_match: default` 로 `04`. `csv_choice` 는 **빈 값을
+(`shipping_condition` → ZSHCO, `shipping_type` → VSART)가 읽는다. **기본값은 없다** — 행이 없으면 둘 다
+빈 칸이고 `required: warn` 으로 노랗게만 띄운다(전송은 막지 않는다). `csv_choice` 는 **빈 값을
 후보로 세지 않는다** — 칸을 비운 행은 없는 행과 같다.
 
 그 밖의 마스터(거래처 규칙 등)를 위한 관리 UI는 아래 중

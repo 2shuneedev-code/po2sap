@@ -194,7 +194,7 @@ def _review_section(batch: Batch) -> None:
         help="숨겨진 컬럼도 **전송에는 그대로 들어갑니다**(빈 값). 보기에서만 접어둔 것입니다.",
     )
 
-    frame, issues_by_row = _to_frame(visible, batch.columns)
+    frame, issues_by_row = _to_frame(visible, _grid_columns(batch))
     edited = st.data_editor(
         frame,
         width="stretch",
@@ -238,11 +238,18 @@ def _column_order(batch: Batch, show_all: bool) -> list[str]:
     순서는 마스터의 `grid.pinned`/`hidden` 이 정한다 — 이 파일에 필드 이름을
     나열하지 않는다 (CLAUDE.md P2). 숨김 컬럼도 **전송에는 그대로 들어간다.**
     """
-    pinned = [c for c in (batch.grid.get("pinned") or []) if c in batch.columns]
+    columns = _grid_columns(batch)
+    pinned = [c for c in (batch.grid.get("pinned") or []) if c in columns]
     hidden = set(batch.grid.get("hidden") or [])
-    rest = [c for c in batch.columns if c not in pinned and c not in hidden]
-    tail = [c for c in batch.columns if c in hidden] if show_all else []
+    rest = [c for c in columns if c not in pinned and c not in hidden]
+    tail = [c for c in columns if c in hidden] if show_all else []
     return [*META, *pinned, *rest, *tail]
+
+
+def _grid_columns(batch: Batch) -> list[str]:
+    """표에 그릴 컬럼. `send_only`(판매조직 등)는 전송에만 들어가고 표에는 없다."""
+    send_only = set(batch.grid.get("send_only") or [])
+    return [c for c in batch.columns if c not in send_only]
 
 
 def _column_config(batch: Batch) -> dict:
@@ -256,7 +263,7 @@ def _column_config(batch: Batch) -> dict:
         "파일": st.column_config.TextColumn("파일", width="medium"),
         "그룹": st.column_config.TextColumn("그룹", width="small"),
     }
-    for name in batch.columns:
+    for name in _grid_columns(batch):
         label = str((specs.get(name) or {}).get("label") or name)
         config[name] = st.column_config.TextColumn(
             f"{name} · {label}",

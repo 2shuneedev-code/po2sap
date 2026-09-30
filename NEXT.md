@@ -71,6 +71,20 @@ HARRISBURG→319677 · RENO→319678 · ATLANTA→319679, `on_no_match: error`)�
 `pytest`·`ruff`·`validate_masters` 전부 0 오류. **이제 실물 발주서로 테스트할
 차례.**
 
+### 2026-09-30 — MSC·KL·YGJP 전용 yaml 삭제 · 전 거래처 공통 기준
+
+> 사장님: **"지금 전부다 규칙없이 시작한다음 새로 규칙 넣을거야 … 3개 업체
+> 모두 공통기준 적용하고 yaml 없애고"**
+
+`masters/customers/{msc,kl,ygjp}.yaml` 을 지웠다. 세 곳도 다른 고객처럼
+`profiles/generic.yaml`(→ standard)로 읽는다. 없어진 것: 읽기 힌트
+(`extraction.hints`), MSC 출하처별 분할과 KUNNR2 결정표(위 09-23 항목).
+규칙은 처음부터 다시 얹는다 — 모양은 SCHEMA.md §4.5 "거래처 전용 예외".
+
+테스트는 옛 세 파일을 **합성 거래처**로 `backend/tests/fixtures/customers/`
+에 두고, `conftest.masters_dir` 가 실물 사본에 얹어 쓴다(`MASTERS_DIR` 도
+그 사본). 실물 규칙이 바뀌어도 테스트가 같이 죽지 않는다.
+
 ### 2026-09-28 — `brand_keys.csv` 완전 폐기 · 보정 오버레이 구현 (SCHEMA §4.5-A)
 
 - `refs/brand_keys.csv` · `scripts/seed_brand_keys.py` 삭제. 엑셀 도구의

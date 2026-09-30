@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -70,8 +71,29 @@ def root() -> Path:
 
 
 @pytest.fixture(scope="session")
-def masters_dir() -> Path:
-    return ROOT / "masters"
+def masters_dir(tmp_path_factory) -> Path:
+    """실물 `masters/` 사본 + 테스트 전용 거래처(`fixtures/customers/`).
+
+    실물에는 전용 규칙 파일이 없다 (2026-09-30 전부 공용 기준으로 초기화).
+    테스트는 결정표·분할·힌트 같은 모양을 여전히 봐야 하므로, 예전
+    MSC·KL·YGJP 파일을 **합성 거래처**로 픽스처에 두고 사본에만 얹는다.
+    실물 규칙이 바뀌어도 테스트가 따라 죽지 않는다.
+    """
+    dst = tmp_path_factory.mktemp("masters_root") / "masters"
+    shutil.copytree(ROOT / "masters", dst)
+    for path in (FIXTURES / "customers").glob("*.yaml"):
+        shutil.copy2(path, dst / "customers" / path.name)
+    return dst
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _masters_dir_env(masters_dir):
+    """`Settings()` 를 인자 없이 만드는 테스트도 같은 사본을 보게 한다."""
+    os.environ["MASTERS_DIR"] = str(masters_dir)
+    try:
+        yield
+    finally:
+        os.environ.pop("MASTERS_DIR", None)
 
 
 @pytest.fixture(scope="session")

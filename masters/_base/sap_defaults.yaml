@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════════
 #  전 거래처 공통 SAP 기본값 / 필드 스펙
-#  원천: samples/templates/SALES ORDER.xlsx  (2026-09-10 실물 확인)
+#  원천: masters/templates/SALES ORDER.xlsx  (2026-09-30 현업 수정본 반영)
 #  ※ 필드 증감은 이 파일만 고치면 전 거래처·화면·전송에 반영된다.
 # ═══════════════════════════════════════════════════════════════
 
@@ -26,6 +26,7 @@ extraction_defaults:
 #
 #  2026-09-21 현업 확정본(SALES ORDER 템플릿) 반영 — 36 → 28.
 #  뺀 8개: VTWEG · VBELN · ZPKRE1 · MAKTX · LGORT · BATCH · VALTY · BSTKD_E
+#  2026-09-30 템플릿 수정 — POSEX 를 BSTKD 옆으로 옮기고 KDMAT(YOUR CODE) 추가.
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
@@ -39,12 +40,14 @@ field_specs:
   KUNNR2:  { label: "출하처",            sheet: "SHIP-TO PARTY",        max_len: 10 }
   KUNNR3:  { label: "최종고객",          sheet: "END CUSTOM",           max_len: 10 }
   BSTKD:   { label: "고객발주번호",      sheet: "CUSTOMER PO",          max_len: 35 }
+  POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
   VDATU:   { label: "납품요청일",        sheet: "DELIVERY DATE",        type: date }
   ZTERM:   { label: "지급조건",          sheet: "TERMS OF PAYM",        max_len: 4 }
   INCO1:   { label: "인도조건1",         sheet: "INCOTERMS1",           max_len: 3 }
   INCO2:   { label: "인도조건2",         sheet: "INCOTERMS2",           max_len: 28 }
   ZBRAND:  { label: "브랜드",            sheet: "BRAND",                max_len: 4 }
   ZSHCO:   { label: "출하조건",          sheet: "SHIPPING CONDITION",   max_len: 2 }
+  KDMAT:   { label: "고객자재번호",      sheet: "YOUR CODE",            max_len: 35, added: "2026-09-30 템플릿 수정" }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
   KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
   ETDAT:   { label: "품목납기일",        sheet: "ITEM DEL. DATE",       type: date }
@@ -54,7 +57,6 @@ field_specs:
   PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
   WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
   BSTDK_E: { label: "발주일",            sheet: "PO ORDER DATE",        type: date }
-  POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
   DELCO:   { label: "납기소요일",        sheet: "DELIVERY TIME",        max_len: 4 }
   AUGRU:   { label: "오더사유",          sheet: "ORDER REASON",         max_len: 3 }
   VKAUS:   { label: "용도",              sheet: "USAGE",                max_len: 3 }

@@ -244,7 +244,8 @@ def _column_order(batch: Batch, show_all: bool) -> list[str]:
     hidden = set(batch.grid.get("hidden") or [])
     rest = [c for c in columns if c not in pinned and c not in hidden]
     tail = [c for c in columns if c in hidden] if show_all else []
-    return [*META, *pinned, *rest, *tail]
+    meta = [m for m in META if m != "그룹" or any(r.group for r in batch.rows)]
+    return [*meta, *pinned, *rest, *tail]
 
 
 def _grid_columns(batch: Batch) -> list[str]:
@@ -259,10 +260,11 @@ def _column_config(batch: Batch) -> dict:
 
     specs = field_specs_for(batch.customer)
     hidden = set(batch.grid.get("hidden") or [])
+    widths = batch.grid.get("width") or {}           # 마스터가 정한 폭이 있으면 그걸 쓴다
     config: dict = {
-        "#": st.column_config.NumberColumn("#", width="small"),
+        "#": st.column_config.NumberColumn("#", width=40),
         "파일": st.column_config.TextColumn("파일", width="medium"),
-        "그룹": st.column_config.TextColumn("그룹", width="small"),
+        "그룹": st.column_config.TextColumn("그룹", width=_fit("그룹")),
     }
     choices = choices_for(batch.customer)
     for name in _grid_columns(batch):
@@ -270,25 +272,34 @@ def _column_config(batch: Batch) -> dict:
         help_text = f"{label} ({name})" + (
             " — 보기에서 접힌 컬럼. 전송에는 들어갑니다." if name in hidden else ""
         )
+        header = f"{name} · {label}"
         if name in choices:
             config[name] = _choice_column(name, label, help_text, choices[name])
             continue
         config[name] = st.column_config.TextColumn(
-            f"{name} · {label}", help=help_text,
-            width="small" if name in hidden else "medium",
+            header, help=help_text, width=int(widths.get(name) or _fit(header)),
         )
     return config
+
+
+def _fit(header: str) -> int:
+    """열 폭 = 머리글 글자 폭. `small`·`medium` 은 짧은 머리글에도 넓어서 한 화면에
+    보이는 열이 적었다. 한글은 영문의 두 배 가까이 넓다. 여백은 머리글 아이콘 몫."""
+    text = sum(13 if ord(ch) >= 0x1100 else 7.5 for ch in header)
+    return max(56, int(text) + 40)
 
 
 def _choice_column(name: str, label: str, help_text: str, options: list[list[str]]):
     """후보가 여럿인 필드 — 드롭다운. 값은 코드, 보이는 글자는 `코드 · 이름`."""
     names = {o[0]: o[1] for o in options if len(o) > 1 and o[1]}
+    header = f"▾ {name} · {label}"
+    longest = max((f"{o[0]} · {o[1]}" if len(o) > 1 else o[0] for o in options), key=len)
     return st.column_config.SelectboxColumn(
-        f"▾ {name} · {label}",
+        header,
         help=help_text + " — 후보 중에서 고릅니다.",
         options=[o[0] for o in options],
         format_func=lambda code: f"{code} · {names[code]}" if code in names else str(code),
-        width="medium",
+        width=max(_fit(header), _fit(longest)),     # 고른 값("038 · HERTEL")이 잘리지 않게
     )
 
 

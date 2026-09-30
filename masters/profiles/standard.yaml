@@ -108,6 +108,8 @@ fields:
   KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
   PRICE:   { from: doc, path: line.unit_price }
   POSEX:   { from: doc, path: line.posex }
+  # KDMAT = 고객 자재번호 = **거래처 품번**(our_item). MATNR(우리 품번)과 반대다.
+  KDMAT:   { from: doc, path: line.our_item }
 
   # ── 규칙·마스터가 정한다 ──────────────────────────────────────
   WAERK:   { from: rule, rule: currency, required: warn }
@@ -135,6 +137,6 @@ fields:
   ZTERM:   { from: const, value: "" }
 
 grid:
-  pinned: [BSTKD, MATNR, KWMENG]
+  pinned: [BSTKD, POSEX, KDMAT, MATNR, KWMENG]   # 템플릿 순서 그대로 앞에
   hidden: [VDATU, ZTERM, INCO1, INCO2, ETDAT, PRICE, WAERK, BSTDK_E, DELCO, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
   width:  { MATNR: 140 }

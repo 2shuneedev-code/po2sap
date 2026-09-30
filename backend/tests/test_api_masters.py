@@ -90,7 +90,7 @@ def test_fixed_holds_only_values_settled_before_reading_the_document(client):
     fixed = {f["field"] for f in body["fixed"]}
 
     assert "BSTKD" not in fixed      # header.po_number 를 참조한다
-    assert "ZSHCO" not in fixed      # brand_code 규칙 결과를 참조한다
+    assert "ZBRAND" not in fixed     # 후보가 여럿이면 검수에서 고른다 → 확정값 아님
     assert "KUNNR1" in fixed         # meta.customer_no 만 쓴다 → 확정값
 
 

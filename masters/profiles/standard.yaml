@@ -36,6 +36,7 @@ rules:
   currency:
     kind: csv_map
     label: "통화 → ISO 3자리"
+    preview: hidden     # 적용만 한다 — 검수자가 볼 규칙이 아니다
     description: |
       발주서 원문("United States Dollars")을 ISO 4217 세 자리(USD)로 바꾼다.
       **거래처와 무관한 전역 참조표**라 filter_column 을 두지 않는다.
@@ -55,6 +56,8 @@ rules:
   shipping_condition:
     kind: csv_choice
     label: "출하조건 — Shipping Master"
+    preview: fixed      # 고객 1곳 = 값 1개라 고정값 칸에 값으로 보인다
+    preview_note: "출하조건 · 운송수단은 Shipping Master 에서 가져옵니다."
     description: |
       refs/shipping_master.csv 에서 이 고객(kunnr) 행의 zshco 를 가져온다.
       고객 1곳 = 행 1개. 행이 없으면 비워 둔다 (필드의 required: warn 이 띄운다).
@@ -70,6 +73,8 @@ rules:
   shipping_type:
     kind: csv_choice
     label: "운송수단 — Shipping Master"
+    preview: fixed
+    preview_note: "출하조건 · 운송수단은 Shipping Master 에서 가져옵니다."
     description: |
       refs/shipping_master.csv 에서 이 고객(kunnr) 행의 vsart 를 가져온다.
       행이 없거나 비어 있으면 비워 둔다 (필드의 required: warn 이 띄운다).

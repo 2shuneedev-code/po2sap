@@ -59,6 +59,7 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
     { "field": "VSART",  "label": "운송수단", "value": "04" },
     { "field": "ZSHCO",  "label": "출하조건", "value": "A" }
   ],
+  "fixed_note": "출하조건 · 운송수단은 Shipping Master 에서 가져옵니다.",
   "rules": [
     {
       "id": "brand_code",
@@ -93,6 +94,10 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
 ```
 
 프론트는 `fixed` / `rules[]` / `split` / `todos` 를 **모양 그대로** 렌더한다.
+`fixed_note` 는 `fixed` 아래 한 줄 안내다(없으면 `""`). `fixed[].value` 가 `""` 면
+참조표에 아직 값이 없다는 뜻이다 — 화면은 `—` 로 그린다.
+규칙의 `preview` 속성(SCHEMA §4.5)이 `fixed` 면 그 규칙은 `rules[]` 대신 `fixed` 에,
+`hidden` 이면 적용만 하고 어디에도 싣지 않는다.
 거래처별 분기 코드를 프론트에 넣지 않는다. `rules[].kind` 로 아이콘만 구분한다.
 
 ---

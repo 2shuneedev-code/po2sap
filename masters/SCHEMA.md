@@ -473,6 +473,8 @@ tables:
 | `kind` | ✅ | 아래 표의 여섯 가지 중 하나 |
 | `label` | | 화면(규칙 카드)에 표시할 이름 |
 | `description` | | 화면에 표시할 설명 |
+| `preview` | | 규칙 카드에서 어디 보일까. `card`(기본) · `fixed`(고정값 칸에 이 고객의 값으로 — 고객 1곳 = 값 1개인 `csv_choice` 용) · `hidden`(적용만, 화면엔 안 보임) |
+| `preview_note` | | `preview: fixed` 일 때 고정값 아래 붙는 한 줄 안내. 같은 문구는 한 번만 |
 | `source` | `fixed`·`lookup`·`csv_choice` 외 ✅ | 평가할 컨텍스트 경로 |
 | `fallback_source` | | `source` 가 비면 이 경로로 평가한다 (예: 라인 → 헤더) |
 | `case_insensitive` | | `true` 면 대소문자를 무시하고 대조한다 (기본 `false`) |

@@ -86,3 +86,23 @@ def test_send_only_field_is_sent_but_not_drawn(workspace, fixtures_dir):
     for name in send_only:
         assert name in result.columns                   # 전송 컬럼에는 있다
         assert all(row.fields[name] for row in result.rows)
+
+
+
+def test_preview_shows_shipping_as_fixed_values_and_hides_currency(workspace):
+    """출하조건·운송수단은 고정값 칸에 값으로, 통화는 적용만 하고 카드에 없다."""
+    from app.preview import build_preview
+
+    settings = Settings(masters_dir=workspace)
+    blank = {f["field"]: f["value"] for f in build_preview("msc", settings)["fixed"]}
+    assert blank["ZSHCO"] == "" and blank["VSART"] == ""     # 행이 없어도 칸은 보인다
+
+    kunnr = load_customer("msc", workspace).customer_no
+    shipping.set_row(workspace, shipping.ShippingRow(kunnr=kunnr, zshco="01", vsart="02"))
+    preview = build_preview("msc", settings)
+
+    fixed = {f["field"]: f["value"] for f in preview["fixed"]}
+    assert fixed["ZSHCO"] == "01" and fixed["VSART"] == "02"
+    assert "Shipping Master" in preview["fixed_note"]
+    ids = {r["id"] for r in preview["rules"]}
+    assert not ids & {"shipping_condition", "shipping_type", "currency"}

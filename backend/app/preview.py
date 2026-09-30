@@ -31,7 +31,8 @@ def build_preview(code: str, settings: Settings) -> dict:
         "code": master.code,
         "name": master.name,
         "customer_no": master.customer_no,
-        "fixed": _fixed(master, specs),
+        "fixed": _fixed(master, specs, settings),
+        "fixed_note": _fixed_note(master),
         "rules": _tables(master) + _rules(master, settings),
         "split": _split(master),
         "todos": _todos(master, specs),
@@ -70,8 +71,12 @@ def _label(specs: dict[str, Any], name: str) -> str:
 
 
 # ── fixed: 발주서를 읽지 않고도 이미 정해지는 값 ──────────────────────
-def _fixed(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
+def _fixed(master: CustomerMaster, specs: dict[str, Any], settings: Settings) -> list[dict]:
     """`const` · `base` · `meta` 만으로 결정되는 필드.
+
+    규칙에 `preview: fixed` 가 달린 `csv_choice`(고객 1곳 = 값 1개인 참조표)도
+    발주서 없이 정해지므로 여기 싣는다. 아직 행이 없으면 빈 값 그대로 싣는다 —
+    빠뜨리면 "없음"과 "해당 없음"이 구분되지 않는다.
 
     `expr` 은 **참조하는 경로를 먼저 본다.** `meta.*` 만 쓰는 식이라야 고정값이다.
     평가 결과로 판단하면 안 된다 — `join("-", ["01", header.po_date, ...])` 는
@@ -93,6 +98,13 @@ def _fixed(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
             value = defaults.get(name)
         elif source == "expr":
             value = _meta_only_expr(str(rule.get("expr") or ""), ctx)
+        elif source == "rule":
+            spec = (master.rules or {}).get(str(rule.get("rule") or "")) or {}
+            if _shown_as(spec) == "fixed":
+                _, rows = _csv_choice_rows(spec, master, settings)
+                value = rows[0][0] if len(rows) == 1 else ""
+                out.append({"field": name, "label": _label(specs, name), "value": value})
+                continue
 
         if value not in (None, ""):
             item = {"field": name, "label": _label(specs, name), "value": str(value)}
@@ -100,6 +112,22 @@ def _fixed(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
                 item["note"] = str(rule["explain"])
             out.append(item)
     return out
+
+
+def _fixed_note(master: CustomerMaster) -> str:
+    """`preview: fixed` 규칙이 어디서 값을 가져오는지 — 고정값 아래 한 줄."""
+    notes: list[str] = []
+    for rule in (master.rules or {}).values():
+        if isinstance(rule, dict) and _shown_as(rule) == "fixed":
+            note = str(rule.get("preview_note") or "").strip()
+            if note and note not in notes:
+                notes.append(note)
+    return " ".join(notes)
+
+
+def _shown_as(rule: dict) -> str:
+    """규칙을 화면 어디에 보이나 — `card`(기본) · `fixed`(고정값 칸) · `hidden`(적용만)."""
+    return str(rule.get("preview") or "card")
 
 
 def _meta_only_expr(source: str, ctx: EvalContext) -> str | None:
@@ -143,8 +171,8 @@ def _tables(master: CustomerMaster) -> list[dict]:
 def _rules(master: CustomerMaster, settings: Settings) -> list[dict]:
     out = []
     for rule_id, rule in (master.rules or {}).items():
-        if not isinstance(rule, dict):
-            continue
+        if not isinstance(rule, dict) or _shown_as(rule) != "card":
+            continue            # fixed 는 고정값 칸에, hidden 은 적용만 하고 안 보인다
         kind = str(rule.get("kind") or "rule")
 
         if kind == "csv_map":

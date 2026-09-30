@@ -73,8 +73,9 @@ RULE_OPTIONS = {
     "case_insensitive", "normalize", "entries", "on_no_match", "on_many",
     "table_file", "key", "key_column", "return", "optional",
     "value_column", "mode_column", "filter_column", "label_column", "value_check",
-    "pattern", "group", "value",
+    "pattern", "group", "value", "preview", "preview_note",
 }
+PREVIEW_MODES = {"card", "fixed", "hidden"}                                    # §4.5
 NORMALIZE_OPS = {"trim", "collapse_spaces", "upper", "lower"}
 TABLE_OPS = {"contains_ci", "equals", "equals_ci", "regex", "starts_with"}     # §4.4
 NO_MATCH_ACTIONS = {"error", "warn", "default", "empty"}
@@ -379,6 +380,14 @@ def check_rules(
         for key in rule:
             if key not in RULE_OPTIONS:
                 report.error(2, f"{where}: 정의되지 않은 옵션입니다: {key}")
+
+        preview = rule.get("preview", "card")
+        if preview not in PREVIEW_MODES:
+            report.error(2, f"{where}: preview 가 허용 목록 밖입니다: {preview!r} "
+                            f"(허용: {', '.join(sorted(PREVIEW_MODES))})")
+        elif preview == "fixed" and kind != "csv_choice":
+            report.error(2, f"{where}: preview: fixed 는 csv_choice 만 쓸 수 있습니다 "
+                            f"(고객 1곳 = 값 1개라야 발주서 없이 값이 정해진다)")
 
         for op in rule.get("normalize") or []:
             if op not in NORMALIZE_OPS:

@@ -42,9 +42,11 @@ def rule_preview(preview: dict) -> None:
             with cols[index % len(cols)]:
                 st.metric(
                     label=f"{item['label']} · {item['field']}",
-                    value=item["value"],
+                    value=item["value"] or "—",
                     help=item.get("note") or None,
                 )
+        if preview.get("fixed_note"):
+            st.caption(preview["fixed_note"])
 
     if rules:
         st.markdown("**자동 판별 규칙**")

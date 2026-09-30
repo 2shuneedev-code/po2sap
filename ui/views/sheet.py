@@ -38,10 +38,19 @@ def _text(value) -> str:
     return str(value).strip()
 
 
+# 스트림릿 표는 **붙여넣기로 행을 늘리지 않는다** — 빈 표나 마지막 행 아래에
+# 붙여넣으면 조용히 버려진다(2026-09-30 실제 크롬·클립보드로 확인). 편집이 열려
+# 있으면 빈 행을 미리 깔아 둔다. 저장 때 빈 행은 버리므로(`records`) 원본엔 안 남는다.
+SPARE_ROWS = 30
+
+
 def editor(frame: pd.DataFrame, *, key: str, unlocked: bool, column_config: dict) -> pd.DataFrame:
     """잠겨 있으면 조회만. 저장 뒤에는 키를 바꿔 **새 원본으로** 다시 편다 —
     같은 키면 방금 저장한 추가 행이 한 번 더 얹힌다."""
     version = st.session_state.get(_VERSION, 0)
+    if unlocked:
+        blank = pd.DataFrame([dict.fromkeys(frame.columns, "")] * SPARE_ROWS)
+        frame = pd.concat([frame, blank], ignore_index=True)
     return st.data_editor(
         frame,
         disabled=not unlocked,
@@ -62,6 +71,7 @@ def saved() -> None:
 def paste_hint() -> None:
     st.caption(
         "엑셀에서 여러 칸을 잡아 복사한 뒤, 표에서 붙여넣을 **첫 칸을 한 번 클릭**하고 "
-        "Ctrl+V 하세요 (칸 안에 들어가 편집 중이면 한 칸에만 들어갑니다). "
-        "행 추가는 표 아래 **+**, 삭제는 행 왼쪽을 골라 Delete."
+        "Ctrl+V 하세요 (칸 안에 들어가 편집 중이면 한 칸에만 들어갑니다). 새 행은 아래 "
+        f"**빈 행 {SPARE_ROWS}줄**에 붙여넣으세요 — 빈 행은 저장 때 버립니다. "
+        "더 필요하면 표 아래 **+**, 삭제는 행 왼쪽을 골라 Delete."
     )

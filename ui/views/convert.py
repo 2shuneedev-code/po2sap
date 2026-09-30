@@ -17,6 +17,7 @@ from ui.service import (
     Batch,
     MasterError,
     SendBlocked,
+    choices_for,
     merge_edits,
     preview_for,
     repo,
@@ -263,15 +264,32 @@ def _column_config(batch: Batch) -> dict:
         "파일": st.column_config.TextColumn("파일", width="medium"),
         "그룹": st.column_config.TextColumn("그룹", width="small"),
     }
+    choices = choices_for(batch.customer)
     for name in _grid_columns(batch):
         label = str((specs.get(name) or {}).get("label") or name)
+        help_text = f"{label} ({name})" + (
+            " — 보기에서 접힌 컬럼. 전송에는 들어갑니다." if name in hidden else ""
+        )
+        if name in choices:
+            config[name] = _choice_column(name, label, help_text, choices[name])
+            continue
         config[name] = st.column_config.TextColumn(
-            f"{name} · {label}",
-            help=f"{label} ({name})"
-                 + (" — 보기에서 접힌 컬럼. 전송에는 들어갑니다." if name in hidden else ""),
+            f"{name} · {label}", help=help_text,
             width="small" if name in hidden else "medium",
         )
     return config
+
+
+def _choice_column(name: str, label: str, help_text: str, options: list[list[str]]):
+    """후보가 여럿인 필드 — 드롭다운. 값은 코드, 보이는 글자는 `코드 · 이름`."""
+    names = {o[0]: o[1] for o in options if len(o) > 1 and o[1]}
+    return st.column_config.SelectboxColumn(
+        f"▾ {name} · {label}",
+        help=help_text + " — 후보 중에서 고릅니다.",
+        options=[o[0] for o in options],
+        format_func=lambda code: f"{code} · {names[code]}" if code in names else str(code),
+        width="medium",
+    )
 
 
 def _apply(batch: Batch, edited: pd.DataFrame, visible) -> None:

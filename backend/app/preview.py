@@ -15,7 +15,7 @@ from .masters import CustomerMaster, MasterError, load_customer
 from .rules import EvalContext, EvalError, ExprError, reftable
 from .rules import expr as expr_mod
 
-__all__ = ["PreviewError", "build_preview", "field_specs", "field_list"]
+__all__ = ["PreviewError", "build_preview", "field_choices", "field_specs", "field_list"]
 
 
 class PreviewError(ValueError):
@@ -38,6 +38,27 @@ def build_preview(code: str, settings: Settings) -> dict:
         "todos": _todos(master, specs),
         "footer": "나머지 항목은 발주서에서 읽어옵니다.",
     }
+
+
+def field_choices(code: str, settings: Settings) -> dict[str, list[list[str]]]:
+    """검수 표 드롭다운 — `csv_choice` 로 정해지는 필드의 이 고객 후보.
+
+    후보가 **2개 이상**일 때만 싣는다. 1개면 이미 자동으로 채워졌고, 0개면
+    고를 것이 없다(빈 칸 경고로 충분). 각 항목은 `[코드]` 또는 `[코드, 이름]`.
+    필드 이름은 YAML 에서 온다 — 이 함수는 어떤 필드인지 모른다 (CLAUDE.md P2).
+    """
+    master = _one(code, settings)
+    out: dict[str, list[list[str]]] = {}
+    for name, rule in (master.fields or {}).items():
+        if not isinstance(rule, dict) or rule.get("from") != "rule":
+            continue
+        spec = (master.rules or {}).get(str(rule.get("rule") or "")) or {}
+        if spec.get("kind") != "csv_choice":
+            continue
+        _, rows = _csv_choice_rows(spec, master, settings)
+        if len(rows) > 1:
+            out[name] = rows
+    return out
 
 
 def field_list(master: CustomerMaster) -> list[dict]:

@@ -40,7 +40,44 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { margin-top
 """
 
 
+# 사내 서버는 http://서버IP:8501 로 연다. 브라우저는 https·localhost 가 아니면
+# `navigator.clipboard` 를 **아예 주지 않는다.** 스트림릿 표(glide-data-grid)는
+# 붙여넣기 때 `navigator.clipboard.read` 부터 확인하다가 거기서 예외가 나고,
+# 여러 칸 붙여넣기가 죽는다(칸 안 편집 중일 때만 한 칸이 들어간다).
+# 빈 clipboard 객체를 주면 표는 붙여넣기 **이벤트의 clipboardData** 로 넘어간다 —
+# 원래 있는 대체 경로다. 복사는 이벤트로 되고, writeText 만 옛 방식으로 채운다.
+# 고정 문자열이다 — 사용자 입력이 섞이지 않는다.
+_CLIPBOARD_SHIM = """
+<script>
+(function () {
+  try {
+    if (window.isSecureContext || navigator.clipboard) return;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: function (text) {
+          return new Promise(function (resolve, reject) {
+            var box = document.createElement("textarea");
+            box.value = text;
+            box.style.position = "fixed";
+            box.style.opacity = "0";
+            document.body.appendChild(box);
+            box.select();
+            try { document.execCommand("copy"); resolve(); }
+            catch (e) { reject(e); }
+            finally { box.remove(); }
+          });
+        }
+      }
+    });
+  } catch (e) { /* 보정 실패는 조용히 — 한 칸 붙여넣기는 그대로 된다 */ }
+})();
+</script>
+"""
+
+
 def main() -> None:
+    st.html(_CLIPBOARD_SHIM, unsafe_allow_javascript=True)
     with st.sidebar:
         st.markdown(_SIDEBAR_TIGHT, unsafe_allow_html=True)
         st.markdown("### 📄 PO2SAP")

@@ -3,7 +3,8 @@
 고객 1곳 = 행 1개. 규칙엔진이 `csv_choice` 로 읽는다(profiles/standard.yaml).
 행이 없으면 둘 다 빈 칸이다 — 검수 표에 노랗게 뜨지만 전송은 막지 않는다.
 
-저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로 브랜드와 같은
+화면은 원본 CSV 를 스프레드시트로 편다 — 고객을 고르면 그 고객 행만, 안 고르면
+전체. 저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로 브랜드와 같은
 암호로 잠근다. 덮어쓰기 전 사본을 남기고, 켜져 있으면 Git 에 올린다.
 """
 
@@ -17,7 +18,11 @@ import streamlit as st
 from backend.app import gitsync
 from ui.auth import gate
 from ui.service import catalog, preview_for, settings, shipping_store
+from ui.views import sheet
 from ui.views.picker import customer_header, customer_picker
+
+COLUMNS = {"고객코드": "kunnr", "고객명": "name1", "ZSHCO": "zshco", "VSART": "vsart"}
+SCOPED = {"ZSHCO": "zshco", "VSART": "vsart"}      # 고객을 골랐을 때 — 나머지는 저장 때 채운다
 
 
 def render() -> None:
@@ -25,53 +30,59 @@ def render() -> None:
 
     st.title("Shipping Master")
     st.caption(
-        "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 여기 적힌 값이 전송 행에 "
-        "그대로 들어갑니다. 행이 없으면 빈 칸으로 두고 검수 표에 노랗게 표시만 합니다 "
-        "(전송은 막지 않습니다)."
+        "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 이 표가 원본"
+        "(`refs/shipping_master.csv`)이고, 저장하면 원본이 바로 바뀝니다. 여기 적힌 값이 "
+        "전송 행에 그대로 들어갑니다. 행이 없으면 빈 칸으로 두고 검수 표에 노랗게 표시만 "
+        "합니다 (전송은 막지 않습니다)."
     )
 
     if entry is None:
-        st.info("왼쪽에서 고객을 선택하세요.", icon="👈")
+        st.caption("왼쪽에서 고객을 고르면 그 고객 행만 봅니다. 지금은 **전체 표**입니다.")
     else:
         customer_header(entry)
-        _editor(entry)
+        if st.button("← 전체 표", key="shipping_all"):
+            st.session_state.pop("shipping_kunnr", None)
+            st.rerun()
+    _sheet(entry)
 
-    with st.expander("전체 표", expanded=entry is None):
-        _all_rows()
 
-
-def _editor(entry) -> None:
+def _sheet(entry) -> None:
     cfg = settings()
-    current = shipping_store.get(cfg.masters_dir, entry.kunnr)
-    if current is None:
-        st.warning("이 고객은 Shipping Master 에 아직 없습니다.", icon="⚠️")
+    rows = shipping_store.load(cfg.masters_dir)
+    if entry is not None:
+        rows = [r for r in rows if r.kunnr == entry.kunnr]
+        if not rows:
+            st.warning("이 고객은 Shipping Master 에 아직 없습니다. 아래 칸에 넣고 저장하세요.", icon="⚠️")
+            rows = [shipping_store.ShippingRow(kunnr=entry.kunnr)]
 
-    unlocked = gate(cfg.master_edit_password, what="Shipping Master")
-    with st.form(f"shipping_{entry.kunnr}"):
-        left, right = st.columns(2)
-        zshco = left.text_input(
-            "출하조건 (ZSHCO)", value=current.zshco if current else "",
-            disabled=not unlocked,
-        )
-        vsart = right.text_input(
-            "운송수단 (VSART)", value=current.vsart if current else "",
-            disabled=not unlocked,
-        )
-        st.caption("둘 다 비우고 저장하면 이 고객 행을 지웁니다.")
-        submitted = st.form_submit_button("저장", type="primary", disabled=not unlocked)
-
-    if submitted:
-        _save(entry, zshco, vsart)
-
-
-def _save(entry, zshco: str, vsart: str) -> None:
-    cfg = settings()
-    row = shipping_store.ShippingRow(
-        kunnr=entry.kunnr, name1=entry.sap_name or entry.name, zshco=zshco, vsart=vsart,
+    heads = SCOPED if entry is not None else COLUMNS
+    frame = pd.DataFrame(
+        [{head: getattr(r, col) for head, col in heads.items()} for r in rows],
+        columns=list(heads),
     )
+    unlocked = gate(cfg.master_edit_password, what="Shipping Master")
+    sheet.paste_hint()
+    edited = sheet.editor(
+        frame, key=f"shipping_{entry.kunnr if entry else 'all'}", unlocked=unlocked,
+        column_config={
+            "고객코드": st.column_config.TextColumn("고객코드", required=True, width="small"),
+            "고객명": st.column_config.TextColumn("고객명", width="medium"),
+            "ZSHCO": st.column_config.TextColumn("출하조건 (ZSHCO)", width="small"),
+            "VSART": st.column_config.TextColumn("운송수단 (VSART)", width="small"),
+        },
+    )
+    st.caption("출하조건·운송수단을 둘 다 비우고 저장하면 그 고객 행을 지웁니다.")
+    if st.button("저장", type="primary", key="shipping_save", disabled=not unlocked):
+        _save(entry, edited, heads)
+
+
+def _save(entry, edited: pd.DataFrame, heads: dict[str, str]) -> None:
+    cfg = settings()
+    fill = {"kunnr": entry.kunnr, "name1": entry.sap_name or entry.name} if entry else {}
+    rows = [shipping_store.ShippingRow(**r) for r in sheet.records(edited, heads, fill)]
     try:
-        saved = shipping_store.set_row(
-            cfg.masters_dir, row,
+        saved = shipping_store.set_rows(
+            cfg.masters_dir, rows, kunnr=entry.kunnr if entry else None,
             storage_dir=cfg.storage_dir, backup_keep=cfg.master_backup_keep,
         )
     except shipping_store.ShippingError as exc:
@@ -85,25 +96,12 @@ def _save(entry, zshco: str, vsart: str) -> None:
         )
         return
 
-    st.success("저장했습니다." if saved else "이 고객 행을 지웠습니다.", icon="✅")
+    sheet.saved()
+    st.success(f"저장했습니다 — {len(saved)}행.", icon="✅")
     _autopush(entry)
     catalog.clear()
     preview_for.clear()
     st.rerun()
-
-
-def _all_rows() -> None:
-    rows = shipping_store.load(settings().masters_dir)
-    if not rows:
-        st.caption("등록된 고객이 없습니다.")
-        return
-    st.dataframe(
-        pd.DataFrame([
-            {"고객코드": r.kunnr, "고객명": r.name1, "ZSHCO": r.zshco, "VSART": r.vsart}
-            for r in rows
-        ]),
-        width="stretch", hide_index=True,
-    )
 
 
 def _autopush(entry) -> None:
@@ -112,10 +110,12 @@ def _autopush(entry) -> None:
     if not cfg.master_git_autopush:
         return
     when = datetime.now().strftime("%Y-%m-%d %H:%M")
+    who = f"{entry.name} ({entry.kunnr})" if entry else "전체 표"
+    scope = f"고객 {entry.kunnr} 의 ZSHCO·VSART" if entry else "전 고객의 ZSHCO·VSART"
     message = (
-        f"rules: 출하 마스터 — {entry.name} ({entry.kunnr})\n\n"
+        f"rules: 출하 마스터 — {who}\n\n"
         f"Shipping Master 화면에서 저장했다. 일시: {when}\n"
-        f"영향 범위: 고객 {entry.kunnr} 의 ZSHCO·VSART."
+        f"영향 범위: {scope}."
     )
     result = gitsync.commit_and_push(
         cfg.project_root, [cfg.masters_dir / shipping_store.FILE], message

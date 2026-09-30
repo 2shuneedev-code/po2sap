@@ -27,13 +27,13 @@ from backend.app.extraction import Extractor  # noqa: E402
 from backend.app.masters import MasterError, load_customer  # noqa: E402
 from backend.app.masters import brands as brand_store  # noqa: E402
 from backend.app.masters import shipping as shipping_store  # noqa: E402
-from backend.app.preview import build_preview, field_specs  # noqa: E402
+from backend.app.preview import build_preview, field_choices, field_specs  # noqa: E402
 from backend.app.send_service import SendBlocked, send_batch  # noqa: E402
 from backend.app.storage import BatchRepo  # noqa: E402
 
 __all__ = [
     "Batch", "CatalogEntry", "MasterError", "SendBlocked", "Settings",
-    "brand_store", "catalog", "customer_master", "field_specs_for", "health",
+    "brand_store", "catalog", "choices_for", "customer_master", "field_specs_for", "health",
     "merge_edits", "preview_for", "repo", "send_batch", "settings", "shipping_store",
     "start_batch", "summary",
 ]
@@ -128,6 +128,12 @@ def health() -> dict:
 def preview_for(code: str) -> dict:
     """규칙 카드 (계약 §2). 라우트와 **같은 함수**를 쓴다."""
     return build_preview(code, settings())
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def choices_for(code: str) -> dict[str, list[list[str]]]:
+    """검수 표 드롭다운 후보 — 후보가 둘 이상인 `csv_choice` 필드만."""
+    return field_choices(code, settings())
 
 
 @st.cache_data(ttl=30, show_spinner=False)

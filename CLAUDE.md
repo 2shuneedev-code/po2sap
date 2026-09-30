@@ -31,7 +31,7 @@
 | 거래처별 규칙 값 | `masters/customers/{code}.yaml` | 예시로만 인용 |
 | 전용 규칙 없는 거래처의 동작 | `masters/profiles/generic.yaml` | 고객코드만 있으면 브랜드까지 나온다 |
 | 출하조건·운송수단 (고객 → ZSHCO·VSART) | `masters/refs/shipping_master.csv` | 화면 Shipping Master 에서 편집. 없으면 둘 다 빈 칸(노랑·전송 가능) |
-| 브랜드 후보 (고객 → 코드) | `masters/refs/brand_master.csv`(SAP) ∪ `brand_master_manual.csv`(보정) | 병합은 `reftable.load()` 한 곳. 발주서 문구로 가리지 않는다 (`csv_choice`) |
+| 브랜드 후보 (고객 → 코드) | `masters/refs/brand_master.csv`(SAP) ∪ `brand_master_manual.csv`(보정) | 병합은 `reftable.load()` 한 곳. 발주서 문구로 가리지 않는다 (`csv_choice`). 화면 Brand Master 스프레드시트가 **원본을 직접** 고친다 (2026-09-30) |
 | 거래처 값 (고정값·문서매핑·결정표) | `masters/customers/{code}.yaml` | 엑셀은 **편집 입구**일 뿐 원천이 아니다 |
 | API 요청/응답·상태값 | `contracts/api-contract.md` | 참조 링크만 |
 | 업무 흐름·화면 정의 | `process.md` §4 | — |
@@ -131,7 +131,7 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 │                   generic.yaml  — **전용 규칙이 없는 거래처**가 쓰는 최소 설정
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
 ├── refs/           참조표 CSV
-│   ├── brand_master.csv   SAP 원본 (읽기 전용 — `import_brand_master.py` 로 교체)
+│   ├── brand_master.csv   SAP 원본 (화면 Brand Master 에서 편집 · 재추출은 `import_brand_master.py`)
 │   ├── brand_master_manual.csv  SAP 원본 위의 보정 (add·override·suppress, 화면에서 편집)
 │   └── shipping_master.csv  고객별 ZSHCO·VSART (화면 Shipping Master 에서 편집)
 └── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
@@ -209,7 +209,7 @@ storage/          런타임 산출물 — Git 제외
 | 거래처마스터.xlsx 를 커밋 | 생성물이다. 낡은 사본을 고쳐 가져오는 사고가 나고 바이너리라 diff 도 안 된다 |
 | 낡은 엑셀로 가져오기 | 그 사이 남이 바꾼 것을 덮어쓴다. **매번 `master_export.py` 로 새로 뽑는다** |
 | 마스터 도구 테스트를 실물 `masters/` 에 | `--masters` 로 사본을 가리킨다. 안 그러면 테스트가 규칙을 덮어쓴다 |
-| `brand_master.csv` 를 손으로 덮어쓰기 | 지금 매핑된 코드가 새 목록에서 빠지면 **다음 발주서에서야** 판정 실패를 안다. `import_brand_master.py` 가 먼저 대조한다 |
+| SAP 재추출본으로 `brand_master.csv` 를 손으로 덮어쓰기 | 지금 매핑된 코드가 새 목록에서 빠지면 **다음 발주서에서야** 판정 실패를 안다. `import_brand_master.py` 가 먼저 대조한다 |
 | 테스트에 데이터 개수를 박기 | SAP 재추출로 고객이 430 → 78 이 되면 멀쩡한 테스트가 죽는다. 참조표에서 기대치를 끌어온다 |
 | 검수 요청 값을 그대로 저장 | 서버 스냅샷에 병합한다. 모르는 행은 거부, 모르는 컬럼은 무시 (계약 §6.1) |
 | 행 누락을 삭제로 해석 | 삭제는 `deleted: true` 명시뿐이다. 통신 유실과 구분되지 않는다 |

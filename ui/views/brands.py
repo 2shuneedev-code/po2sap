@@ -1,17 +1,15 @@
-"""브랜드 후보 — 고객별 ZBRAND 후보 목록과 그 보정 (SCHEMA §4.5-A).
+"""Brand Master — 고객별 ZBRAND 후보. **SAP 원본(`brand_master.csv`)을 직접 고친다.**
 
 ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다. 1개면 자동, 여럿이면
 검수 표의 드롭다운에서 사람이 고른다. 발주서 문구는 보지 않는다.
 
-후보 = SAP 원본(`brand_master.csv`, 읽기 전용) ∪ 사람이 얹은 보정
-(`brand_master_manual.csv`). 이 화면은 **보정만 쓴다.**
-
-  add       SAP 에 아직 없는 후보를 더한다 (재추출 전 임시)
-  override  SAP 행의 브랜드명을 고친다 (오탈자 등)
-  suppress  잘못된 후보를 뺀다
+2026-09-30 부터 이 화면은 보정 파일이 아니라 원본을 스프레드시트로 고친다
+(사장님 지시). 고객을 고르면 그 고객 행만, 안 고르면 파일 전체를 편다.
+보정 파일(`brand_master_manual.csv`)은 판정에 여전히 합쳐지지만 화면에서는
+고치지 않는다 — 행이 있으면 알려만 준다.
 
 저장은 서버 디스크의 CSV 를 고치고 모두에게 즉시 반영되므로 암호로 잠가 둔다
-(`ui/auth.py`). 변경 이력은 CSV 의 Git 이력이 남긴다.
+(`ui/auth.py`). 덮어쓰기 전 사본을 남기고, 변경 이력은 CSV 의 Git 이력이 남긴다.
 """
 
 from __future__ import annotations
@@ -24,13 +22,13 @@ import streamlit as st
 from backend.app import gitsync
 from backend.app.masters import backup
 from ui.auth import gate
-from ui.service import MasterError, brand_store, catalog, preview_for, settings
+from ui.service import MasterError, brand_store, catalog, choices_for, preview_for, settings
+from ui.views import sheet
 from ui.views.picker import customer_header, customer_picker
 from ui.views.rules import rule_preview
 
-ACTIONS = list(brand_store.ACTIONS)
-COLS = ["동작", "코드", "브랜드명", "비고"]
-SOURCE_LABEL = {"sap": "SAP", "override": "SAP · 이름 보정", "add": "수동 추가"}
+COLUMNS = {"고객코드": "kunnr", "고객명": "name1", "코드": "zbrand", "브랜드명": "zbrant"}
+SCOPED = {"코드": "zbrand", "브랜드명": "zbrant"}     # 고객을 골랐을 때 — 나머지는 저장 때 채운다
 
 
 def render() -> None:
@@ -39,107 +37,66 @@ def render() -> None:
     st.title("Brand Master")
     st.caption(
         "고객별 ZBRAND 후보입니다. **후보가 1개면 자동으로 채우고, 여럿이면 검수 표에서 "
-        "고릅니다.** SAP 원본은 고칠 수 없고, 아래 보정 표로 더하거나 빼거나 이름을 고칩니다."
+        "드롭다운으로 고릅니다.** 이 표가 SAP 원본(`refs/brand_master.csv`)이고, 저장하면 "
+        "원본이 바로 바뀝니다."
     )
 
     if entry is None:
-        st.info("왼쪽에서 고객을 선택하세요.", icon="👈")
+        st.caption("왼쪽에서 고객을 고르면 그 고객 행만 봅니다. 지금은 **전체 표**입니다.")
+        _sheet(None)
         return
 
     customer_header(entry)
+    if st.button("← 전체 표", key="brands_all"):
+        st.session_state.pop("brands_kunnr", None)
+        st.rerun()
 
     tab_keys, tab_logic = st.tabs(["후보 표", "적용 로직"])
     with tab_keys:
-        _candidates(entry)
+        _sheet(entry)
     with tab_logic:
         _logic(entry)
 
 
-def _candidates(entry) -> None:
+def _sheet(entry) -> None:
     cfg = settings()
-    merged = [b for b in brand_store.load_master(cfg.masters_dir) if b.kunnr == entry.kunnr]
-    manual = [m for m in brand_store.load_manual(cfg.masters_dir) if m.kunnr == entry.kunnr]
+    rows = brand_store.load_sap_rows(cfg.masters_dir)
+    if entry is not None:
+        rows = [r for r in rows if r.kunnr == entry.kunnr]
+        verdict = {0: "후보가 없어 발주서를 읽을 수 없습니다",
+                   1: "자동으로 채웁니다"}.get(len(rows), "검수 표에서 고릅니다")
+        st.markdown(f"**후보 {len(rows)}개** — {verdict}")
 
-    if merged:
-        verdict = "자동으로 채웁니다" if len(merged) == 1 else "검수 표에서 고릅니다"
-        st.markdown(f"**판정 후보 {len(merged)}개** — {verdict}")
-        st.dataframe(
-            pd.DataFrame([
-                {"코드": b.zbrand, "브랜드명": b.name, "출처": SOURCE_LABEL.get(b.source, b.source)}
-                for b in merged
-            ]),
-            width="stretch", hide_index=True,
-        )
-    else:
-        st.warning("이 고객은 판정 후보가 없습니다. 발주서를 읽을 수 없습니다.", icon="⚠️")
-
-    st.markdown("**보정**")
-    st.caption(
-        "add = SAP 에 없는 후보 추가 · override = SAP 행의 브랜드명 교체 · "
-        "suppress = 후보에서 제외. **비고는 필수**입니다 — 왜 고쳤는지 남깁니다."
-    )
-
+    heads = SCOPED if entry is not None else COLUMNS
     frame = pd.DataFrame(
-        [{"동작": m.action, "코드": m.zbrand, "브랜드명": m.zbrant, "비고": m.note} for m in manual],
-        columns=COLS,
+        [{head: getattr(r, col) for head, col in heads.items()} for r in rows],
+        columns=list(heads),
     )
-    unlocked = gate(cfg.master_edit_password, what="브랜드 후보")
-
-    edited = st.data_editor(
-        frame,
-        disabled=not unlocked,
-        num_rows="dynamic" if unlocked else "fixed",
-        width="stretch",
-        hide_index=True,
-        key=f"brandmanual_{entry.kunnr}",
+    unlocked = gate(cfg.master_edit_password, what="Brand Master")
+    sheet.paste_hint()
+    edited = sheet.editor(
+        frame, key=f"brand_{entry.kunnr if entry else 'all'}", unlocked=unlocked,
         column_config={
-            "동작": st.column_config.SelectboxColumn(
-                "동작", options=ACTIONS, required=True, width="small",
-            ),
-            "코드": st.column_config.TextColumn(
-                "코드", required=True, width="small",
-                help="override·suppress 는 SAP 에 있는 코드, add 는 SAP 에 없는 코드",
-            ),
-            "브랜드명": st.column_config.TextColumn(
-                "브랜드명", width="medium", help="suppress 면 비워도 됩니다",
-            ),
-            "비고": st.column_config.TextColumn("비고 (필수)", required=True),
+            "고객코드": st.column_config.TextColumn("고객코드", required=True, width="small"),
+            "고객명": st.column_config.TextColumn("고객명", width="medium"),
+            "코드": st.column_config.TextColumn("코드 (ZBRAND)", required=True, width="small"),
+            "브랜드명": st.column_config.TextColumn("브랜드명", width="medium"),
         },
     )
+    if st.button("저장", type="primary", key="brand_save", disabled=not unlocked):
+        _save(entry, edited, heads)
 
-    if st.button("저장", type="primary", key=f"save_{entry.kunnr}", disabled=not unlocked):
-        _save(entry, edited)
-
-    if any(m.action == "add" for m in manual):
-        st.caption("⚠️ add 한 코드는 SAP 재추출 전까지 SAP 이 모르는 코드일 수 있습니다.")
+    _overlay_notice(entry)
     _git_panel(entry, unlocked=unlocked)
 
 
-def rows_for_save(kunnr: str, records: list[dict]) -> list:
-    """표의 행 → 보정 행. 빈 줄은 없는 것으로 본다.
-
-    화면에서 떼어놨다 — 순수 함수라 테스트가 잡을 수 있다.
-    """
-    rows = []
-    for record in records:
-        code = str(record.get("코드") or "").strip()
-        action = str(record.get("동작") or "").strip()
-        if not code and not action:
-            continue
-        rows.append(brand_store.ManualRow(
-            kunnr=kunnr, zbrand=code, action=action,
-            zbrant=str(record.get("브랜드명") or "").strip(),
-            note=str(record.get("비고") or "").strip(),
-        ))
-    return rows
-
-
-def _save(entry, edited: pd.DataFrame) -> None:
+def _save(entry, edited: pd.DataFrame, heads: dict[str, str]) -> None:
     cfg = settings()
-    rows = rows_for_save(entry.kunnr, edited.to_dict("records"))
+    fill = {"kunnr": entry.kunnr, "name1": entry.sap_name or entry.name} if entry else {}
+    rows = [brand_store.SapRow(**r) for r in sheet.records(edited, heads, fill)]
     try:
-        brand_store.set_manual(
-            cfg.masters_dir, entry.kunnr, rows,
+        brand_store.set_sap_rows(
+            cfg.masters_dir, rows, kunnr=entry.kunnr if entry else None,
             storage_dir=cfg.storage_dir, backup_keep=cfg.master_backup_keep,
         )
     except (brand_store.BrandError, MasterError, ValueError) as exc:
@@ -153,11 +110,25 @@ def _save(entry, edited: pd.DataFrame) -> None:
         )
         return
 
-    st.success(f"저장했습니다 — 보정 {len(rows)}행.", icon="✅")
+    sheet.saved()
+    st.success(f"저장했습니다 — {len(rows)}행.", icon="✅")
     _autopush(entry)
     catalog.clear()
     preview_for.clear()
+    choices_for.clear()
     st.rerun()
+
+
+def _overlay_notice(entry) -> None:
+    """보정 파일에 행이 남아 있으면 판정 후보가 이 표와 다를 수 있다 — 알린다."""
+    manual = brand_store.load_manual(settings().masters_dir)
+    if entry is not None:
+        manual = [m for m in manual if m.kunnr == entry.kunnr]
+    if manual:
+        st.caption(
+            f"⚠️ 보정 파일(`{brand_store.MANUAL_FILE}`)에 {len(manual)}행이 있어 판정에 "
+            "함께 적용됩니다 — 후보가 이 표와 다를 수 있습니다."
+        )
 
 
 def _logic(entry) -> None:
@@ -175,14 +146,15 @@ def _logic(entry) -> None:
 
 
 # ── Git 동기화 ─────────────────────────────────────────────────────────
-def _sync_message(kunnr: str, name: str) -> str:
+def _sync_message(entry) -> str:
     """`rules:` 커밋은 본문에 근거를 남긴다 (CLAUDE.md §6)."""
     when = datetime.now().strftime("%Y-%m-%d %H:%M")
+    who = f"{entry.name} ({entry.kunnr})" if entry else "전체 표"
+    scope = f"고객 {entry.kunnr} 의 ZBRAND 후보" if entry else "전 고객의 ZBRAND 후보"
     return (
-        f"rules: 브랜드 후보 보정 — {name} ({kunnr})\n\n"
-        f"브랜드 후보 화면에서 저장했다. 일시: {when}\n"
-        f"영향 범위: 고객 {kunnr} 의 ZBRAND 후보.\n"
-        f"보정표({brand_store.MANUAL_FILE})만 바뀐다. SAP 원본은 그대로다."
+        f"rules: 브랜드 마스터 — {who}\n\n"
+        f"Brand Master 화면에서 저장했다. 일시: {when}\n"
+        f"영향 범위: {scope} ({brand_store.MASTER_FILE})."
     )
 
 
@@ -193,8 +165,8 @@ def _autopush(entry) -> None:
         return
     result = gitsync.commit_and_push(
         cfg.project_root,
-        [cfg.masters_dir / brand_store.MANUAL_FILE],
-        _sync_message(entry.kunnr, entry.name),
+        [cfg.masters_dir / brand_store.MASTER_FILE],
+        _sync_message(entry),
     )
     if result.ok:
         st.caption(f"🔄 {result.detail}")
@@ -212,14 +184,14 @@ def _git_panel(entry, *, unlocked: bool) -> None:
     화면이 조용히 되돌리는 것이 가장 나쁘다.
     """
     cfg = settings()
-    path = cfg.masters_dir / brand_store.MANUAL_FILE
+    path = cfg.masters_dir / brand_store.MASTER_FILE
     st_ = gitsync.status(cfg.project_root, [path])
 
     if not st_.repo:
         return          # Git 밖에서 돌리는 설치라면 갈릴 일 자체가 없다
 
     if st_.synced:
-        head = "🔄 Git 과 같음 — 이 서버의 보정이 저장소에 반영돼 있습니다"
+        head = "🔄 Git 과 같음 — 이 서버의 브랜드 마스터가 저장소에 반영돼 있습니다"
     elif st_.dirty:
         head = "🔄 커밋 안 된 변경이 있습니다 — `git pull` 이 막힐 수 있습니다"
     else:
@@ -227,7 +199,7 @@ def _git_panel(entry, *, unlocked: bool) -> None:
 
     with st.expander(head, expanded=not st_.synced):
         st.caption(
-            f"브랜치 `{st_.branch}` · 파일 `{brand_store.MANUAL_FILE}`"
+            f"브랜치 `{st_.branch}` · 파일 `{brand_store.MASTER_FILE}`"
             + ("" if st_.tracked else " · **아직 Git 에 추적되지 않는 파일입니다**")
         )
         if not st_.synced:
@@ -240,10 +212,9 @@ def _git_panel(entry, *, unlocked: bool) -> None:
         if backups:
             st.caption(f"되돌릴 사본 {len(backups)}개 · 최근 `{backups[0].name}`")
 
-        if st.button("커밋하고 푸시", key=f"gitpush_{entry.kunnr}", disabled=not unlocked or st_.synced):
-            result = gitsync.commit_and_push(
-                cfg.project_root, [path], _sync_message(entry.kunnr, entry.name)
-            )
+        key = f"gitpush_{entry.kunnr if entry else 'all'}"
+        if st.button("커밋하고 푸시", key=key, disabled=not unlocked or st_.synced):
+            result = gitsync.commit_and_push(cfg.project_root, [path], _sync_message(entry))
             (st.success if result.ok else st.error)(result.detail)
             if result.ok:
                 st.rerun()

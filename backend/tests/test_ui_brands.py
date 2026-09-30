@@ -1,43 +1,39 @@
-"""브랜드 후보 화면의 저장 변환 — 표의 행이 보정 행으로 그대로 가는가.
+"""참조표 스프레드시트의 저장 변환 — 표의 행이 파일 컬럼으로 그대로 가는가.
 
 빈 줄은 없는 것으로 보고, 나머지는 **걸러내지 않고** 넘긴다 — 틀린 행은
-`set_manual` 의 검증이 이유와 함께 거부해야 사람이 고칠 수 있다.
+저장 함수(`set_sap_rows` · `set_rows`)의 검증이 이유와 함께 거부해야 사람이 고칠 수 있다.
 """
 
 from __future__ import annotations
 
 import pytest
 
+pd = pytest.importorskip("pandas")
 pytest.importorskip("streamlit")
-pytest.importorskip("pandas")
 
-from ui.views.brands import rows_for_save  # noqa: E402
+from ui.views.sheet import records  # noqa: E402
 
-MSC = "100249"
-
-
-def row(action: str, code: str, name: str = "", note: str = "") -> dict:
-    return {"동작": action, "코드": code, "브랜드명": name, "비고": note}
+HEADS = {"코드": "zbrand", "브랜드명": "zbrant"}
 
 
-def test_rows_become_manual_rows_in_order():
-    out = rows_for_save(MSC, [row("add", "9999", "NEW", "n"), row("suppress", "38", note="단종")])
-    assert [(r.action, r.zbrand, r.zbrant, r.note) for r in out] == [
-        ("add", "9999", "NEW", "n"), ("suppress", "38", "", "단종"),
-    ]
-    assert {r.kunnr for r in out} == {MSC}
+def test_rows_keep_order_and_fill_scope_columns():
+    frame = pd.DataFrame([{"코드": "001", "브랜드명": "YG"}, {"코드": "002", "브랜드명": "OEM"}])
+    out = records(frame, HEADS, {"kunnr": "100161", "name1": "BFT"})
+    assert [r["zbrand"] for r in out] == ["001", "002"]
+    assert all(r["kunnr"] == "100161" and r["name1"] == "BFT" for r in out)
 
 
-def test_blank_lines_are_ignored():
-    assert rows_for_save(MSC, [row("", ""), {"동작": None, "코드": None}]) == []
+def test_blank_lines_are_ignored_including_nan_and_none():
+    frame = pd.DataFrame([{"코드": None, "브랜드명": float("nan")}, {"코드": "", "브랜드명": " "}])
+    assert records(frame, HEADS, {"kunnr": "1"}) == []
 
 
 def test_incomplete_rows_are_passed_on_for_validation():
-    """코드만 있고 동작이 비었으면 조용히 버리지 않는다 — 저장이 거부하게 둔다."""
-    out = rows_for_save(MSC, [row("", "38", note="n")])
-    assert len(out) == 1 and out[0].action == ""
+    frame = pd.DataFrame([{"코드": "", "브랜드명": "이름만"}])
+    assert records(frame, HEADS, {}) == [{"zbrand": "", "zbrant": "이름만"}]
 
 
-def test_values_are_trimmed():
-    out = rows_for_save(MSC, [row("add", " 9999 ", " NEW ", " 메모 ")])
-    assert (out[0].zbrand, out[0].zbrant, out[0].note) == ("9999", "NEW", "메모")
+def test_values_are_trimmed_and_explicit_values_win_over_fill():
+    heads = {"고객코드": "kunnr", "코드": "zbrand"}
+    frame = pd.DataFrame([{"고객코드": " 200 ", "코드": " 9999 "}])
+    assert records(frame, heads, {"kunnr": "100"}) == [{"kunnr": "200", "zbrand": "9999"}]

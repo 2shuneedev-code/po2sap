@@ -20,6 +20,7 @@ import yaml
 
 from ..rules import reftable
 from . import backup
+from .tabular import replace_scope
 
 FILE = "refs/shipping_master.csv"
 COLUMNS = ["kunnr", "name1", "zshco", "vsart"]
@@ -96,6 +97,57 @@ def set_row(
         backup.snapshot(path, storage_dir, keep=backup_keep)
     _write(path, kept)
     return clean if keep_row else None
+
+
+def set_rows(
+    masters_dir: Path,
+    rows: list[ShippingRow],
+    *,
+    kunnr: str | None = None,
+    storage_dir: Path | None = None,
+    backup_keep: int = 30,
+) -> list[ShippingRow]:
+    """화면 스프레드시트 저장 — **원본 CSV 를 직접** 고친다.
+
+    `kunnr` 를 주면 그 고객 행만 `rows` 로 바꾸고(자리 유지), 없으면 파일 전체를
+    `rows` 로 바꾼다. 값이 둘 다 빈 행은 버린다(→ 그 고객은 빈 칸). 검사를 하나라도
+    통과 못 하면 파일을 건드리지 않는다.
+    """
+    limits = _max_lens(masters_dir)
+    clean: list[ShippingRow] = []
+    for index, row in enumerate(rows, start=1):
+        r = ShippingRow(**{c: str(getattr(row, c) or "").strip() for c in COLUMNS})
+        if not any(getattr(r, c) for c in (*COLUMNS,)):
+            continue                                    # 빈 줄
+        if not r.kunnr:
+            raise ShippingError(f"{index}행 — 고객코드가 비어 있습니다.")
+        if kunnr is not None and r.kunnr != kunnr:
+            raise ShippingError(f"{index}행 — 이 화면은 고객 {kunnr} 행만 고칩니다: {r.kunnr}")
+        for col, limit in limits.items():
+            if len(getattr(r, col)) > limit:
+                raise ShippingError(f"{index}행 — {col.upper()} 는 {limit}자까지입니다: {getattr(r, col)!r}")
+        if any(getattr(r, c) for c in VALUE_COLUMNS):
+            clean.append(r)
+
+    result = replace_scope(load(masters_dir), clean, kunnr)
+    dup = _first_duplicate([r.kunnr for r in result])
+    if dup:
+        raise ShippingError(f"고객 {dup} 행이 두 개입니다 — 고객 1곳 = 행 1개.")
+
+    path = masters_dir / FILE
+    if storage_dir is not None:
+        backup.snapshot(path, storage_dir, keep=backup_keep)
+    _write(path, result)
+    return clean
+
+
+def _first_duplicate(keys: list) -> object | None:
+    seen: set = set()
+    for key in keys:
+        if key in seen:
+            return key
+        seen.add(key)
+    return None
 
 
 def _write(path: Path, rows: list[ShippingRow]) -> None:

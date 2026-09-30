@@ -204,8 +204,11 @@ def _review_section(batch: Batch) -> None:
         column_order=_column_order(batch, show_all),
         column_config=_column_config(batch),
         disabled=META,
-        key=f"grid_{batch.batch_id}_{file_filter}_{group_filter}_{show_all}",
+        key=f"grid_{batch.batch_id}_{file_filter}_{group_filter}_{show_all}"
+            f"_{st.session_state.get(_GRID_VERSION, 0)}",
     )
+
+    _bulk_fill(batch, edited, visible)
 
     if st.button("검증", help="고친 값을 서버 스냅샷에 반영하고 다시 검사합니다"):
         _apply(batch, edited, visible)
@@ -214,6 +217,47 @@ def _review_section(batch: Batch) -> None:
     _summary_bar(batch)
     _issue_list(batch, issues_by_row)
     _send_section(batch)
+
+
+# 표 키에 붙이는 판 번호. 일괄 채우기 뒤에 올린다 — 같은 키면 표가 들고 있던
+# 칸 단위 수정이 새 값 위에 다시 얹혀, 방금 채운 값을 옛 값이 덮는다.
+_GRID_VERSION = "grid_version"
+
+
+def _bulk_fill(batch: Batch, edited: pd.DataFrame, visible) -> None:
+    """한 값을 여러 행에 한 번에 — 스트림릿 표에는 엑셀의 채우기 핸들이 없다.
+
+    붙여넣기는 **복사한 크기만큼만** 들어간다. 한 칸을 복사해 열 전체를 잡고
+    붙여넣으면 첫 칸 하나만 바뀐다(표 라이브러리 동작, 2026-09-30 확인).
+    어느 열을 먼저 보일지는 드롭다운 후보가 있는 열 — YAML 이 정한다.
+    """
+    choices = choices_for(batch.customer)
+    columns = [c for c in _column_order(batch, True) if c not in META]
+    if not columns:
+        return
+    first = next((c for c in columns if c in choices), columns[0])
+
+    with st.expander("⇣ 열 일괄 채우기 — 한 값을 여러 행에 한 번에", expanded=bool(choices)):
+        left, mid, right, go = st.columns([2, 3, 2, 1], vertical_alignment="bottom")
+        column = left.selectbox("열", columns, index=columns.index(first), key="bulk_col")
+        if column in choices:
+            names = {o[0]: o[1] for o in choices[column] if len(o) > 1}
+            value = mid.selectbox(
+                "값", [o[0] for o in choices[column]], key=f"bulk_val_{column}",
+                format_func=lambda code: f"{code} · {names[code]}" if code in names else code,
+            )
+        else:
+            value = mid.text_input("값", key=f"bulk_val_{column}")
+        scope = right.radio("대상", ["빈 칸만", "보이는 행 전체"], key="bulk_scope", horizontal=True)
+        if go.button("채우기", type="primary", key="bulk_go"):
+            frame = edited.copy()
+            current = frame[column].fillna("").astype(str).str.strip()
+            mask = current == "" if scope == "빈 칸만" else pd.Series(True, index=frame.index)
+            frame.loc[mask, column] = value
+            _apply(batch, frame, visible)
+            st.session_state[_GRID_VERSION] = st.session_state.get(_GRID_VERSION, 0) + 1
+            st.toast(f"{column} — {int(mask.sum())}행을 채웠습니다.", icon="✅")
+            st.rerun()
 
 
 def _to_frame(rows, columns: list[str]) -> tuple[pd.DataFrame, dict]:
@@ -335,16 +379,53 @@ def _summary_bar(batch: Batch) -> None:
 
 
 def _issue_list(batch: Batch, issues_by_row: dict) -> None:
+    """위에는 **묶은 요약**만, 행별 상세는 접어 둔다.
+
+    행마다 같은 경고("브랜드 후보가 2개입니다")가 수십 줄 반복되면 전송 버튼까지
+    한참 내려가야 했다. 같은 (필드·문구)는 한 줄로, 빈 칸 경고는 필드 목록 한 줄로
+    합친다. 어떤 필드가 중요한지는 여기서 정하지 않는다 — 마스터의 `required` 가
+    낸 경고를 묶기만 한다 (CLAUDE.md P2).
+    """
     if not issues_by_row:
         st.success("검증을 통과했습니다.", icon="✅")
         return
-    with st.container(border=True):
+
+    for severity, show in (("error", st.error), ("warn", st.warning)):
+        lines = _grouped(issues_by_row, severity)
+        if lines:
+            show("\n\n".join(lines), icon="⛔" if severity == "error" else "⚠️")
+
+    total = sum(len(issues) for _, issues in issues_by_row.values())
+    with st.expander(f"행별 상세 {total}건", expanded=False):
         for index, (row, issues) in sorted(issues_by_row.items()):
             for issue in issues:
                 icon = "⛔" if issue.severity == "error" else "⚠️"
                 st.markdown(
                     f"{icon} **{index}행** ({row.file}) `{issue.field}` — {issue.message}"
                 )
+
+
+def _grouped(issues_by_row: dict, severity: str) -> list[str]:
+    """(필드·문구)별로 몇 행인지. 빈 칸(REQUIRED_MISSING)은 필드 목록 한 줄로."""
+    missing: dict[str, set[int]] = {}
+    other: dict[tuple[str, str], set[int]] = {}
+    for index, (_, issues) in issues_by_row.items():
+        for issue in issues:
+            if issue.severity != severity:
+                continue
+            if issue.code == "REQUIRED_MISSING":
+                missing.setdefault(issue.field, set()).add(index)
+            else:
+                other.setdefault((issue.field, issue.message), set()).add(index)
+
+    lines = [
+        (f"`{field}` — " if field else "") + f"{message} (**{len(rows)}행**)"
+        for (field, message), rows in other.items()
+    ]
+    if missing:
+        fields = " · ".join(f"`{f}`({len(rows)}행)" for f, rows in missing.items())
+        lines.append(f"빈 칸 있음: {fields} — 확인해 보세요")
+    return lines
 
 
 # ── ④ 전송 ───────────────────────────────────────────────────────────

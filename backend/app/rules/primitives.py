@@ -85,6 +85,14 @@ def _assemble(year: int, month: int, day: int, raw: str) -> str:
     return f"{year:04d}{month:02d}{day:02d}"
 
 
+# 괄호(반각·전각)와 그 안의 내용을 통째로 — "D1103036(1pc)" → "D1103036".
+_PARENS = re.compile(r"\s*[(（][^()（）]*[)）]")
+
+
+def strip_parens(text: str) -> str:
+    return _PARENS.sub("", text).strip()
+
+
 FORMATS = {
     "integer": to_integer,
     "decimal3": to_decimal3,
@@ -92,6 +100,7 @@ FORMATS = {
     "upper": lambda s: s.upper(),
     "lower": lambda s: s.lower(),
     "trim": lambda s: s.strip(),
+    "strip_parens": strip_parens,
 }
 
 

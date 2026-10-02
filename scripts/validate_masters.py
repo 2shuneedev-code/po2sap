@@ -63,7 +63,7 @@ FIELD_OPTIONS = {
     "from", "value", "path", "table", "rule", "expr", "generator",
     "fallback", "required", "required_unless", "format", "default", "explain", "todo",
 }
-FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim"}
+FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim", "strip_parens"}
 GENERATORS = {"line_no_x10"}
 RULE_KINDS = {
     "keyword_map", "value_map", "csv_map", "csv_choice", "lookup", "regex_extract", "fixed",

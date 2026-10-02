@@ -132,3 +132,99 @@ def test_sid_brand_codes_are_registered_for_the_customer(sid):
     registered = {r["zbrand"] for r in _ref_rows("brand_master.csv") if r["kunnr"] == sid.customer_no}
     codes = {e["value"] for e in sid.rules["brand_text_match"]["entries"]}
     assert codes <= registered
+
+
+# ── KL (kl.yaml) ─────────────────────────────────────────────────────
+@pytest.fixture(scope="module")
+def kl():
+    return load_customer("kl", REAL)
+
+
+def _kl_po(brands: list[str], po: str = "4507628839 / 040") -> RawPO:
+    return RawPO(
+        customer_code="KL", source_file="f.pdf",
+        header=POHeader(po_number=ev(po), currency_text=ev("USD")),
+        lines=[
+            POLine(line_no=n, posex=ev(f"{n:05d}"), our_item=ev(f"27486{n:02d}"),
+                   quantity=ev("24"), brand_text=ev(b))
+            for n, b in enumerate(brands, start=1)
+        ],
+    )
+
+
+def test_kl_po_number_drops_the_part_after_slash(kl):
+    assert build(_kl_po(["WIDIA GTD"]), kl, REAL).rows[0].fields["BSTKD"] == "4507628839"
+    assert build(_kl_po(["WIDIA GTD"], "4507628839"), kl, REAL).rows[0].fields["BSTKD"] == "4507628839"
+
+
+def test_kl_posex_is_an_integer(kl):
+    rows = build(_kl_po(["", ""]), kl, REAL).rows
+    assert [r.fields["POSEX"] for r in rows] == ["1", "2"]
+
+
+def test_kl_brand_text_goes_to_packing_remark_and_remark(kl):
+    rows = build(_kl_po(["WIDIA GTD", "Kennametal", "OTHER", ""]), kl, REAL).rows
+    assert [(r.fields["ZPKRE"], r.fields["EMPST"]) for r in rows] == [
+        ("WGT", "WGT"), ("KMT", "KMT"), ("", ""), ("", ""),
+    ]
+    assert not [i for r in rows for i in r.issues if i.field in ("ZPKRE", "EMPST")]
+
+
+def test_kl_brand_is_left_to_the_shared_dropdown(kl):
+    assert "brand_text_match" not in (kl.rules or {})
+    assert kl.fields["ZBRAND"]["rule"] == "brand_code"
+
+
+# ── YGJP (ygjp.yaml) ─────────────────────────────────────────────────
+def _ygjp_po(brand: str, item_code: str = "E24201502SE") -> RawPO:
+    return RawPO(
+        customer_code="YGJP", source_file="f.pdf",
+        header=POHeader(po_number=ev("10972"), po_date=ev("2026-05-18"),
+                        brand_text=ev(brand), currency_text=ev("JPY")),
+        lines=[POLine(line_no=1, item_code=ev(item_code), our_item=ev("1515X16"), quantity=ev("15"))],
+    )
+
+
+def _ygjp_brands(masters: Path) -> list[dict[str, str]]:
+    ygjp = load_customer("ygjp", masters)
+    return [r for r in _ref_rows("brand_master.csv") if r["kunnr"] == ygjp.customer_no]
+
+
+def test_ygjp_fixed_ship_to_and_order_number():
+    row = build(_ygjp_po("YG BRAND"), load_customer("ygjp", REAL), REAL).rows[0]
+    assert row.fields["KUNNR2"] == "319854"
+    assert row.fields["BSTKD"] == "01-20260518-10972"
+
+
+def test_ygjp_brand_name_contained_in_the_line_picks_its_code():
+    brand = _ygjp_brands(REAL)[0]
+    line = f"{brand['zbrant'].lower()} S-Y,B-Y"             # 포장지시가 붙고 대소문자가 달라도
+    row = build(_ygjp_po(line), load_customer("ygjp", REAL), REAL).rows[0]
+    assert row.fields["ZBRAND"] == brand["zbrand"]
+    assert row.fields["ZSHCO"] == ("A" if brand["zbrand"] in ("471", "507") else "L")
+
+
+def test_ygjp_unknown_brand_is_blank_and_shipping_condition_is_l():
+    row = build(_ygjp_po("NOT A BRAND"), load_customer("ygjp", REAL), REAL).rows[0]
+    assert row.fields["ZBRAND"] == ""
+    assert row.fields["ZSHCO"] == "L"
+    assert any(i.severity == "warn" and "브랜드" in i.message for i in row.issues)
+
+
+@pytest.mark.parametrize("code", ["471", "507"])
+def test_ygjp_shipping_condition_a_for_471_507(tmp_path, code):
+    """지금 마스터 3200 에는 471·507 이 없다 — 사본에 한 줄 얹어 A 분기를 본다."""
+    import shutil
+
+    masters = tmp_path / "masters"
+    shutil.copytree(REAL, masters)
+    with (masters / "refs" / "brand_master.csv").open("a", encoding="utf-8", newline="") as fh:
+        fh.write(f'\n3200,"YG-1 JAPAN CO., LTD.",{code},TEST BRAND {code}\n')
+    row = build(_ygjp_po(f"TEST BRAND {code} YG STD"), load_customer("ygjp", masters), masters).rows[0]
+    assert (row.fields["ZBRAND"], row.fields["ZSHCO"]) == (code, "A")
+
+
+def test_ygjp_missing_product_id_warns_even_with_your_code():
+    row = build(_ygjp_po("YG BRAND", item_code=""), load_customer("ygjp", REAL), REAL).rows[0]
+    assert row.fields["KDMAT"] == "1515X16"
+    assert any(i.field == "MATNR" and i.severity == "warn" for i in row.issues)

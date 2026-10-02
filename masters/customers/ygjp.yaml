@@ -1,0 +1,102 @@
+# ═══════════════════════════════════════════════════════════════
+#  YGJP — YG-1 JAPAN CO., LTD.  (고객코드 3200)
+#  스키마: masters/SCHEMA.md · 설계와 결정 근거: CUSTOMER_RULES.md §4.3
+#
+#  공용(profiles/standard.yaml)과 **다른 것만** 적는다:
+#    · Ship-to(KUNNR2) = 319854 고정
+#    · BSTKD = 01-{Created On YYYYMMDD}-{Purchase Order ID}
+#    · 브랜드 = 브랜드 마스터의 3200 브랜드명이 발주서 문구에 들어 있으면 그 코드
+#      (못 찾으면 빈 칸 + 드롭다운). 마스터가 기준이다 — POC 코드표는 쓰지 않는다
+#    · ZSHCO = 브랜드가 471 또는 507 이면 A, 아니면 L
+#    · Product ID(MATNR)가 없으면 노랑 (KDMAT 가 있어도)
+#  포장지시·비고는 보내지 않는다 (ZPKRE·EMPST 공용 그대로 빈 칸).
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+meta:
+  code: YGJP
+  name: "YG-1 JAPAN CO., LTD."
+  customer_no: "3200"
+  status: active
+  file_types: [pdf]
+
+extends: [_base/sap_defaults, profiles/standard]
+
+extraction:
+  input: text
+  page_limit: 20
+  hints: |
+    YG-1 JAPAN 발주서 PDF다. 텍스트 추출 시 표의 컬럼 머리글이 한 줄로 붙어 나온다.
+    일본어가 깨질 수 있으나 필요한 값은 대부분 영숫자다.
+
+    [헤더]
+      "Created On:  2026-05-18"       → po_date (원문 그대로)
+      "Purchase Order ID:  10972"     → po_number  (YGJP 는 이것이 발주번호다)
+      "Incoterms: CIP"                → incoterms_text
+      "Payment Terms: ..." 뒤 문장     → payment_terms_text
+      "Ship-to Address:" 뒤 주소 블록  → ship_to_text
+      "Total Value: 82,575 JPY" 의 통화표기(JPY)  → currency_text (원문 그대로)
+
+    [품목표] — 머리글이 이렇게 붙어서 나온다.
+      NoProduct IDYour CodeProduct DimensionsDelivery dateQtyNet PriceNet Value
+      1E24201502SE1515X16X30X952026-06-0515 1,189 17,835
+      컬럼 순서대로 잘라 읽을 것:
+        No            → line_no          (1)
+        Product ID    → item_code        (E24201502SE)  ※ 우리 YG 품번
+        Your Code     → our_item
+        Product Dimensions → description
+        Delivery date → delivery_date    (2026-06-05)
+        Qty           → quantity         (15)
+        Net Price     → unit_price       (1,189)
+        Net Value     → net_value        (17,835)
+      값이 붙어 있어 경계가 애매하면 **날짜(YYYY-MM-DD) 패턴을 기준점**으로 삼을 것.
+      Product ID 가 비어 있거나 수량이 0 인 줄도 **빼지 말고** 그대로 읽을 것.
+      "Total Quantities:" 줄 이후는 품목이 아니다.
+
+    [문서 하단 — 브랜드 줄] ★
+      "Total Quantities:" 아래, 서명란(SIGNATURE / APPROVAL) 위에 있다.
+        Remark: YG agent : Sakusaku-OEM   ← 비고. 브랜드가 아니다
+        Domestic stock                    ← 비고. 브랜드가 아니다
+        YAMAKATSU BRAND S-Y,B-Y           ← 브랜드 줄
+      브랜드가 적힌 줄을 **줄 전체 원문 그대로** brand_text 에 담을 것.
+      포장지시(S-Y,B-Y 등)나 다른 말(YG STD 등)이 같은 줄에 붙어 있어도 가르지 말 것.
+      예: "YG BRAND" / "SAKUSAKU BRAND" / "YAMAKATSU BRAND S-Y,B-Y" /
+          "YG BRAND (COMINIX) YG STD." / "YG BRAND YG STD"
+      코드로 바꾸지 말 것.
+
+split:
+  by: none
+
+rules:
+  brand_text_match:
+    kind: csv_map
+    label: "브랜드 — 마스터 브랜드명이 원문에 포함되면"
+    description: |
+      브랜드 마스터(refs/brand_master.csv)에서 이 고객(3200) 행의 브랜드명이
+      발주서 브랜드 줄에 들어 있으면 그 코드. 대소문자 무시. 못 찾으면 빈 칸 —
+      검수 표 드롭다운(같은 마스터의 후보)에서 고른다.
+    source: header.brand_text
+    table_file: refs/brand_master.csv
+    filter_column: kunnr
+    key_column: zbrant
+    value_column: zbrand
+    case_insensitive: true
+    on_no_match:
+      action: warn
+      message: "브랜드를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요"
+
+fields:
+  # ── profiles/standard.yaml 과 **다른 것만** ──────────────────────
+  KUNNR2: { from: const, value: "319854", explain: "YGJP Ship-to 고정" }
+  BSTKD:
+    from: expr
+    expr: 'concat("01-", date_yyyymmdd(header.po_date), "-", header.po_number)'
+    required: warn
+    explain: "01-{Created On YYYYMMDD}-{Purchase Order ID}"
+  ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
+  ZSHCO:
+    from: expr
+    expr: 'if(in(brand_text_match, ["471", "507"]), "A", "L")'
+    explain: "브랜드가 471 또는 507 이면 A, 아니면 L"
+  # Product ID 가 없는 줄은 KDMAT 가 있어도 노랑 — 공용의 required_unless 를 뺀다
+  MATNR: { from: doc, path: line.item_code, format: strip_parens, required: warn }

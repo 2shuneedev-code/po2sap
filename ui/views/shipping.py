@@ -21,8 +21,8 @@ from ui.service import catalog, preview_for, settings, shipping_store
 from ui.views import sheet
 from ui.views.picker import customer_header, customer_picker
 
-COLUMNS = {"고객코드": "kunnr", "고객명": "name1", "ZSHCO": "zshco", "VSART": "vsart"}
-SCOPED = {"ZSHCO": "zshco", "VSART": "vsart"}      # 고객을 골랐을 때 — 나머지는 저장 때 채운다
+COLUMNS = {"고객코드": "kunnr", "고객명": "name1", "VSART": "vsart", "ZSHCO": "zshco"}
+SCOPED = {"VSART": "vsart", "ZSHCO": "zshco"}      # 고객을 골랐을 때 — 나머지는 저장 때 채운다
 
 
 def render() -> None:
@@ -30,7 +30,7 @@ def render() -> None:
 
     st.title("Shipping Master")
     st.caption(
-        "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 저장하면 "
+        "고객별 **Shipping Type (VSART)** 과 **Shipping Condition (ZSHCO)** 입니다. 저장하면 "
         "`refs/shipping_master.csv` 에 반영됩니다. 여기 적힌 값이 "
         "전송 행에 그대로 들어갑니다. 행이 없으면 빈 칸으로 두고 검수 표에 노랗게 표시만 "
         "합니다 (전송은 막지 않습니다)."
@@ -67,11 +67,11 @@ def _sheet(entry) -> None:
         column_config={
             "고객코드": st.column_config.TextColumn("고객코드", required=True, width="small"),
             "고객명": st.column_config.TextColumn("고객명", width="medium"),
-            "ZSHCO": st.column_config.TextColumn("출하조건 (ZSHCO)", width="small"),
-            "VSART": st.column_config.TextColumn("운송수단 (VSART)", width="small"),
+            "VSART": st.column_config.TextColumn("Shipping Type (VSART)", width="small"),
+            "ZSHCO": st.column_config.TextColumn("Shipping Condition (ZSHCO)", width="small"),
         },
     )
-    st.caption("출하조건·운송수단을 둘 다 비우고 저장하면 그 고객 행을 지웁니다.")
+    st.caption("Shipping Type·Shipping Condition 을 둘 다 비우고 저장하면 그 고객 행을 지웁니다.")
     if st.button("저장", type="primary", key="shipping_save", disabled=not unlocked):
         _save(entry, edited, heads)
 
@@ -111,7 +111,7 @@ def _autopush(entry) -> None:
         return
     when = datetime.now().strftime("%Y-%m-%d %H:%M")
     who = f"{entry.name} ({entry.kunnr})" if entry else "전체 표"
-    scope = f"고객 {entry.kunnr} 의 ZSHCO·VSART" if entry else "전 고객의 ZSHCO·VSART"
+    scope = f"고객 {entry.kunnr} 의 VSART·ZSHCO" if entry else "전 고객의 VSART·ZSHCO"
     message = (
         f"rules: 출하 마스터 — {who}\n\n"
         f"Shipping Master 화면에서 저장했다. 일시: {when}\n"

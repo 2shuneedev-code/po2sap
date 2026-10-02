@@ -43,7 +43,11 @@ def build_preview(code: str, settings: Settings) -> dict:
 
 
 def field_choices(code: str, settings: Settings) -> dict[str, list[list[str]]]:
-    """검수 표 드롭다운 — `csv_choice` 로 정해지는 필드의 이 고객 후보.
+    """검수 표 드롭다운 — `csv_choice` 규칙이 주는 이 고객 후보 (SCHEMA §4.6 `choices`).
+
+    후보 규칙은 필드의 `choices` 가 가리키는 규칙이고, 없으면 `from: rule` 인
+    필드의 그 규칙이다. 값은 다른 규칙(거래처 전용 문구 대조 등)이 정하고
+    후보는 공용 `csv_choice` 가 주는 모양이 이래서 가능하다.
 
     후보가 **2개 이상**일 때만 싣는다. 1개면 이미 자동으로 채워졌고, 0개면
     고를 것이 없다(빈 칸 경고로 충분). 각 항목은 `[코드]` 또는 `[코드, 이름]`.
@@ -52,9 +56,10 @@ def field_choices(code: str, settings: Settings) -> dict[str, list[list[str]]]:
     master = _one(code, settings)
     out: dict[str, list[list[str]]] = {}
     for name, rule in (master.fields or {}).items():
-        if not isinstance(rule, dict) or rule.get("from") != "rule":
+        if not isinstance(rule, dict):
             continue
-        spec = (master.rules or {}).get(str(rule.get("rule") or "")) or {}
+        source = rule.get("choices") or (rule.get("rule") if rule.get("from") == "rule" else "")
+        spec = (master.rules or {}).get(str(source or "")) or {}
         if spec.get("kind") != "csv_choice":
             continue
         _, rows = _csv_choice_rows(spec, master, settings)

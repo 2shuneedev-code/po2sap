@@ -518,7 +518,7 @@ rules:
 
 ```yaml
 rules:
-  brand_choice:
+  brand_code:
     kind: csv_choice
     label: "브랜드 — 이 고객에 등록된 코드"
     description: |
@@ -664,135 +664,88 @@ masters/brands.py::load_master()` 는 이 병합 함수를 재사용하는 얇�
 
 #### 거래처 전용 예외 — 그 거래처 파일 안에 가둔다 ★
 
-> **2026-09-23 현재 아래 A·B·C 는 설계 참고용 예시이고, 실물 거래처 파일에는
-> 아직 없다.** 사장님 지시로 msc/kl/ygjp 의 거래처 전용 규칙(결정표·csv_map·
-> keyword_map·const 예외 전부)을 걷어내고 기본(`profiles/standard`, 위
-> `csv_choice`)만 쓰도록 단순화했다 — "기본부터 만들어 놓고 예외는 나중에
-> 정리해서 다시 얹는다." 세 거래처 모두 지금은 브랜드 후보가 여럿이라
-> `csv_choice` 가 자동으로 비워 두고 사람이 검수 화면 드롭다운에서 고른다.
-> 아래 A(MSC)·B(YGJP)·C(KL) 예시는 **그 예외를 다시 붙일 때의 참고 모양**이다
-> (지운 원본 규칙은 이 절 이전의 git 이력에 그대로 있다).
+> 2026-10-02 결정 반영(`CUSTOMER_RULES.md` §5). 실물 파일은 `masters/customers/` 에 있다.
 
-전용 규칙은 공용 CSV 를 쓰지 않는다 — 그 거래처에서만 쓰는 값이 다른 78곳의
-판정에 끼어들 이유가 없다. **세 가지 모양이 나왔다.** 셋 다 "그 거래처 파일
-안에서만" 끝난다는 점은 같고, 무엇으로 판정하느냐가 다르다.
+전용 규칙은 공용 CSV 를 고치지 않는다 — 그 거래처에서만 쓰는 값이 다른 고객의
+판정에 끼어들 이유가 없다. 브랜드에 대해 나온 모양은 셋이다.
 
 | 거래처 | 판정 근거 | 방식 |
 |---|---|---|
-| MSC | 발주서 **문구**(ORDERED FROM 블록)로 믿을 만하게 가릴 수 있다 | `keyword_map` (아래 A) |
-| YGJP | 발주서 브랜드 문구가 **SAP 브랜드명과 거의 그대로 같다** — 별도 대조표 없이 마스터 자체를 대조표로 쓴다 | `csv_map` + `table_file: refs/brand_master.csv` (아래 B) |
-| KL | 문구를 볼 것도 없이 **이 거래처는 늘 한 코드로 나간다** (업무 규칙, 확인됨) | `fields.ZBRAND` 를 `const` 로 고정 (아래 C) |
+| SID TOOL | 발주서 **문구**(ORDERED FROM 블록)로 믿을 만하게 가릴 수 있다 | 전용 `keyword_map` (아래 A) |
+| YGJP | 브랜드 마스터에 등록된 **브랜드명이 원문에 들어 있는지** | 전용 `csv_map` + `table_file: refs/brand_master.csv` (아래 B) |
+| KL | 전용 규칙 없음 — 공용 `csv_choice` 드롭다운 그대로 | (아래 C) |
 
-**A. MSC — 문구 키워드 대조 (확인됨)**
+**★ 규칙 이름을 `brand_code` 로 짓지 않는다.** `brand_code` 는 `profiles/standard.yaml` 의
+공용 `csv_choice`(드롭다운 후보)다. 거래처 파일에서 같은 이름을 쓰면 규칙이 **통째로
+교체**돼(§1) 드롭다운 후보가 사라진다. 전용 규칙은 다른 이름(`brand_text_match`)으로
+두고, 필드는 값과 후보를 따로 가리킨다:
 
 ```yaml
-# masters/customers/msc.yaml — MSC 는 ORDERED FROM 문구로 가른다 (확인됨)
+fields:
+  ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
+  #                     └ 값은 전용 규칙이        └ 후보는 공용 csv_choice 가
+```
+
+**A. SID TOOL — 문구 키워드 대조**
+
+```yaml
+# masters/customers/sid.yaml
 rules:
-  brand_code:
+  brand_text_match:
     kind: keyword_map
-    label: "브랜드 판별 (이 거래처 전용)"
-    description: "ORDERED FROM 블록 문구로 가린다. 다른 거래처와 공유하지 않는다."
+    label: "브랜드 — ORDERED FROM 문구 (이 거래처 전용)"
     source: header.brand_text
     fallback_source: header.order_text
     case_insensitive: true
     entries:
-      - { contains: "HERTEL",     value: "38"  }
+      - { contains: "HERTEL",     value: "038" }
       - { contains: "INTERSTATE", value: "127" }
       - { contains: "ACCUPRO",    value: "205" }
       - { contains: "CLASS C",    value: "428" }
-    value_check:                       # SAP 에 없는 코드를 적어 두는 사고를 막는다
+    value_check:                       # 브랜드 마스터에 없는 코드를 적어 두는 사고를 막는다
       table_file: refs/brand_master.csv
       value_column: zbrand
       filter_column: kunnr
     on_no_match:
       action: warn                     # 막지 않는다 — 드롭다운으로 고르면 된다
       message: "브랜드 문구를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요"
-
-fields:
-  ZBRAND:
-    from: rule
-    rule: brand_code                   # 값은 전용 규칙이 정하고
-    choices: brand_choice              # 드롭다운 후보는 공용 csv_choice 가 준다
-    required: warn
 ```
 
+- 코드는 브랜드 마스터 형식 그대로 **0 붙인 3자리**다(`038`).
 - **`entries` 를 CSV 로 빼지 않는다.** 거래처 하나의 몇 줄짜리 예외이고, 행 순서가
   곧 우선순위라 파일 안에 보이는 편이 안전하다. 수백 줄이 되면 그때 `csv_map` 으로
   옮기고 **그 거래처 전용 CSV** 를 만든다 (공용 표에 섞지 않는다).
 - `value_check` 는 `keyword_map` · `value_map` · `csv_map` · `csv_choice` 에서 쓸 수 있다.
   선언하면 검증기가 **모든 후보 값**이 그 참조표에 등록돼 있는지 대조한다(§7-10).
 
-**B. YGJP — SAP 브랜드명을 그대로 대조표로 쓴다**
+**B. YGJP — 브랜드 마스터의 이름을 대조표로 쓴다 (포함 대조)**
 
-YGJP 는 후보가 21개(§4.5-A)라 `csv_choice` 기본값만으로는 드롭다운이 너무 크고,
-그런데 발주서 하단 브랜드 블록에 `"YG BRAND"` 처럼 **SAP 브랜드명(ZBRANT)과 거의
-같은 문구가 원문 그대로** 찍힌다(`extraction.hints` 의 "[문서 하단 — 브랜드/포장/
-비고 블록]" 참고). 그래서 **별도 대조표를 만들지 않고 `brand_master.csv` 자체를
-`csv_map` 의 `table_file` 로 재사용**한다 — 키 컬럼이 `zbrant`(브랜드명)라는 점만
-다르다.
+발주서 하단 브랜드 줄은 모양이 제각각이다 — 포장지시가 같은 줄에 붙거나(`YAMAKATSU
+BRAND S-Y,B-Y`) 뒤에 다른 말이 붙는다(`YG BRAND YG STD`). 그래서 **완전일치가 아니라
+포함 대조**다. 별도 대조표를 만들지 않고 **브랜드 마스터 자체**를 쓴다 — 마스터가
+기준이므로 마스터가 바뀌면 판정도 따라간다.
 
 ```yaml
 # masters/customers/ygjp.yaml
 rules:
-  brand_code:
+  brand_text_match:
     kind: csv_map
-    label: "브랜드 판별 — SAP 브랜드명과 원문 완전일치"
-    description: |
-      발주서 하단 브랜드 블록의 원문이 이 거래처(kunnr)에 등록된 SAP 브랜드명
-      (zbrant) 과 같으면 그 코드로 정한다. 별도 대조표를 두지 않고 브랜드
-      마스터 자체를 대조표로 쓴다 — 그래서 브랜드명이 SAP 재추출로 바뀌면
-      판정도 그대로 따라간다.
-      코드 448/450/477 은 SAP 브랜드명과 실제 발주서 문구가 다르다고 알려져
-      있다(예전 brand_keys.csv 의 확인 메모) — 원문 확인 전까지는 대조에
-      실패하고 드롭다운(21개 후보)에서 사람이 고른다.
+    label: "브랜드 — 마스터 브랜드명이 원문에 포함되면"
     source: header.brand_text
-    table_file: refs/brand_master.csv   # 별도 CSV 없음 — 마스터를 그대로 대조
-    filter_column: kunnr
-    key_column: zbrant                  # ZBRAND 가 아니라 **브랜드명**이 대조 키다
-    mode: equals                        # 전 행 완전일치 (mode_column 없음)
+    table_file: refs/brand_master.csv
+    filter_column: kunnr                # 이 고객 행만
+    key_column: zbrant                  # **브랜드명**이 대조 키다 (판정 기본값 = 포함)
     value_column: zbrand
     case_insensitive: true
     on_no_match:
-      action: warn                      # 21개 후보 드롭다운으로 넘어간다
-      message: "브랜드 문구가 SAP 브랜드명과 다릅니다: {brand_text} — 드롭다운에서 고르세요"
-
-fields:
-  ZBRAND: { from: rule, rule: brand_code, choices: brand_choice, required: true }
-  ZSHCO:
-    from: expr
-    expr: 'if(in(brand_code, ["471", "507"]), "A", "L")'
-    explain: '브랜드 코드가 471 또는 507 이면 A, 그 외 L'
+      action: warn
+      message: "브랜드를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요"
 ```
 
-- `ZSHCO` 의 `expr` 은 그대로다 — `brand_code` 라는 **규칙 이름**만 같으면 되고,
-  그 규칙이 `csv_map` 이든 `keyword_map` 이든 `<규칙명>` 참조는 똑같이 동작한다.
-- `refs/brand_keys.csv` 는 더 이상 필요 없다. 지금 그 파일에 있던 "equals" 매핑은
-  대부분 `zbrant` 값과 동일하므로 정보 손실이 아니다 — 다른 것만 §4.5-A 의
-  오버레이로 옮긴다(아래 "이관 메모" 참고).
+**C. KL — 전용 브랜드 규칙 없음**
 
-**C. KL — 고정값 (업무 규칙, 확인됨)**
-
-KL 은 브랜드 후보가 2개(`2`=OEM BRAND, `58`=NO BRAND)지만, 문구를 볼 것도 없이
-**항상 OEM(`2`)으로 나간다**는 것이 확인된 업무 규칙이다. 문구 대조도
-`csv_choice` 자동판정(후보 1개일 때만 자동)도 필요 없다 — **필드를 그냥
-고정한다.** 다만 드롭다운은 살려 둔다. 사람이 예외적으로 NO BRAND 를 골라야
-하는 발주가 있을 수 있어서다.
-
-```yaml
-# masters/customers/kl.yaml
-fields:
-  ZBRAND:
-    from: const
-    value: "2"
-    choices: brand_choice        # from: const 라 §4.6 의 "자동으로 자기 자신" 이
-                                  # 붙지 않는다 — 여기선 반드시 명시해야 한다
-    explain: "KL 은 브랜드 고정 2 (OEM) — 업무 규칙 확인됨. 드롭다운은 열어 둔다"
-```
-
-- `keyword_map`/`csv_map` 같은 `rules` 선언조차 필요 없다 — `fields` 한 줄이 전부다.
-- `choices` 를 생략하면 안 된다. `from: rule` 이 아니므로 §4.6 의 자동 부착 규칙이
-  적용되지 않고, 생략하면 드롭다운 없는 텍스트 칸이 되어 오타로 잘못된 코드가
-  들어갈 수 있다.
+KL 은 후보가 2개(002 OEM BRAND · 058 NO BRAND)이고 공용 `csv_choice` 가 비워 두면
+검수 화면 드롭다운에서 고른다. 고정값을 두지 않는다 — 후보 정리는 브랜드 마스터에서 한다.
 
 `kind: csv_map` 전용 옵션 — **매핑표가 커지면 YAML 이 아니라 CSV 에 둔다**:
 
@@ -815,7 +768,6 @@ rules:
 | `key_column` | ✅ | 원문과 대조할 문구가 든 컬럼 |
 | `value_column` | ✅ | 매칭됐을 때 결정될 값이 든 컬럼 |
 | `mode_column` | | 행마다 `contains`(포함) / `equals`(완전일치)를 고르게 한다. 있으면 이 값이 우선한다 |
-| `mode` | | `mode_column` 이 없을 때 **전 행**에 적용할 기본 판정 방식. 생략하면 `contains` |
 | `filter_column` | | 이 컬럼이 `meta.customer_no` 와 같은 행만 쓴다. 거래처별 매핑표를 한 파일에 모을 때 |
 | `value_check` | | 결정된 값이 다른 참조표에 등록돼 있는지 검증한다(§7-10) |
 
@@ -883,7 +835,7 @@ MATNR:
   required_unless: [KDMAT]     # 이 필드들 중 하나라도 값이 있으면 비어도 통과
   format: integer | decimal3 | date_yyyymmdd | upper | trim | strip_parens   # strip_parens: 괄호째 삭제 ("D1103036(1pc)" → "D1103036")
   default: ""                  # 최종 폴백
-  choices: brand_choice        # 검수 화면 드롭다운 후보 (아래)
+  choices: brand_code          # 검수 화면 드롭다운 후보 — csv_choice 규칙 이름 (아래)
   explain: "화면 툴팁·규칙 카드에 표시할 설명"
   todo: "값 미확정 — SAP 담당 확인 필요"   # ← 값이 안 정해졌을 때
 ```

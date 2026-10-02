@@ -62,6 +62,7 @@ FIELD_FROM = {"const", "base", "doc", "table", "rule", "expr", "gen"}     # §4.
 FIELD_OPTIONS = {
     "from", "value", "path", "table", "rule", "expr", "generator",
     "fallback", "required", "required_unless", "format", "default", "explain", "todo",
+    "choices",
 }
 FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim", "strip_parens"}
 GENERATORS = {"line_no_x10"}
@@ -267,6 +268,16 @@ def check_fields(
 
         for key in ("path", "fallback"):
             check_path(report, f"fields.{name}.{key}", spec.get(key), allowed)
+
+        choice = spec.get("choices")
+        if choice is not None:
+            target = rules.get(choice) if isinstance(choice, str) else None
+            if not isinstance(target, dict):
+                report.error(3, f"fields.{name}.choices: 없는 규칙을 참조합니다: {choice}")
+            elif target.get("kind") != "csv_choice":
+                report.error(
+                    3, f"fields.{name}.choices: csv_choice 규칙이어야 합니다 ({choice} 은 {target.get('kind')})"
+                )
 
         unless = spec.get("required_unless")
         if unless is not None:

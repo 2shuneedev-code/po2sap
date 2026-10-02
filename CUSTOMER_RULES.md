@@ -151,7 +151,7 @@ YAML 예시는 모양만 보여 줍니다. 값은 2026-10-02 결정(§5) 기준�
 | 브랜드 - ZBRAND | ORDERED FROM 키워드: HERTEL→38, INTERSTATE→127, ACCUPRO→205, CLASS C→428 | 전용 `keyword_map`(`brand_text_match`): HERTEL→`038` · INTERSTATE→`127` · ACCUPRO→`205` · CLASS C→`428`. 못 찾으면 빈 칸 + 노랑 + 드롭다운(후보 7개) | 전용 규칙 필요 |
 | Shipping Condition - ZSHCO | `A` 고정 | Shipping Master 를 따른다 (지금 100249 = 빈 칸 → 노랑) | 공용으로 이미 됨 |
 | Shipping Type - VSART | `04` | Shipping Master 100249 = `04` | 공용으로 이미 됨 |
-| Packing Spec - ZPKRE | 도시 기본값 + 참조표(MSC_REF) B·C열 | **도시 기본값만**: ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A` (결정표 `_pack_base`). 참조표 연동은 하지 않는다 | 전용 규칙 필요 |
+| Packing Spec - ZPKRE | 도시 기본값 + 참조표(MSC_REF) B·C열 | 도시 기본값(ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A`, 결정표 `_pack_base`) + **Your Code 가 Color Ring·HERTEL 대상이면** `refs/msc_ref.csv` 의 값을 쉼표로 이어 붙인다 (예: `A,Blue RING`). `lookup` 규칙 + `join(",", compact([...]))`. 표에 없으면 기본값만 | 전용 규칙 필요 · **참조표 대기** |
 | 자재번호 - MATNR | your_item | 공용 (`line.item_code`). hints 가 "Your Item Number = item_code" 를 지킨다 | 공용으로 이미 됨 |
 | 고객자재번호 - KDMAT | (없음) | 공용 (`line.our_item`, MSC 8자리 품번) | 공용으로 이미 됨 |
 | PO품목번호 - POSEX | 넣지 않음 | 공용 (문서에 없으면 빈 칸) | 공용으로 이미 됨 |
@@ -327,7 +327,7 @@ checks:
 | Q12 | KL POSEX | **정수** (`00001` → `1`) | 2026-10-02 |
 | Q13 | KL BSTKD | **`/` 앞부분만.** 읽기는 원문 전체(Claude), 자르기는 엔진(`regex_extract`) | 2026-10-02 |
 | Q14 | KL Ship-to | **107525** (공용 기본 그대로) | 2026-10-02 |
-| Q16 | MSC 포장 참조표(MSC_REF) | **연동하지 않는다.** 창고별 기본값(C/N/O/A)만 ZPKRE2 에 | 2026-10-02 |
+| Q16 | MSC 포장 참조표(MSC_REF) | **연동한다** (2026-10-02 재결정). 사용자가 `masters/refs/msc_ref.csv` 로 넣는다. Your Code 가 Color Ring·HERTEL 대상이면 창고 기본값 뒤에 이어 붙인다. 열 구성은 파일을 받은 뒤 정한다 | 2026-10-02 |
 | Q17 | MSC 도시 미인식 시 전송 차단 | **막지 않는다.** 경고만 — 전송 후 SAP 에서 고칠 수 있다(§1 원칙) | 2026-10-02 |
 | Q18 | MSC 여러 창고 문서의 PRICE 빈 칸 | **괜찮다.** SAP 가격 마스터가 채운다 | 2026-10-02 |
 | Q19 | MSC 키워드에 없는 브랜드 | **빈 칸**, 드롭다운에서 고른다 | 2026-10-02 |
@@ -355,6 +355,7 @@ checks:
 | # | 내용 | 파일 | 지금 엔진으로 가능? |
 |---|---|---|---|
 | Y1 | MSC — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE2 · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/msc.yaml` | **가능** — 엔진 의존 없음 |
+| D3 | MSC 포장 참조표 — `refs/msc_ref.csv` + `lookup` 규칙, ZPKRE2 를 `기본값,B,C` 로 | `masters/refs/msc_ref.csv` · `msc.yaml` | 파일 받은 뒤. Y1 은 먼저 가능(ZPKRE2 = 기본값만으로 시작) |
 | Y2 | KL — meta · hints(발주번호 원문 전체로 고침) · BSTKD `regex_extract` · POSEX `format: integer` · ZPKRE2·EMPST `keyword_map`(WGT/KMT, `on_no_match: empty`) | `masters/customers/kl.yaml` | **가능** — 엔진 의존 없음 |
 | Y3 | YGJP — meta · hints(브랜드 줄 원문 그대로, `Remark: YG agent` 줄 구분) · KUNNR2 `319854` · BSTKD 식 · 브랜드 `csv_map`(마스터 이름 포함) · ZSHCO 식 · MATNR 덮어쓰기 | `masters/customers/ygjp.yaml` | **부분 가능** — 지금 바로 얹을 수 있다. N2(`order: longest_first`)·N3(`zero_quantity`)가 끝나면 각 한 줄을 더하고, N1 이 끝나면 ZSHCO 식이 최종 ZBRAND 를 보도록 바꾼다 |
 
@@ -388,7 +389,6 @@ checks:
 |---|---|
 | POC 사전점검 엑셀 (`pre_check`, Unit=PC 고정, "Your Code" 열) | 이 프로그램의 출력은 EAI 전송 하나다 |
 | YGJP PO정리 엑셀 (`ygjp_po.py`) | 같은 이유. 포장지시·비고는 SAP 로 보내지 않는다(Q9) |
-| MSC 포장 참조표(MSC_REF) 연동 | 사용자 결정으로 하지 않는다(Q16) |
 | `parsers/pdf_yg1.py` (YG1) | POC 에서도 쓰이지 않던 코드이고 이번 범위에서 제외 |
 | POC 파일명 규칙 | 전송 페이로드에 파일명이 들어가지 않는다 |
 | 삭제된 전송 필드(KUNNR3·VDATU·ZTERM·INCO1/2·ETDAT·BSTDK_E·DELCO·AUGRU·VKAUS·IHREZ_E·VGBEL·VGPOS) | 2026-10-02 사용자 결정으로 보내지 않는다. 다시 필요하면 `_base` 부터 |

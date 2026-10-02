@@ -28,7 +28,7 @@ def rule_preview(preview: dict) -> None:
     if todos:
         st.warning(
             "**확인 중인 값** — "
-            + " · ".join(f"`{t['field']}` ({t['note']})" for t in todos),
+            + " · ".join(f"`{t.get('title') or t['field']}` ({t['note']})" for t in todos),
             icon="⚠️",
         )
 
@@ -41,7 +41,7 @@ def rule_preview(preview: dict) -> None:
         for index, item in enumerate(fixed):
             with cols[index % len(cols)]:
                 st.metric(
-                    label=f"{item['label']} · {item['field']}",
+                    label=item.get("title") or item["field"],
                     value=item["value"] or "—",
                     help=item.get("note") or None,
                 )

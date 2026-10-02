@@ -15,7 +15,9 @@ from .masters import CustomerMaster, MasterError, load_customer
 from .rules import EvalContext, EvalError, ExprError, reftable
 from .rules import expr as expr_mod
 
-__all__ = ["PreviewError", "build_preview", "field_choices", "field_specs", "field_list"]
+__all__ = [
+    "PreviewError", "build_preview", "field_choices", "field_specs", "field_list", "field_title",
+]
 
 
 class PreviewError(ValueError):
@@ -33,7 +35,7 @@ def build_preview(code: str, settings: Settings) -> dict:
         "customer_no": master.customer_no,
         "fixed": _fixed(master, specs, settings),
         "fixed_note": _fixed_note(master),
-        "rules": _tables(master) + _rules(master, settings),
+        "rules": _tables(master, specs) + _rules(master, settings),
         "split": _split(master),
         "todos": _todos(master, specs),
         "footer": "나머지 항목은 발주서에서 읽어옵니다.",
@@ -66,7 +68,7 @@ def field_list(master: CustomerMaster) -> list[dict]:
     out = []
     for name, spec in field_specs(master).items():
         item: dict[str, Any] = {"name": name, "label": str(spec.get("label") or name)}
-        for key in ("sheet", "type", "max_len"):
+        for key in ("code", "sheet", "type", "max_len"):
             if spec.get(key) not in (None, ""):
                 item[key] = spec[key]
         out.append(item)
@@ -89,6 +91,16 @@ def field_specs(master: CustomerMaster) -> dict[str, Any]:
 
 def _label(specs: dict[str, Any], name: str) -> str:
     return str((specs.get(name) or {}).get("label") or name)
+
+
+def field_title(specs: dict[str, Any], name: str) -> str:
+    """화면에 필드를 부르는 **유일한** 이름 — `필드명 - 필드코드`.
+
+    필드코드는 `_base` 의 `code`(화면용 SAP 코드)가 있으면 그것, 없으면 전송 키.
+    검수 표 머리글·규칙 카드·경고 요약이 모두 이걸 쓴다 — 한 곳만 바꾸면 어긋난다.
+    """
+    spec = specs.get(name) or {}
+    return f"{spec.get('label') or name} - {spec.get('code') or name}"
 
 
 # ── fixed: 발주서를 읽지 않고도 이미 정해지는 값 ──────────────────────
@@ -124,11 +136,13 @@ def _fixed(master: CustomerMaster, specs: dict[str, Any], settings: Settings) ->
             if _shown_as(spec) == "fixed":
                 _, rows = _csv_choice_rows(spec, master, settings)
                 value = rows[0][0] if len(rows) == 1 else ""
-                out.append({"field": name, "label": _label(specs, name), "value": value})
+                out.append({"field": name, "label": _label(specs, name),
+                            "title": field_title(specs, name), "value": value})
                 continue
 
         if value not in (None, ""):
-            item = {"field": name, "label": _label(specs, name), "value": str(value)}
+            item = {"field": name, "label": _label(specs, name),
+                    "title": field_title(specs, name), "value": str(value)}
             if rule.get("explain"):
                 item["note"] = str(rule["explain"])
             out.append(item)
@@ -168,7 +182,7 @@ def _meta_only_expr(source: str, ctx: EvalContext) -> str | None:
 
 
 # ── rules[]: 결정표 ───────────────────────────────────────────────────
-def _tables(master: CustomerMaster) -> list[dict]:
+def _tables(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
     """`tables` 는 조건 → 결과 행렬이다. 그대로 표로 그린다."""
     out = []
     for table_id, table in (master.tables or {}).items():
@@ -176,7 +190,7 @@ def _tables(master: CustomerMaster) -> list[dict]:
             continue
         conds = [c for c in (table.get("when") or []) if isinstance(c, dict)]
         columns = [str(c.get("label") or c.get("source") or "") for c in conds]
-        columns += [f"→ {name}" for name in (table.get("then") or [])]
+        columns += [f"→ {field_title(specs, n) if n in specs else n}" for n in (table.get("then") or [])]
 
         rows = []
         for row in table.get("rows") or []:
@@ -323,7 +337,7 @@ def _todos(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
     for name, rule in (master.fields or {}).items():
         if isinstance(rule, dict) and rule.get("todo"):
             out.append({"field": name, "label": _label(specs, name),
-                        "note": str(rule["todo"])})
+                        "title": field_title(specs, name), "note": str(rule["todo"])})
     for rule_id, rule in (master.rules or {}).items():
         if not isinstance(rule, dict):
             continue
@@ -331,5 +345,6 @@ def _todos(master: CustomerMaster, specs: dict[str, Any]) -> list[dict]:
             if isinstance(entry, dict) and entry.get("todo"):
                 out.append({"field": rule_id,
                             "label": str(rule.get("label") or rule_id),
+                            "title": str(rule.get("label") or rule_id),
                             "note": f"{entry.get('value', '')}: {entry['todo']}"})
     return out

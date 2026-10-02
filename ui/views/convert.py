@@ -18,6 +18,8 @@ from ui.service import (
     MasterError,
     SendBlocked,
     choices_for,
+    field_specs_for,
+    field_title,
     merge_edits,
     preview_for,
     repo,
@@ -87,7 +89,8 @@ def _brand_choice_notice(entry) -> None:
 
 # ── ① 규칙 미리보기 ───────────────────────────────────────────────────
 def _rules_section(entry) -> None:
-    with st.expander("이 거래처에 자동 적용되는 값", expanded=False):
+    with st.container(border=True):
+        st.markdown("**이 거래처에 자동 적용되는 값**")
         try:
             rule_preview(preview_for(entry.parse_code))
         except (MasterError, ValueError) as exc:
@@ -240,10 +243,14 @@ def _bulk_fill(batch: Batch, edited: pd.DataFrame, visible) -> None:
     if not columns:
         return
     first = next((c for c in columns if c in choices), columns[0])
+    specs = field_specs_for(batch.customer)
 
     with st.expander("⇣ 열 일괄 채우기 — 한 값을 여러 행에 한 번에", expanded=bool(choices)):
         left, mid, right, go = st.columns([2, 3, 2, 1], vertical_alignment="bottom")
-        column = left.selectbox("열", columns, index=columns.index(first), key="bulk_col")
+        column = left.selectbox(
+            "열", columns, index=columns.index(first), key="bulk_col",
+            format_func=lambda name: field_title(specs, name),
+        )
         if column in choices:
             names = {o[0]: o[1] for o in choices[column] if len(o) > 1}
             value = mid.selectbox(
@@ -260,7 +267,7 @@ def _bulk_fill(batch: Batch, edited: pd.DataFrame, visible) -> None:
             frame.loc[mask, column] = value
             _apply(batch, frame, visible)
             st.session_state[_GRID_VERSION] = st.session_state.get(_GRID_VERSION, 0) + 1
-            st.toast(f"{column} — {int(mask.sum())}행을 채웠습니다.", icon="✅")
+            st.toast(f"{field_title(specs, column)} — {int(mask.sum())}행을 채웠습니다.", icon="✅")
             st.rerun()
 
 
@@ -303,11 +310,7 @@ def _grid_columns(batch: Batch) -> list[str]:
 
 
 def _column_config(batch: Batch) -> dict:
-    """헤더는 `필드명 - 필드코드`. 숨김 컬럼은 접어두되 전송에는 그대로 들어간다.
-
-    필드코드는 `_base` 의 `code`(화면용 SAP 코드)가 있으면 그것, 없으면 전송 키.
-    """
-    from ui.service import field_specs_for
+    """헤더는 `필드명 - 필드코드`(`field_title`). 숨김 컬럼은 접어두되 전송에는 그대로 들어간다."""
 
     specs = field_specs_for(batch.customer)
     hidden = set(batch.grid.get("hidden") or [])
@@ -319,10 +322,8 @@ def _column_config(batch: Batch) -> dict:
     }
     choices = choices_for(batch.customer)
     for name in _grid_columns(batch):
-        spec = specs.get(name) or {}
-        label = str(spec.get("label") or name)
-        code = str(spec.get("code") or name)
-        header = f"{label} - {code}"
+        code = str((specs.get(name) or {}).get("code") or name)
+        header = field_title(specs, name)
         help_text = header + (f" (전송 필드 {name})" if code != name else "") + (
             " — 보기에서 접힌 컬럼. 전송에는 들어갑니다." if name in hidden else ""
         )
@@ -399,8 +400,13 @@ def _issue_list(batch: Batch, issues_by_row: dict) -> None:
         st.success("검증을 통과했습니다.", icon="✅")
         return
 
+    specs = field_specs_for(batch.customer)
+
+    def title(name: str) -> str:
+        return field_title(specs, name) if name in specs else name
+
     for severity, show in (("error", st.error), ("warn", st.warning)):
-        lines = _grouped(issues_by_row, severity)
+        lines = _grouped(issues_by_row, severity, title)
         if lines:
             show("\n\n".join(lines), icon="⛔" if severity == "error" else "⚠️")
 
@@ -410,11 +416,11 @@ def _issue_list(batch: Batch, issues_by_row: dict) -> None:
             for issue in issues:
                 icon = "⛔" if issue.severity == "error" else "⚠️"
                 st.markdown(
-                    f"{icon} **{index}행** ({row.file}) `{issue.field}` — {issue.message}"
+                    f"{icon} **{index}행** ({row.file}) `{title(issue.field)}` — {issue.message}"
                 )
 
 
-def _grouped(issues_by_row: dict, severity: str) -> list[str]:
+def _grouped(issues_by_row: dict, severity: str, title) -> list[str]:
     """(필드·문구)별로 몇 행인지. 빈 칸(REQUIRED_MISSING)은 필드 목록 한 줄로."""
     missing: dict[str, set[int]] = {}
     other: dict[tuple[str, str], set[int]] = {}
@@ -428,11 +434,11 @@ def _grouped(issues_by_row: dict, severity: str) -> list[str]:
                 other.setdefault((issue.field, issue.message), set()).add(index)
 
     lines = [
-        (f"`{field}` — " if field else "") + f"{message} (**{len(rows)}행**)"
+        (f"`{title(field)}` — " if field else "") + f"{message} (**{len(rows)}행**)"
         for (field, message), rows in other.items()
     ]
     if missing:
-        fields = " · ".join(f"`{f}`({len(rows)}행)" for f, rows in missing.items())
+        fields = " · ".join(f"`{title(f)}`({len(rows)}행)" for f, rows in missing.items())
         lines.append(f"빈 칸 있음: {fields} — 확인해 보세요")
     return lines
 

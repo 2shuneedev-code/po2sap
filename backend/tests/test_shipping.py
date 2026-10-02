@@ -106,3 +106,17 @@ def test_preview_shows_shipping_as_fixed_values_and_hides_currency(workspace):
     assert "Shipping Master" in preview["fixed_note"]
     ids = {r["id"] for r in preview["rules"]}
     assert not ids & {"shipping_condition", "shipping_type", "currency"}
+
+
+def test_preview_titles_use_screen_code_not_send_key(workspace):
+    """화면 이름은 `필드명 - 필드코드` — 코드는 `_base` 의 `code`(KUNNR1 → KUNNR)."""
+    from app.preview import build_preview, field_specs, field_title
+
+    specs = field_specs(load_customer("msc", workspace))
+    titles = {f["field"]: f["title"] for f in build_preview("msc", Settings(masters_dir=workspace))["fixed"]}
+    for name, title in titles.items():
+        assert title == field_title(specs, name)
+    coded = [n for n in titles if specs[n].get("code")]
+    assert coded                                            # KUNNR1 등 — 코드가 다른 필드가 있다
+    for name in coded:
+        assert titles[name] == f"{specs[name]['label']} - {specs[name]['code']}"

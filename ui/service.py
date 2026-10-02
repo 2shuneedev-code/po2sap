@@ -27,13 +27,14 @@ from backend.app.extraction import Extractor  # noqa: E402
 from backend.app.masters import MasterError, load_customer  # noqa: E402
 from backend.app.masters import brands as brand_store  # noqa: E402
 from backend.app.masters import shipping as shipping_store  # noqa: E402
-from backend.app.preview import build_preview, field_choices, field_specs  # noqa: E402
+from backend.app.preview import build_preview, field_choices, field_specs, field_title  # noqa: E402
 from backend.app.send_service import SendBlocked, send_batch  # noqa: E402
 from backend.app.storage import BatchRepo  # noqa: E402
 
 __all__ = [
     "Batch", "CatalogEntry", "MasterError", "SendBlocked", "Settings",
-    "brand_store", "catalog", "choices_for", "customer_master", "field_specs_for", "health",
+    "brand_store", "catalog", "choices_for", "customer_master", "field_specs_for", "field_title",
+    "health",
     "merge_edits", "preview_for", "repo", "send_batch", "settings", "shipping_store",
     "start_batch", "summary",
 ]

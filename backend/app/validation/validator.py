@@ -33,13 +33,15 @@ def validate_row(
         others = [str(f) for f in spec.get("required_unless") or []]
         if required and not value and not any(values.get(f) for f in others):
             warn_only = str(required).lower() == "warn"
-            label = str((field_specs.get(name) or {}).get("label") or name)
+            spec_of = field_specs.get(name) or {}
+            label = str(spec_of.get("label") or name)
+            code = str(spec_of.get("code") or name)
             if warn_only:
-                message = f"{label}({name}) 이 비어 있습니다. 확인하세요."
+                message = f"{label}({code}) 이 비어 있습니다. 확인하세요."
             else:
-                message = f"{label}({name}) 은 필수입니다. 값을 입력하세요."
+                message = f"{label}({code}) 은 필수입니다. 값을 입력하세요."
             if others:
-                what = " · ".join([f"{label}({name})", *others])
+                what = " · ".join([f"{label}({code})", *others])
                 message = f"{what} 가 모두 비어 있습니다. " + (
                     "확인하세요." if warn_only else "하나는 입력하세요."
                 )

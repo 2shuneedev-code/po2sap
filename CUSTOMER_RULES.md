@@ -13,9 +13,9 @@
 | 구분 | 무엇 | 어디에 있나 |
 |---|---|---|
 | **공용 설정** | 모든 거래처에 똑같이 적용되는 방식. 예) 판매처(Sold-to)는 고객코드, 브랜드는 브랜드 마스터에서, 출하조건·운송수단은 Shipping Master 에서 | `masters/profiles/standard.yaml` · `generic.yaml` |
-| **거래처 전용 규칙** | 특정 거래처에만 있는 예외. 예) MSC 는 창고 도시마다 Ship-to 가 다르다 | `masters/customers/{code}.yaml` (거래처 1곳 = 파일 1개) |
+| **거래처 전용 규칙** | 특정 거래처에만 있는 예외. 예) SID TOOL 는 창고 도시마다 Ship-to 가 다르다 | `masters/customers/{code}.yaml` (거래처 1곳 = 파일 1개) |
 
-**지금(2026-10-02) 실물 `masters/customers/` 에는 전용 규칙 파일이 하나도 없습니다.** MSC·KL·YGJP 도
+**지금(2026-10-02) 실물 `masters/customers/` 에는 전용 규칙 파일이 하나도 없습니다.** SID TOOL·KL·YGJP 도
 공용 설정만으로 돌고 있습니다(2026-09-23 "기본부터 만들고 예외는 나중에 다시 얹는다" 결정).
 예전 규칙 모양은 테스트용 사본 `backend/tests/fixtures/customers/{msc,kl,ygjp}.yaml` 에 남아 있습니다.
 
@@ -40,7 +40,7 @@
 1. **값의 원천은 `masters/customers/{code}.yaml` 과 `masters/refs/*.csv` 입니다.** 이 문서에 적힌 코드값은
    결정 내용과 POC 원본의 **인용**일 뿐입니다.
 2. 한 항목이 YAML 로 구현되면, 이 문서의 해당 행은 **값을 지우고 위치만** 남깁니다.
-   예) `Ship-to - KUNWE → masters/customers/msc.yaml tables.ship_to_routing`
+   예) `Ship-to - KUNWE → masters/customers/sid.yaml tables.ship_to_routing`
 3. 구현 뒤에 값을 바꿀 때는 YAML 만 고치고 이 문서는 고치지 않습니다. 두 곳에 같은 값을 쓰면
    언젠가 어긋나고, 어긋나면 오더가 잘못 생성됩니다.
 
@@ -97,16 +97,16 @@ POC 는 이 경우 브랜드·포장지시·비고가 전부 빈 값이 됩니�
 | 오더유형 - AUART | `ZEXP` | `_base` 고정값 `ZEXP` | 공용으로 이미 됨 |
 | 판매조직 - VKORG | `1000` | `_base` 고정값 `1000` (전송 전용) | 공용으로 이미 됨 |
 | Sold-to - KUNNR | 고객코드 | 고객코드(`meta.customer_no`) | 공용으로 이미 됨 |
-| Ship-to - KUNWE | 거래처마다 다름 | 기본 = 고객코드, 비면 노랑 | 공용 + 거래처 예외(MSC·YGJP) |
+| Ship-to - KUNWE | 거래처마다 다름 | 기본 = 고객코드, 비면 노랑 | 공용 + 거래처 예외(SID TOOL·YGJP) |
 | 최종고객 - KUNNR3 | 고객코드 | **전송 필드에서 삭제** (2026-10-02) | 해당 없음 |
-| 고객발주번호 - BSTKD | `PO번호(Location)` | `header.po_number` 원문 그대로 | 공용 + 거래처 예외(MSC·KL·YGJP) |
+| 고객발주번호 - BSTKD | `PO번호(Location)` | `header.po_number` 원문 그대로 | 공용 + 거래처 예외(SID TOOL·KL·YGJP) |
 | PO품목번호 - POSEX | 있을 때만 | `line.posex` 원문, 없으면 빈 칸 | 공용 + 거래처 예외(KL 정수화) |
-| 브랜드 - ZBRAND | 거래처별 하드코딩 | 브랜드 마스터에서 이 고객 후보 — 1개면 자동, 여럿이면 빈 칸 + 드롭다운 (`csv_choice`, 규칙 이름 `brand_code`) | 공용 + 거래처 예외(MSC·YGJP). KL 은 공용 그대로 |
+| 브랜드 - ZBRAND | 거래처별 하드코딩 | 브랜드 마스터에서 이 고객 후보 — 1개면 자동, 여럿이면 빈 칸 + 드롭다운 (`csv_choice`, 규칙 이름 `brand_code`) | 공용 + 거래처 예외(SID TOOL·YGJP). KL 은 공용 그대로 |
 | Shipping Condition - ZSHCO | 거래처별 고정 | Shipping Master 값 | 공용 + 거래처 예외(YGJP) |
 | 고객자재번호 - KDMAT | (없었음) | `line.our_item` (거래처 품번) | 공용으로 이미 됨 — POC 에 없던 새 필드 |
 | 자재번호 - MATNR | `your_item` (KL 은 빈 칸) | `line.item_code`(우리 품번), 괄호 제거, KDMAT 가 있으면 비어도 통과 | 공용 + 거래처 예외(YGJP 경고 강화) |
 | 수량 - KWMENG | qty | `line.quantity` 정수, 비면 빨강 | 공용 (수량 0 경고는 엔진 항목 N3) |
-| Packing Spec - ZPKRE | 거래처별 | 빈 칸 | 거래처 예외(MSC·KL) |
+| Packing Spec - ZPKRE | 거래처별 | 빈 칸 | 거래처 예외(SID TOOL·KL) |
 | Remark - EMPST | KL 만 | 빈 칸 | 거래처 예외(KL) |
 | Shipping Type - VSART | 3곳 모두 `04` | Shipping Master 값 | 공용으로 이미 됨 (3곳 모두 Shipping Master 를 따른다) |
 | 단가 - PRICE | **보내지 않음** | `line.unit_price` | 공용으로 이미 됨 — POC 와 다름(지금은 보낸다) |
@@ -136,7 +136,9 @@ POC 는 이 경우 브랜드·포장지시·비고가 전부 빈 값이 됩니�
 
 YAML 예시는 모양만 보여 줍니다. 값은 2026-10-02 결정(§5) 기준입니다.
 
-### 4.1 MSC — SID TOOL CO., INC. (고객코드 100249)
+### 4.1 SID TOOL — SID TOOL CO., INC. (고객코드 100249)
+
+> 옛 별칭 "SID TOOL"는 쓰지 않는다. 거래처 파일은 `masters/customers/sid.yaml`(`meta.code: SID`).
 
 - 입력: HTM. 발주서 1부에 출하 창고가 여럿이면 **창고마다 오더 1건**으로 나뉩니다(`split.by: shipment`).
 - 실물 근거: `samples/MSC` 의 **SAP 업로드 결과 CSV 12개**("판매오더 업로드 내역 MSC_100249_*.csv").
@@ -151,16 +153,16 @@ YAML 예시는 모양만 보여 줍니다. 값은 2026-10-02 결정(§5) 기준�
 | 브랜드 - ZBRAND | ORDERED FROM 키워드: HERTEL→38, INTERSTATE→127, ACCUPRO→205, CLASS C→428 | 전용 `keyword_map`(`brand_text_match`): HERTEL→`038` · INTERSTATE→`127` · ACCUPRO→`205` · CLASS C→`428`. 못 찾으면 빈 칸 + 노랑 + 드롭다운(후보 7개) | 전용 규칙 필요 |
 | Shipping Condition - ZSHCO | `A` 고정 | Shipping Master 를 따른다 (지금 100249 = 빈 칸 → 노랑) | 공용으로 이미 됨 |
 | Shipping Type - VSART | `04` | Shipping Master 100249 = `04` | 공용으로 이미 됨 |
-| Packing Spec - ZPKRE | 도시 기본값 + 참조표(MSC_REF) B·C열 | 도시 기본값(ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A`, 결정표 `_pack_base`) + **Your Code 가 Color Ring·HERTEL 대상이면** `refs/msc_ref.csv` 의 값을 쉼표로 이어 붙인다 (예: `A,Blue RING`). `lookup` 규칙 + `join(",", compact([...]))`. 표에 없으면 기본값만 | 전용 규칙 필요 · **참조표 대기** |
+| Packing Spec - ZPKRE | 도시 기본값 + 참조표 B·C열 | 도시 기본값(ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A`, 결정표 `_pack_base`) + **고객자재번호(KDMAT, Your Code)가 `refs/sid_ref.csv` 에 있으면** 그 행의 Color RING 또는 HERTEL Number 값을 쉼표로 이어 붙인다 (예: `A,Blue RING` · `C,4006205`). 표에 없으면 기본값만, 경고 없음 | 전용 규칙 필요 |
 | 자재번호 - MATNR | your_item | 공용 (`line.item_code`). hints 가 "Your Item Number = item_code" 를 지킨다 | 공용으로 이미 됨 |
-| 고객자재번호 - KDMAT | (없음) | 공용 (`line.our_item`, MSC 8자리 품번) | 공용으로 이미 됨 |
+| 고객자재번호 - KDMAT | (없음) | 공용 (`line.our_item`, SID TOOL 8자리 품번) | 공용으로 이미 됨 |
 | PO품목번호 - POSEX | 넣지 않음 | 공용 (문서에 없으면 빈 칸) | 공용으로 이미 됨 |
 | 단가 - PRICE | 보내지 않음 | 공용. 창고별 블록 품목표에는 Price 열이 없어 여러 창고 문서는 빈 칸 — **괜찮다**(SAP 가격 마스터가 채운다) | 공용으로 이미 됨 |
 | 통화 - WAERK | 보내지 않음 | 공용 (`United States Dollars` → USD) | 공용으로 이미 됨 |
 | 합계 검증 | 없음 | `checks: shipment_total_match`, `severity: warn` — 창고별 수량 합 ≠ 요약표 합계면 노랑(블록을 빠뜨렸다는 신호) | 전용 규칙 필요 |
 
 ```yaml
-# masters/customers/msc.yaml (모양만)
+# masters/customers/sid.yaml (모양만)
 split: { by: shipment, group_label: _city }
 tables:
   ship_to_routing:
@@ -186,11 +188,18 @@ rules:
       - { contains: "CLASS C",    value: "428" }
     value_check: { table_file: refs/brand_master.csv, value_column: zbrand, filter_column: kunnr }
     on_no_match: { action: warn, message: "브랜드 문구를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요" }
+  sid_ref:                              # Color RING · HERTEL 대상 품번 (masters/refs/sid_ref.csv)
+    kind: lookup
+    table_file: refs/sid_ref.csv
+    key: line.our_item                  # = KDMAT (Your Code)
+    key_column: your_code
+    return: [color_ring, hertel_no]
+    on_no_match: { action: empty }      # 대상이 아닌 품번이 대부분이다 — 경고하지 않는다
 fields:
   KUNNR2: { from: table, table: ship_to_routing, required: warn }
   BSTKD:  { from: expr, expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)', required: warn }
   ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
-  ZPKRE2: { from: expr, expr: 'coalesce(_pack_base, "")' }
+  ZPKRE2: { from: expr, expr: 'join(",", compact([_pack_base, sid_ref.color_ring, sid_ref.hertel_no]))' }
 checks:
   - { id: shipment_total_match, severity: warn }
 ```
@@ -313,8 +322,8 @@ checks:
 
 | # | 질문 | 결정 | 일자 |
 |---|---|---|---|
-| Q1 | 브랜드 코드 앞자리 0 | **0 붙인 3자리** — 브랜드 마스터 형식 그대로. MSC 키워드 값은 038 · 127 · 205 · 428 | 2026-10-02 |
-| Q2 | MSC ZSHCO=A 를 Shipping Master 에 넣을지 | **넣지 않는다.** ZSHCO 는 Shipping Master 를 따른다 | 2026-10-02 |
+| Q1 | 브랜드 코드 앞자리 0 | **0 붙인 3자리** — 브랜드 마스터 형식 그대로. SID TOOL 키워드 값은 038 · 127 · 205 · 428 | 2026-10-02 |
+| Q2 | SID TOOL ZSHCO=A 를 Shipping Master 에 넣을지 | **넣지 않는다.** ZSHCO 는 Shipping Master 를 따른다 | 2026-10-02 |
 | Q3 | YGJP VSART 04 vs 05 | **Shipping Master 를 따른다** (지금 05). 전용 규칙 없음 | 2026-10-02 |
 | Q4 | POC 브랜드 코드 25개 처리 | **브랜드 마스터가 무조건 기준.** 마스터는 건드리지 않고 POC 25개 표는 버린다 | 2026-10-02 |
 | Q5 | YGJP 브랜드 판정 방식 | 마스터에 등록된 3200 의 **브랜드명(zbrant)이 원문에 포함되면** 그 코드(`csv_map`). 못 찾으면 빈 칸 + 드롭다운 | 2026-10-02 |
@@ -327,10 +336,10 @@ checks:
 | Q12 | KL POSEX | **정수** (`00001` → `1`) | 2026-10-02 |
 | Q13 | KL BSTKD | **`/` 앞부분만.** 읽기는 원문 전체(Claude), 자르기는 엔진(`regex_extract`) | 2026-10-02 |
 | Q14 | KL Ship-to | **107525** (공용 기본 그대로) | 2026-10-02 |
-| Q16 | MSC 포장 참조표(MSC_REF) | **연동한다** (2026-10-02 재결정). 사용자가 `masters/refs/msc_ref.csv` 로 넣는다. Your Code 가 Color Ring·HERTEL 대상이면 창고 기본값 뒤에 이어 붙인다. 열 구성은 파일을 받은 뒤 정한다 | 2026-10-02 |
-| Q17 | MSC 도시 미인식 시 전송 차단 | **막지 않는다.** 경고만 — 전송 후 SAP 에서 고칠 수 있다(§1 원칙) | 2026-10-02 |
-| Q18 | MSC 여러 창고 문서의 PRICE 빈 칸 | **괜찮다.** SAP 가격 마스터가 채운다 | 2026-10-02 |
-| Q19 | MSC 키워드에 없는 브랜드 | **빈 칸**, 드롭다운에서 고른다 | 2026-10-02 |
+| Q16 | SID TOOL 포장 참조표(sid_ref) | **연동한다** (2026-10-02 재결정). `masters/refs/sid_ref.csv`(열: Your code · Color RING · HERTEL Number). KDMAT 가 표에 있으면 그 값을 창고 기본값 뒤에 이어 붙인다. 한 행에 두 값이 함께 있는 경우는 없다(1,007행 확인). 같은 품번 10건이 중복이나 값도 같다 | 2026-10-02 |
+| Q17 | SID TOOL 도시 미인식 시 전송 차단 | **막지 않는다.** 경고만 — 전송 후 SAP 에서 고칠 수 있다(§1 원칙) | 2026-10-02 |
+| Q18 | SID TOOL 여러 창고 문서의 PRICE 빈 칸 | **괜찮다.** SAP 가격 마스터가 채운다 | 2026-10-02 |
+| Q19 | SID TOOL 키워드에 없는 브랜드 | **빈 칸**, 드롭다운에서 고른다 | 2026-10-02 |
 
 (Q15 · Q20 은 삭제됨.)
 
@@ -348,21 +357,21 @@ checks:
 | **N4** | SCHEMA §4.5 정리 (문서) | ① 예시 A·B 가 `choices: brand_choice` 를 가리키는데 프로필의 후보 규칙 이름은 `brand_code` — 그대로 베끼면 검증기 14번 오류 또는 드롭다운 소실. ② 예시 B 는 완전일치, 예시 C(KL 고정)는 Q5·Q10 결정과 반대. ③ `csv_map` 옵션 표의 `mode` 는 엔진·검증기 모두 지원하지 않는다 | 전용 규칙 이름 `brand_text_match`, `choices: brand_code`. 예시 B 를 포함 대조로, 예시 C 는 삭제 또는 "고정하지 않음"으로. `mode` 는 표에서 빼거나 구현 대상으로 표시. architect 소유 문서 | 전 거래처 |
 
 **하지 않기로 함 (2026-10-02):** 품목 줄 자동 제외(Q7) · 브랜드 보정 파일을 보는 `value_check`·브랜드 마스터 보강(Q4) ·
-브랜드 코드 0 제거 정규화(Q1) · 여러 창고 문서 단가 보충(Q18) · MSC 포장 참조표 연동(Q16) · Shipping Master 값 변경(Q2·Q3).
+브랜드 코드 0 제거 정규화(Q1) · 여러 창고 문서 단가 보충(Q18) · SID TOOL 포장 참조표 연동(Q16) · Shipping Master 값 변경(Q2·Q3).
 
 ### 6-b. YAML 만으로 되는 것
 
 | # | 내용 | 파일 | 지금 엔진으로 가능? |
 |---|---|---|---|
-| Y1 | MSC — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE2 · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/msc.yaml` | **가능** — 엔진 의존 없음 |
-| D3 | MSC 포장 참조표 — `refs/msc_ref.csv` + `lookup` 규칙, ZPKRE2 를 `기본값,B,C` 로 | `masters/refs/msc_ref.csv` · `msc.yaml` | 파일 받은 뒤. Y1 은 먼저 가능(ZPKRE2 = 기본값만으로 시작) |
+| Y1 | SID TOOL — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE2 · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/sid.yaml` | **가능** — 엔진 의존 없음 |
+| D3 | SID TOOL 포장 참조표 — `lookup` 규칙 `sid_ref` + ZPKRE2 식. **열 이름에 공백이 있어 식에서 참조할 수 없다** → `sid_ref.csv` 머리글을 `your_code,color_ring,hertel_no` 로 바꾸거나(권장, 다른 참조표와 같은 소문자 규칙), 엔진이 공백 열 이름을 받게 한다 | `masters/refs/sid_ref.csv` · `sid.yaml` | 파일 들어옴. 머리글 결정 후 Y1 과 함께 |
 | Y2 | KL — meta · hints(발주번호 원문 전체로 고침) · BSTKD `regex_extract` · POSEX `format: integer` · ZPKRE2·EMPST `keyword_map`(WGT/KMT, `on_no_match: empty`) | `masters/customers/kl.yaml` | **가능** — 엔진 의존 없음 |
 | Y3 | YGJP — meta · hints(브랜드 줄 원문 그대로, `Remark: YG agent` 줄 구분) · KUNNR2 `319854` · BSTKD 식 · 브랜드 `csv_map`(마스터 이름 포함) · ZSHCO 식 · MATNR 덮어쓰기 | `masters/customers/ygjp.yaml` | **부분 가능** — 지금 바로 얹을 수 있다. N2(`order: longest_first`)·N3(`zero_quantity`)가 끝나면 각 한 줄을 더하고, N1 이 끝나면 ZSHCO 식이 최종 ZBRAND 를 보도록 바꾼다 |
 
 ### 구현 시 고려 — 테스트 픽스처와 이름이 겹친다
 
 `backend/tests/conftest.py` 는 실물 `masters/` 를 사본으로 복사한 뒤 `backend/tests/fixtures/customers/*.yaml` 을
-**같은 이름으로 덮어쓴다.** 실물 `masters/customers/msc.yaml`·`kl.yaml`·`ygjp.yaml` 을 만들어도 테스트 사본에서는
+**같은 이름으로 덮어쓴다.** SID TOOL 은 실물 파일명이 `sid.yaml` 이라 픽스처(`msc.yaml`)와 겹치지 않지만, 실물 `kl.yaml`·`ygjp.yaml` 을 만들면 테스트 사본에서는
 픽스처가 이긴다 — 테스트는 실물 규칙을 검증하지 않는다. 실물 규칙용 회귀 테스트를 따로 두거나, 픽스처를 새 규칙에 맞춰
 함께 고칠지 구현 때 정한다.
 
@@ -370,7 +379,7 @@ checks:
 
 ```
 1. N4 (SCHEMA 정리)                ← Y1~Y3 가 베낄 원본이므로 먼저. 문서만
-2. Y1 MSC                          ← 지금 엔진으로 가능. 업로드 결과 12건과 대조
+2. Y1 SID TOOL                          ← 지금 엔진으로 가능. 업로드 결과 12건과 대조
    → validate_masters → check_sample → parse_one --rows → 업로드 CSV 와 비교
 3. Y2 KL                           ← 지금 엔진으로 가능
 4. Y3 YGJP (1차)                   ← 지금 엔진으로 얹는다. ZSHCO 는 자동 판정 브랜드 기준

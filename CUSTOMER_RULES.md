@@ -336,7 +336,7 @@ checks:
 | Q12 | KL POSEX | **정수** (`00001` → `1`) | 2026-10-02 |
 | Q13 | KL BSTKD | **`/` 앞부분만.** 읽기는 원문 전체(Claude), 자르기는 엔진(`regex_extract`) | 2026-10-02 |
 | Q14 | KL Ship-to | **107525** (공용 기본 그대로) | 2026-10-02 |
-| Q16 | SID TOOL 포장 참조표(sid_ref) | **연동한다** (2026-10-02 재결정). `masters/refs/sid_ref.csv`(열: Your code · Color RING · HERTEL Number). KDMAT 가 표에 있으면 그 값을 창고 기본값 뒤에 이어 붙인다. 한 행에 두 값이 함께 있는 경우는 없다(1,007행 확인). 같은 품번 10건이 중복이나 값도 같다 | 2026-10-02 |
+| Q16 | SID TOOL 포장 참조표(sid_ref) | **연동한다** (2026-10-02 재결정). `masters/refs/sid_ref.csv`(열: your_code · color_ring · hertel_no). KDMAT 가 표에 있으면 그 값을 창고 기본값 뒤에 이어 붙인다. 한 행에 두 값이 함께 있는 경우는 없다(1,007행 확인). 같은 품번 10건이 중복이나 값도 같다 | 2026-10-02 |
 | Q17 | SID TOOL 도시 미인식 시 전송 차단 | **막지 않는다.** 경고만 — 전송 후 SAP 에서 고칠 수 있다(§1 원칙) | 2026-10-02 |
 | Q18 | SID TOOL 여러 창고 문서의 PRICE 빈 칸 | **괜찮다.** SAP 가격 마스터가 채운다 | 2026-10-02 |
 | Q19 | SID TOOL 키워드에 없는 브랜드 | **빈 칸**, 드롭다운에서 고른다 | 2026-10-02 |
@@ -364,7 +364,7 @@ checks:
 | # | 내용 | 파일 | 지금 엔진으로 가능? |
 |---|---|---|---|
 | Y1 | SID TOOL — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/sid.yaml` | **가능** — 엔진 의존 없음 |
-| D3 | SID TOOL 포장 참조표 — `lookup` 규칙 `sid_ref` + ZPKRE 식. **열 이름에 공백이 있어 식에서 참조할 수 없다** → `sid_ref.csv` 머리글을 `your_code,color_ring,hertel_no` 로 바꾸거나(권장, 다른 참조표와 같은 소문자 규칙), 엔진이 공백 열 이름을 받게 한다 | `masters/refs/sid_ref.csv` · `sid.yaml` | 파일 들어옴. 머리글 결정 후 Y1 과 함께 |
+| D3 | SID TOOL 포장 참조표 — `lookup` 규칙 `sid_ref` + ZPKRE 식. 머리글은 `your_code,color_ring,hertel_no`(2026-10-02 사용자가 원본 머리글 `Your code,Color RING,HERTEL Number` 에서 변경). 붙이는 것은 **열의 값**(`Blue RING` · `4006205`, 값 안의 띄어쓰기 그대로) | `masters/refs/sid_ref.csv` · `sid.yaml` | 지금 엔진으로 가능 — Y1 과 함께 |
 | Y2 | KL — meta · hints(발주번호 원문 전체로 고침) · BSTKD `regex_extract` · POSEX `format: integer` · ZPKRE·EMPST `keyword_map`(WGT/KMT, `on_no_match: empty`) | `masters/customers/kl.yaml` | **가능** — 엔진 의존 없음 |
 | Y3 | YGJP — meta · hints(브랜드 줄 원문 그대로, `Remark: YG agent` 줄 구분) · KUNNR2 `319854` · BSTKD 식 · 브랜드 `csv_map`(마스터 이름 포함) · ZSHCO 식 · MATNR 덮어쓰기 | `masters/customers/ygjp.yaml` | **부분 가능** — 지금 바로 얹을 수 있다. N2(`order: longest_first`)·N3(`zero_quantity`)가 끝나면 각 한 줄을 더하고, N1 이 끝나면 ZSHCO 식이 최종 ZBRAND 를 보도록 바꾼다 |
 

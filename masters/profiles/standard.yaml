@@ -69,7 +69,7 @@ rules:
       action: warn
       message: "Shipping Master 에 이 고객 행이 {count}개입니다 — 하나로 정리하세요"
     on_no_match:
-      action: empty     # 빈 칸은 ZSHCO 의 required: warn 이 노랗게 띄운다 (경고 두 번 안 낸다)
+      action: empty     # 빈 칸이어도 경고하지 않는다 (2026-10-02 사용자 결정)
   shipping_type:
     kind: csv_choice
     label: "운송수단 — Shipping Master"
@@ -115,7 +115,7 @@ fields:
   # ── 규칙·마스터가 정한다 ──────────────────────────────────────
   WAERK:   { from: rule, rule: currency, required: warn }
   ZBRAND:  { from: rule, rule: brand_code, required: warn }
-  ZSHCO:   { from: rule, rule: shipping_condition, required: warn }
+  ZSHCO:   { from: rule, rule: shipping_condition }      # 비어도 경고 안 함 (2026-10-02 — 너무 산만)
   VSART:   { from: rule, rule: shipping_type, required: warn }
 
   # ── 공란 (템플릿 확정본 2026-09-21) ───────────────────────────

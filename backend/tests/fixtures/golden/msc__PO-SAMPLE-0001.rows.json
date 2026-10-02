@@ -37,12 +37,6 @@
           "message": "브랜드(ZBRAND) 이 비어 있습니다. 확인하세요."
         },
         {
-          "field": "ZSHCO",
-          "severity": "warn",
-          "code": "REQUIRED_MISSING",
-          "message": "Shipping Condition(ZSHCO) 이 비어 있습니다. 확인하세요."
-        },
-        {
           "field": "VSART",
           "severity": "warn",
           "code": "REQUIRED_MISSING",
@@ -85,12 +79,6 @@
           "severity": "warn",
           "code": "REQUIRED_MISSING",
           "message": "브랜드(ZBRAND) 이 비어 있습니다. 확인하세요."
-        },
-        {
-          "field": "ZSHCO",
-          "severity": "warn",
-          "code": "REQUIRED_MISSING",
-          "message": "Shipping Condition(ZSHCO) 이 비어 있습니다. 확인하세요."
         },
         {
           "field": "VSART",

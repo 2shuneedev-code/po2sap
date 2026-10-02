@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -82,6 +83,11 @@ def parse_batch(
                     issues=_dedupe(issues),
                 ))
             entry.status, entry.row_count = "DONE", len(result.rows)
+            printed = parsed.raw.totals
+            entry.doc_line_count = "" if printed.line_count is None else str(printed.line_count)
+            entry.doc_total_qty = printed.total_qty or ""
+            entry.doc_total_amount = printed.total_amount or ""
+            entry.doc_split = parsed.raw.is_split
             if not result.rows:
                 # 행이 없으면 이슈를 붙일 곳이 없다 — 이유(구간을 못 읽음 · 품목 없음 등)가
                 # 사라지지 않게 파일의 실패 사유로 올린다.
@@ -236,6 +242,74 @@ def summary(batch: Batch) -> dict[str, str]:
         "error_count": str(errors),
         "warn_count": str(warns),
     }
+
+
+def totals(batch: Batch, field_specs: dict) -> list[dict[str, str]]:
+    """파일별 합계 + 전체 — 검수 화면이 발주서 인쇄 합계와 대조한다.
+
+    수량·단가 필드는 `_base` 의 `role`(quantity · unit_price)이 정한다 — 필드 이름을
+    여기 적지 않는다. 금액 = Σ 수량 × 단가. 단가가 빈 행은 금액에서 빠지고 따로 센다.
+    단가 빈 행이 있으면 금액을, 출하처별로 나뉜 문서면 품목 수를 대조하지 않는다.
+    삭제한 행은 빠진다. 값은 화면용 문자열이다.
+    """
+    def role(name: str) -> str:
+        return next((f for f, s in field_specs.items() if isinstance(s, dict) and s.get("role") == name), "")
+
+    qty_f, price_f = role("quantity"), role("unit_price")
+    out: list[dict[str, str]] = []
+    grand = {"rows": 0, "qty": Decimal(0), "amount": Decimal(0), "no_price": 0}
+    for entry in batch.files:
+        rows = [r for r in batch.live_rows if r.file_id == entry.file_id]
+        acc = {"rows": len(rows), "qty": Decimal(0), "amount": Decimal(0), "no_price": 0}
+        for row in rows:
+            qty = _dec(row.fields.get(qty_f)) if qty_f else None
+            price = _dec(row.fields.get(price_f)) if price_f else None
+            acc["qty"] += qty or 0
+            if price is None:
+                acc["no_price"] += 1
+            else:
+                acc["amount"] += (qty or 0) * price
+        for k in grand:
+            grand[k] += acc[k]
+        out.append({
+            "file": entry.name, **_fmt(acc),
+            "doc_lines": entry.doc_line_count,
+            "doc_qty": entry.doc_total_qty,
+            "doc_amount": entry.doc_total_amount,
+            "qty_match": _match(acc["qty"], entry.doc_total_qty),
+            # 비교할 수 없으면 판정하지 않는다 — 뜨는 ⚠️ 는 진짜 봐야 할 것이어야 한다
+            "amount_match": "" if acc["no_price"] else _match(acc["amount"], entry.doc_total_amount),
+            "lines_match": "" if entry.doc_split else _match(Decimal(acc["rows"]), entry.doc_line_count),
+        })
+    out.append({"file": "", **_fmt(grand)})
+    return out
+
+
+def _dec(text: object) -> Decimal | None:
+    raw = str(text or "").replace(",", "").strip()
+    if not raw:
+        return None
+    try:
+        return Decimal(raw)
+    except InvalidOperation:
+        return None
+
+
+def _fmt(acc: dict) -> dict[str, str]:
+    return {
+        "rows": str(acc["rows"]),
+        "qty": f"{acc['qty'].normalize():,f}",
+        "amount": f"{acc['amount']:,.2f}",
+        "no_price": str(acc["no_price"]),
+    }
+
+
+def _match(value: Decimal, printed: str) -> str:
+    """인쇄 합계와 같은가 — "" (인쇄 합계 없음) · "true" · "false"."""
+    doc = _dec(printed)
+    if doc is None:
+        return ""
+    return "true" if value == doc else "false"
 
 
 def upload_dir(settings: Settings, batch_id: str) -> Path:

@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
-from backend.app.batch_service import merge_edits, parse_batch, summary  # noqa: E402
+from backend.app.batch_service import merge_edits, parse_batch, summary, totals  # noqa: E402
 from backend.app.catalog import CatalogEntry, load_catalog  # noqa: E402
 from backend.app.config import Settings, get_settings  # noqa: E402
 from backend.app.domain.models import Batch, BatchFile  # noqa: E402
@@ -36,7 +36,7 @@ __all__ = [
     "brand_store", "catalog", "choices_for", "customer_master", "field_specs_for", "field_title",
     "health",
     "merge_edits", "preview_for", "repo", "send_batch", "settings", "shipping_store",
-    "start_batch", "summary",
+    "start_batch", "summary", "totals",
 ]
 
 # 업로드 안전장치 — 계약 §4 와 같은 값. 없으면 디스크가 채워지거나 파싱이 멈춘다.

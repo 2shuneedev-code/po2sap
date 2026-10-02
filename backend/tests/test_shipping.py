@@ -37,11 +37,12 @@ def test_registered_customer_gets_its_values(workspace, fixtures_dir):
 
 
 def test_unregistered_customer_is_blank_and_only_warned(workspace, fixtures_dir):
-    """기본값 없음 — 빈 칸은 노랗게만, 전송은 막지 않는다."""
+    """기본값 없음 — 빈 칸으로 두고 전송은 막지 않는다. VSART 는 노랑, ZSHCO 는 경고 없음
+    (2026-10-02 사용자 결정 — 거의 모든 행에 떠서 산만했다)."""
     for row in _rows(fixtures_dir, workspace):
-        for name in ("ZSHCO", "VSART"):
-            assert row.fields[name] == ""
-            assert any(i.field == name and i.severity == "warn" for i in row.issues)
+        assert row.fields["ZSHCO"] == "" and row.fields["VSART"] == ""
+        assert any(i.field == "VSART" and i.severity == "warn" for i in row.issues)
+        assert not [i for i in row.issues if i.field == "ZSHCO"]
         assert not [i for i in row.issues if i.severity == "error"]
 
 

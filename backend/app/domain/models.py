@@ -233,6 +233,12 @@ class BatchFile(BaseModel):
     status: str = "PARSING"     # PARSING | DONE | FAILED
     error: str = ""
     row_count: int = 0
+    # 발주서에 **인쇄된** 합계 (추출 원문 그대로) — 검수 화면 합계와 대조한다
+    doc_line_count: str = ""
+    doc_total_qty: str = ""
+    doc_total_amount: str = ""
+    # 출하처별로 나뉜 문서 — 인쇄된 품목 수는 요약표(품목 종류) 기준이라 행 수와 비교할 수 없다
+    doc_split: bool = False
 
 
 class BatchRow(BaseModel):

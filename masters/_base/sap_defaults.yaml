@@ -40,6 +40,8 @@ extraction_defaults:
 #  `code` — 화면에 보이는 SAP 필드 코드가 키와 다를 때만. 전송 키는 그대로 왼쪽 키다.
 #    (KUNNR1 은 화면에 KUNNR 로 보이지만 EAI 로는 KUNNR1 로 나간다)
 #
+#  `role` — 검수 화면 합계에 쓰는 필드. quantity(수량 합계) · unit_price(금액 = 수량 × 단가).
+#
 #  `send_only: true` — 전송(EAI)에만 들어가고 검수 표·규칙 카드에는 안 보인다.
 #    사람이 볼 일도 고칠 일도 없는 값(판매조직 등)을 표에서 치운다.
 field_specs:
@@ -53,11 +55,11 @@ field_specs:
   ZSHCO:   { label: "Shipping Condition", sheet: "SHIPPING CONDITION",   max_len: 2 }
   KDMAT:   { label: "고객자재번호",      sheet: "YOUR CODE",            max_len: 35, added: "2026-09-30 템플릿 수정" }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
-  KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
+  KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal, role: quantity }
   ZPKRE:   { label: "Packing Spec",     sheet: "PACKING REMARK",       max_len: 50 }
   EMPST:   { label: "Remark",           sheet: "REMARK",               max_len: 25 }
   VSART:   { label: "Shipping Type",    sheet: "SHIPPING TYPE",        max_len: 2 }
-  PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
+  PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal, role: unit_price }
   WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
 
 # ── 주의 ───────────────────────────────────────────────────────

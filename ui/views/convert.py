@@ -27,6 +27,7 @@ from ui.service import (
     settings,
     start_batch,
     summary,
+    totals,
 )
 from ui.views.picker import customer_header, customer_picker
 from ui.views.rules import rule_preview
@@ -399,12 +400,45 @@ def _apply(batch: Batch, edited: pd.DataFrame, visible) -> None:
 
 def _summary_bar(batch: Batch) -> None:
     info = summary(batch)
-    cols = st.columns(4)
+    rows = totals(batch, field_specs_for(batch.customer))
+    grand = rows[-1]
+    cols = st.columns(5)
     cols[0].metric("행", info["row_count"])
-    cols[1].metric("총 수량", info["total_qty"])
-    cols[2].metric("오류", info["error_count"], delta=None,
+    cols[1].metric("총 수량", grand["qty"])
+    cols[2].metric("총 금액", grand["amount"],
+                   help=f"Σ 수량 × 단가. 단가가 빈 행 {grand['no_price']}개는 빠졌습니다."
+                   if grand["no_price"] != "0" else "Σ 수량 × 단가")
+    cols[3].metric("오류", info["error_count"], delta=None,
                    delta_color="inverse" if info["error_count"] != "0" else "normal")
-    cols[3].metric("경고", info["warn_count"])
+    cols[4].metric("경고", info["warn_count"])
+    _totals_table(rows)
+
+
+def _totals_table(rows: list[dict[str, str]]) -> None:
+    """파일별 합계 ↔ 발주서에 인쇄된 합계. 다르면 ⚠️ — 품목을 놓쳤거나 더 읽은 신호다.
+
+    검수 표에서 고친 값은 **검증**을 눌러야 여기 반영된다(서버 스냅샷 기준).
+    """
+    def mark(flag: str) -> str:
+        return {"true": "✅", "false": "⚠️"}.get(flag, "")
+
+    files = rows[:-1]
+    data = [{
+        "파일": r["file"],
+        "행": r["rows"],
+        "발주서 품목 수": f"{r['doc_lines']} {mark(r['lines_match'])}".strip(),
+        "수량 합계": r["qty"],
+        "발주서 수량": f"{r['doc_qty']} {mark(r['qty_match'])}".strip(),
+        "금액 합계": r["amount"],
+        "발주서 금액": f"{r['doc_amount']} {mark(r['amount_match'])}".strip(),
+        "단가 빈 행": r["no_price"],
+    } for r in files]
+    mismatch = any("false" in (r["lines_match"], r["qty_match"], r["amount_match"]) for r in files)
+    with st.expander("합계 대조 — 발주서에 인쇄된 합계와 비교" + (" ⚠️" if mismatch else ""),
+                     expanded=mismatch):
+        st.dataframe(pd.DataFrame(data), hide_index=True, width="stretch")
+        st.caption("발주서 쪽이 비어 있으면 인쇄된 합계를 찾지 못한 것입니다. "
+                   "표에서 고친 값은 **검증**을 누르면 반영됩니다.")
 
 
 def _issue_list(batch: Batch, issues_by_row: dict) -> None:

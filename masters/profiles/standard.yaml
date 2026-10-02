@@ -104,7 +104,8 @@ fields:
   # ★ MATNR 은 **우리 품번**(item_code)이다. 고객 품번(our_item)이 아니다.
   #   거래처에 따라 발주서 컬럼명이 반대인 곳이 있다 (MSC: "Your Item
   #   Number" 가 우리 품번). 여기서 한 번 고정해 두면 그 혼동이 사라진다.
-  MATNR:   { from: doc, path: line.item_code,    required: warn }
+  #   KDMAT(거래처 품번)이 있으면 비어도 경고하지 않는다 — 둘 다 없을 때만 🟡.
+  MATNR:   { from: doc, path: line.item_code,    required: warn, required_unless: [KDMAT] }
   KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
   PRICE:   { from: doc, path: line.unit_price }
   POSEX:   { from: doc, path: line.posex }

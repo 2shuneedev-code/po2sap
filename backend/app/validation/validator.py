@@ -28,19 +28,26 @@ def validate_row(
         # required: warn  → 🟡 표시만. 값을 옮기는 게 이 프로그램의 본업이라,
         #                   비었다고 무조건 막지는 않는다. 거래처 규칙이 확정되면
         #                   그 거래처 파일에서 true 로 올린다.
+        # required_unless: [다른 필드] → 그중 하나라도 값이 있으면 비어도 통과.
         required = spec.get("required")
-        if required and not value:
+        others = [str(f) for f in spec.get("required_unless") or []]
+        if required and not value and not any(values.get(f) for f in others):
             warn_only = str(required).lower() == "warn"
             label = str((field_specs.get(name) or {}).get("label") or name)
+            if warn_only:
+                message = f"{label}({name}) 이 비어 있습니다. 확인하세요."
+            else:
+                message = f"{label}({name}) 은 필수입니다. 값을 입력하세요."
+            if others:
+                what = " · ".join([f"{label}({name})", *others])
+                message = f"{what} 가 모두 비어 있습니다. " + (
+                    "확인하세요." if warn_only else "하나는 입력하세요."
+                )
             issues.append(RowIssue(
                 field=name,
                 severity="warn" if warn_only else "error",
                 code="REQUIRED_MISSING",
-                message=(
-                    f"{label}({name}) 이 비어 있습니다. 확인하세요."
-                    if warn_only
-                    else f"{label}({name}) 은 필수입니다. 값을 입력하세요."
-                ),
+                message=message,
             ))
 
         max_len = (field_specs.get(name) or {}).get("max_len")

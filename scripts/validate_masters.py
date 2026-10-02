@@ -61,7 +61,7 @@ CHUNKING_INTEGERS = ("max_lines_per_chunk", "header_context_lines")
 FIELD_FROM = {"const", "base", "doc", "table", "rule", "expr", "gen"}     # §4.6
 FIELD_OPTIONS = {
     "from", "value", "path", "table", "rule", "expr", "generator",
-    "fallback", "required", "format", "default", "explain", "todo",
+    "fallback", "required", "required_unless", "format", "default", "explain", "todo",
 }
 FORMATS = {"integer", "decimal3", "date_yyyymmdd", "upper", "lower", "trim"}
 GENERATORS = {"line_no_x10"}
@@ -267,6 +267,15 @@ def check_fields(
 
         for key in ("path", "fallback"):
             check_path(report, f"fields.{name}.{key}", spec.get(key), allowed)
+
+        unless = spec.get("required_unless")
+        if unless is not None:
+            if not isinstance(unless, list):
+                report.error(2, f"fields.{name}.required_unless: 필드 이름 목록이어야 합니다")
+            else:
+                for other in unless:
+                    if other not in base_fields:
+                        report.error(2, f"fields.{name}.required_unless: _base 에 없는 필드입니다: {other}")
 
         if src == "table":
             ref = spec.get("table")

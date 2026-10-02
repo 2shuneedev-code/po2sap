@@ -52,7 +52,7 @@ fields:
   #  출하조건·운송수단은 Shipping Master 에서 온다 — **예외일 때만** 덮어쓴다.
 
   BSTKD:   { from: doc,   path: header.po_number, required: true }
-  MATNR:   { from: doc,   path: line.item_code, required: true }
+  MATNR:   { from: doc,   path: line.item_code, required: true, required_unless: [KDMAT] }
 
   # 필요할 때만 추가로 덮어쓴다 (기본값은 프로필에 있다)
   # ZPKRE2:  { from: doc,   path: header.packing_spec }

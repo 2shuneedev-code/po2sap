@@ -27,15 +27,18 @@
 masters/
 ├── SCHEMA.md              ← 이 문서 (스키마 정의)
 ├── _base/
-│   └── sap_defaults.yaml  ← 전 거래처 공통 고정값 + 전송 필드 목록
+│   └── sap_defaults.yaml  ← 전 거래처 공통 고정값 + 전송 필드 속성(field_specs).
+│                             필드 **목록·순서**는 templates/SALES ORDER.xlsx 2행이 정한다
 │                            + 추출 기본값(`extraction_defaults`, §4.2)
 ├── profiles/
 │   ├── standard.yaml      ← 대부분의 거래처가 그대로 쓰는 필드 매핑
 │   └── generic.yaml       ← 전용 규칙이 없는 거래처의 최소 설정
 ├── customers/
-│   ├── msc.yaml           ← 거래처 1개 = 파일 1개. **다른 것만** 적는다
+│   ├── sid.yaml           ← 거래처 1개 = 파일 1개. **다른 것만** 적는다
 │   ├── kl.yaml
 │   └── ygjp.yaml
+├── templates/
+│   └── SALES ORDER.xlsx   ← ★ 전송 필드 목록·순서의 원천 (2행 코드 · 1행 머리글)
 └── refs/
     ├── brand_master.csv        ← 4컬럼(kunnr,name1,zbrand,zbrant). 화면 Brand Master 에서 편집,
     │                              재추출로 통째 교체 (§4.5-A)

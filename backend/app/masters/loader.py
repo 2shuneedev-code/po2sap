@@ -13,6 +13,8 @@ from typing import Any
 
 import yaml
 
+from .template import TemplateError, apply_template
+
 
 class MasterError(RuntimeError):
     pass
@@ -75,6 +77,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
     data = _load_yaml(str(path), path.stat().st_mtime)
     own_fields = list((data.get("fields") or {}).keys())
     data = _apply_extends(data, masters_dir)
+    data = _with_template(data, masters_dir)
     data = _resolve_chunking(data)
 
     meta = data.get("meta") or {}
@@ -135,6 +138,7 @@ def _generic_customer(code: str, masters_dir: Path) -> CustomerMaster:
         },
         "extends": GENERIC_EXTENDS,
     }, masters_dir)
+    data = _with_template(data, masters_dir)
     data = _resolve_chunking(data)
 
     meta = data["meta"]
@@ -172,6 +176,14 @@ def _resolve_chunking(data: dict[str, Any]) -> dict[str, Any]:
     if not merged:
         return data
     return {**data, "extraction": {**extraction, "chunking": merged}}
+
+
+def _with_template(data: dict[str, Any], masters_dir: Path) -> dict[str, Any]:
+    """전송 필드 목록·순서를 SALES ORDER 템플릿에 맞춘다 (masters/template.py)."""
+    try:
+        return apply_template(data, masters_dir)
+    except TemplateError as exc:
+        raise MasterError(str(exc)) from exc
 
 
 def _apply_extends(data: dict[str, Any], masters_dir: Path) -> dict[str, Any]:

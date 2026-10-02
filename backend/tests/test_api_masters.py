@@ -50,12 +50,14 @@ def test_fields_follow_base_order_and_count(client, workspace):
 
 
 def test_fields_shrink_with_the_base_file(client, workspace):
-    """필드 개수가 코드에 박혀 있지 않다는 증거. _base 에서 빼면 응답도 준다."""
-    path = workspace / "_base" / "sap_defaults.yaml"
-    spec = yaml.safe_load(path.read_text("utf-8"))
-    before = len(spec["field_specs"])
-    spec["field_specs"].pop(list(spec["field_specs"])[-1])
-    path.write_text(yaml.safe_dump(spec, allow_unicode=True), encoding="utf-8")
+    """필드 개수가 코드에 박혀 있지 않다는 증거. SALES ORDER 템플릿에서 열을 빼면 응답도 준다."""
+    import openpyxl
+
+    before = len(client.get("/api/masters/fields").json()["fields"])
+    path = workspace / "templates" / "SALES ORDER.xlsx"
+    wb = openpyxl.load_workbook(path)
+    wb.active.delete_cols(wb.active.max_column)
+    wb.save(path)
 
     body = client.get("/api/masters/fields").json()
     assert len(body["fields"]) == before - 1

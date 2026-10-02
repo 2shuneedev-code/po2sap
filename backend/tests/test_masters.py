@@ -196,8 +196,6 @@ def test_expressions_in_masters_are_valid(validate_masters, workspace):
 
 # ── 2) 역테스트: 깨뜨린 것을 잡는가 (합성 거래처 fx 로 확인) ────────────
 FAULTS = [
-    ("§7-1 없는 필드", 'ZSHCO: { from: const, value: "A" }',
-     'ZSHCO: { from: const, value: "A" }\n  NOPE: { from: const, value: "" }'),
     ("§7-2 잘못된 from", "MATNR: { from: doc, path: line.item_code, required: true }",
      "MATNR: { from: lambda, path: line.item_code, required: true }"),
     ("§7-2 잘못된 format", "MATNR: { from: doc, path: line.item_code, required: true }",
@@ -237,11 +235,22 @@ def test_fault_is_detected_as_error(validate_masters, workspace, label, old, new
     assert run(validate_masters, workspace).errors, f"{label} 을 놓쳤다"
 
 
-def test_field_missing_from_merged_result_is_an_error(validate_masters, workspace):
-    """§7-1 — 프로필에서 빠지면 그 프로필을 쓰는 전 거래처가 걸린다."""
+def test_template_field_without_mapping_becomes_a_blank_todo(validate_masters, workspace):
+    """§7-1 — 템플릿에 있는데 매핑이 없으면 막지 않고 빈 칸으로 보낸다. TODO 로 띄운다."""
     break_profile(workspace, '  EMPST:   { from: const, value: "" }\n', "")
     report = run(validate_masters, workspace, "kl")
-    assert any("EMPST" in e for e in report.errors), report.errors
+    assert not report.errors, report.errors
+    assert any("EMPST" in t for t in report.todos), report.todos
+
+
+def test_field_not_in_template_is_warned_and_dropped(validate_masters, workspace):
+    from app.masters.loader import load_customer
+
+    break_fx(workspace, 'ZSHCO: { from: const, value: "A" }',
+             'ZSHCO: { from: const, value: "A" }\n  NOPE: { from: const, value: "" }')
+    report = run(validate_masters, workspace)
+    assert any("NOPE" in w for w in report.warnings), report.warnings
+    assert "NOPE" not in load_customer("fx", workspace).fields
 
 
 def test_profile_is_not_listed_as_a_customer(validate_masters, masters_dir):

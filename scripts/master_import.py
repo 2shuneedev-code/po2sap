@@ -76,6 +76,10 @@ def read_sheets(path: Path) -> dict[str, list[dict]]:
 def field_names() -> list[str]:
     y = yaml_rt()
     base = y.load((MASTERS / "_base" / "sap_defaults.yaml").read_text(encoding="utf-8"))
+    if base.get("template"):                 # 전송 필드 목록의 원천은 SALES ORDER 템플릿
+        from app.masters.template import template_columns
+
+        return [code for code, _ in template_columns(MASTERS / str(base["template"]))]
     return list(base.get("field_specs") or {})
 
 
@@ -113,7 +117,7 @@ def validate(sheets: dict[str, list[dict]]) -> list[str]:
             if field and field not in fields:
                 errors.append(
                     f"{where} — '{field}' 는 전송 필드가 아닙니다 "
-                    "(masters/_base/sap_defaults.yaml 에 있는 이름만 됩니다)."
+                    "(masters/templates/SALES ORDER.xlsx 2행에 있는 이름만 됩니다)."
                 )
 
     return errors

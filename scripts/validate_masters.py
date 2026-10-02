@@ -40,6 +40,7 @@ from app.extraction.schema_builder import (  # noqa: E402
     build_outline_schema,
 )
 from app.masters.loader import MasterError, load_customer  # noqa: E402
+from app.masters.template import template_columns  # noqa: E402
 from app.rules import expr as expr_mod  # noqa: E402
 
 MASTERS = ROOT / "masters"
@@ -49,6 +50,7 @@ TOP_LEVEL_KEYS = {                      # §4.0
     "version", "extends", "meta", "extraction", "split",
     "tables", "rules", "fields", "grid", "checks",
     "sap_defaults", "field_specs",      # _base 조각이 병합되어 올라온다
+    "template",                         # _base — 전송 필드 목록·순서의 원천 (SALES ORDER.xlsx)
     "extraction_defaults",              # (§4.0) 추출 기본값 — `chunking` 이 여기서 온다
 }
 EXTRACTION_KEYS = {                     # §4.2
@@ -239,6 +241,11 @@ def check_fields(
             1,
             f"_base 에 없는 필드를 선언했습니다: {', '.join(unknown)}",
         )
+
+    # 거래처 파일이 템플릿에 없는 필드를 적었으면 엔진은 무시한다 — 알려만 준다
+    dropped = [f for f in getattr(master, "own_fields", []) if f not in base_fields]
+    if dropped:
+        report.warn(1, f"SALES ORDER 템플릿에 없는 필드라 보내지 않습니다: {', '.join(dropped)}")
 
     tables, rules = master.tables or {}, master.rules or {}
 
@@ -785,8 +792,12 @@ def validate_customer(
 
 
 def load_base_fields(masters_dir: Path = MASTERS) -> list[str]:
-    data = yaml.safe_load((masters_dir / "_base" / "sap_defaults.yaml").read_text("utf-8"))
-    return list((data or {}).get("field_specs") or {})
+    """전송 필드 목록 — SALES ORDER 템플릿 2행 순서 (`template:` 이 없으면 field_specs 순서)."""
+    data = yaml.safe_load((masters_dir / "_base" / "sap_defaults.yaml").read_text("utf-8")) or {}
+    rel = data.get("template")
+    if rel:
+        return [code for code, _ in template_columns(masters_dir / str(rel))]
+    return list(data.get("field_specs") or {})
 
 
 def customer_codes(masters_dir: Path = MASTERS) -> list[str]:

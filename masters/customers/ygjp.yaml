@@ -97,8 +97,8 @@ fields:
   ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
   ZSHCO:
     from: expr
-    expr: 'if(in(brand_text_match, ["471", "507"]), "A", "L")'
-    explain: "브랜드가 471 또는 507 이면 A, 아니면 L"
+    expr: 'if(in(field.ZBRAND, ["471", "507"]), "A", "L")'
+    explain: "브랜드가 471 또는 507 이면 A, 아니면 L. 검수에서 브랜드를 바꾸면 저장할 때 따라간다"
   # Product ID 가 없는 줄은 KDMAT 가 있어도 노랑 — 공용의 required_unless 를 뺀다
   MATNR: { from: doc, path: line.item_code, format: strip_parens, required: warn }
   # 수량 0 인 줄은 빼지 않고 노랑 — 사람이 지운다

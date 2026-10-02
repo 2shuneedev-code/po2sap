@@ -31,6 +31,7 @@ from ..validation.validator import validate_batch, validate_row
 from . import expr as expr_mod
 from .context import EvalContext
 from .decision_table import evaluate_table
+from .derived import recompute
 from .expr import ExprError
 from .mapping_rules import evaluate_rule
 
@@ -109,6 +110,8 @@ def build(
                 table_assignments=assignments,
             )
             issues += field_issues
+            # 파생 필드(field.*)는 다른 필드가 다 정해진 뒤에 — 검수 저장 때도 같은 함수가 돈다
+            recompute(values, master.fields or {}, field_order)
             issues += validate_row(values, master.fields or {}, field_specs)  # ⑦
 
             group = ""

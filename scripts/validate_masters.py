@@ -138,6 +138,10 @@ def valid_paths(master: Any) -> set[str]:
         for col in rule.get("return") or []:
             out.add(f"{name}.{col}")
 
+    # field.* — 다른 전송 필드의 최종 값 (파생 필드 전용, SCHEMA §3)
+    for name in master.raw.get("field_specs") or {}:
+        out.add(f"field.{name}")
+
     return out
 
 
@@ -311,9 +315,36 @@ def check_fields(
                 )
         if src == "expr":
             check_expr(report, f"fields.{name}", spec.get("expr"), allowed)
+            check_derived(report, name, spec, declared)
 
         if spec.get("todo"):
             report.todos.append(f"fields.{name}: {spec['todo']}")
+
+
+def check_derived(report: Report, name: str, spec: dict, declared: dict) -> None:
+    """파생 필드(field.*) — field.* 와 상수만, 다른 파생 필드는 참조하지 않는다.
+
+    검수 저장 때 원문 없이 다시 계산하므로(rules/derived.py) 문서·규칙 값을 섞을 수 없다.
+    파생끼리 이어지면 계산 순서가 생겨 사람이 고친 값이 반쯤만 따라간다.
+    """
+    try:
+        info = expr_mod.analyze(str(spec.get("expr") or ""))
+    except expr_mod.ExprError:
+        return
+    if not info.ok:
+        return
+    roots = [p for p in info.referenced_paths if p.root == "field"]
+    if not roots:
+        return
+    others = [p.dotted for p in info.referenced_paths if p.root != "field"]
+    if others:
+        report.error(
+            4, f"fields.{name}: field.* 를 쓰는 식은 field.* 와 상수만 쓸 수 있습니다 ({', '.join(others)})"
+        )
+    for path in roots:
+        target = declared.get(path.parts[1]) if len(path.parts) == 2 else None
+        if isinstance(target, dict) and target.get("from") == "expr" and "field." in str(target.get("expr") or ""):
+            report.error(4, f"fields.{name}: 파생 필드가 다른 파생 필드({path.dotted})를 참조합니다")
 
 
 def check_expr(report: Report, where: str, source: Any, allowed: set[str]) -> None:

@@ -55,3 +55,17 @@ def test_validator_rejects_choices_that_is_not_a_csv_choice(validate_masters, wo
 def test_choices_loads_through_the_customer_loader(workspace):
     _set_brand(workspace, {"from": "rule", "rule": "brand_text_match", "choices": "brand_code"})
     assert load_customer("msc", workspace).fields["ZBRAND"]["choices"] == "brand_code"
+
+
+@pytest.mark.parametrize(("expr", "bad"), [
+    ('if(in(field.ZBRAND, ["471"]), "A", header.po_number)', True),   # 원문과 섞임
+    ('if(in(field.ZBRAND, ["471"]), "A", "L")', False),
+])
+def test_validator_keeps_derived_fields_to_field_refs_only(validate_masters, workspace, expr, bad):
+    path = workspace / "customers" / "msc.yaml"
+    data = yaml.safe_load(path.read_text("utf-8"))
+    data.setdefault("fields", {})["ZSHCO"] = {"from": "expr", "expr": expr}
+    path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), "utf-8")
+    base = validate_masters.load_base_fields(workspace)
+    report = validate_masters.validate_customer("msc", base, workspace)
+    assert any("field.*" in e for e in report.errors) is bad, report.errors

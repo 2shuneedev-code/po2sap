@@ -250,6 +250,9 @@ class BatchRow(BaseModel):
     fields: dict[str, str] = Field(default_factory=dict)
     issues: list[RowIssue] = Field(default_factory=list)
     edited: list[str] = Field(default_factory=list)
+    # 사람이 검수 화면에서 **직접** 바꾼 필드. `edited`(원본과 다른 칸)와 달리 서버가
+    # 다시 계산한 파생 필드(field.*)는 들어가지 않는다 — 그래야 다음 저장 때도 계속 따라간다.
+    manual: list[str] = Field(default_factory=list)
     deleted: bool = False
 
     @property

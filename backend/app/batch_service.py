@@ -17,6 +17,7 @@ from .extraction import Extractor
 from .extraction.extractor import ProgressCallback
 from .extraction.providers.base import LLMError
 from .masters import MasterError, load_customer
+from .rules.derived import recompute
 from .rules.engine import build
 from .storage import BatchRepo
 
@@ -196,7 +197,13 @@ def merge_edits(
 
         for name, value in (item.get("fields") or {}).items():
             if name in columns:
-                row.fields[name] = "" if value is None else str(value)
+                text = "" if value is None else str(value)
+                if text != row.fields.get(name, ""):
+                    row.manual = sorted({*row.manual, name})
+                row.fields[name] = text
+
+        # 파생 필드(field.*) — 사람이 바꾼 값을 따라 다시 계산한다. 직접 고친 칸은 그대로(P5)
+        recompute(row.fields, fields, batch.columns, keep=set(row.manual))
 
         row.edited = sorted(n for n in columns if row.fields.get(n, "") != row.original.get(n, ""))
         if row.deleted:

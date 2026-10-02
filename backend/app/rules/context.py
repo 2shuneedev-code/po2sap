@@ -23,6 +23,7 @@ class EvalContext:
     line: dict[str, str] = field(default_factory=dict)
     derived: dict[str, str] = field(default_factory=dict)      # 결정표가 만든 _xxx
     rules: dict[str, Any] = field(default_factory=dict)        # 규칙 결과
+    fields: dict[str, str] = field(default_factory=dict)       # field.* — 다른 필드의 최종 값 (rules/derived.py)
 
     def resolve(self, path: str) -> Any:
         parts = path.split(".")
@@ -38,6 +39,9 @@ class EvalContext:
 
         if head.startswith("_"):
             return self.derived.get(head)
+
+        if head == "field":
+            return self.fields.get(parts[1]) if len(parts) == 2 else None
 
         result = self.rules.get(head)
         if len(parts) == 1:

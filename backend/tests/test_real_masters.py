@@ -249,3 +249,40 @@ def test_ygjp_zero_quantity_line_is_kept_with_a_warning():
     row = build(raw, load_customer("ygjp", REAL), REAL).rows[0]
     assert row.fields["KWMENG"] == "0"                     # 빼지 않는다
     assert any(i.field == "KWMENG" and i.code == "ZERO_VALUE" and i.severity == "warn" for i in row.issues)
+
+
+# ── N1: 파생 필드는 검수 저장 때 다시 계산된다 ─────────────────────────
+def _ygjp_batch(masters: Path):
+    from app.domain.models import Batch, BatchRow
+
+    result = build(_ygjp_po("NOT A BRAND"), load_customer("ygjp", masters), masters)
+    row = result.rows[0]
+    return Batch(
+        batch_id="b1", customer="YGJP", status="NEEDS_REVIEW", columns=result.columns,
+        rows=[BatchRow(row_id="r_0001", original=dict(row.fields), fields=dict(row.fields))],
+    )
+
+
+@pytest.mark.parametrize(("brand", "shco"), [("471", "A"), ("507", "A"), ("002", "L")])
+def test_ygjp_shipping_condition_follows_a_brand_picked_in_review(tmp_path, brand, shco):
+    from app.batch_service import merge_edits
+    from app.config import Settings
+
+    batch = _ygjp_batch(REAL)
+    assert batch.rows[0].fields["ZSHCO"] == "L"
+    merge_edits(batch, [{"row_id": "r_0001", "fields": {"ZBRAND": brand}}],
+                Settings(masters_dir=REAL, storage_dir=tmp_path))
+    row = batch.rows[0]
+    assert row.fields["ZSHCO"] == shco
+    assert row.manual == ["ZBRAND"]                        # ZSHCO 는 사람이 고친 게 아니다
+
+
+def test_ygjp_shipping_condition_typed_by_hand_is_not_overwritten(tmp_path):
+    from app.batch_service import merge_edits
+    from app.config import Settings
+
+    cfg = Settings(masters_dir=REAL, storage_dir=tmp_path)
+    batch = _ygjp_batch(REAL)
+    merge_edits(batch, [{"row_id": "r_0001", "fields": {"ZSHCO": "X"}}], cfg)
+    merge_edits(batch, [{"row_id": "r_0001", "fields": {"ZBRAND": "471", "ZSHCO": "X"}}], cfg)
+    assert batch.rows[0].fields["ZSHCO"] == "X"            # 사람이 넣은 값이 최종 진실 (P5)

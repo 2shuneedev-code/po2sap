@@ -27,6 +27,7 @@ extraction_defaults:
 #  2026-09-21 현업 확정본(SALES ORDER 템플릿) 반영 — 36 → 28.
 #  뺀 8개: VTWEG · VBELN · ZPKRE1 · MAKTX · LGORT · BATCH · VALTY · BSTKD_E
 #  2026-09-30 템플릿 수정 — POSEX 를 BSTKD 옆으로 옮기고 KDMAT(YOUR CODE) 추가.
+#  2026-10-02 KUNNR3(END CUSTOM · 최종고객) 삭제 — 사용자 결정. 전송에서도 뺀다.
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
@@ -41,7 +42,6 @@ field_specs:
   VKORG:   { label: "판매조직",          sheet: "SALES ORG.",           max_len: 4, send_only: true }
   KUNNR1:  { label: "Sold-to",          code: KUNNR, sheet: "SOLD-TO PARTY",        max_len: 10 }
   KUNNR2:  { label: "Ship-to",          code: KUNWE, sheet: "SHIP-TO PARTY",        max_len: 10 }
-  KUNNR3:  { label: "최종고객",          sheet: "END CUSTOM",           max_len: 10 }
   BSTKD:   { label: "고객발주번호",      sheet: "CUSTOMER PO",          max_len: 35 }
   POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
   VDATU:   { label: "납품요청일",        sheet: "DELIVERY DATE",        type: date }

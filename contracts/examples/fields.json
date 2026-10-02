@@ -6,7 +6,6 @@
     { "name": "VBELN",   "label": "외부오더번호",     "sheet": "EXT SO NO",            "max_len": 10 },
     { "name": "KUNNR1",  "label": "판매처",           "sheet": "SOLD-TO PARTY",        "max_len": 10 },
     { "name": "KUNNR2",  "label": "출하처",           "sheet": "SHIP-TO PARTY",        "max_len": 10 },
-    { "name": "KUNNR3",  "label": "최종고객",         "sheet": "END CUSTOM",           "max_len": 10 },
     { "name": "BSTKD",   "label": "고객발주번호",     "sheet": "CUSTOMER PO",          "max_len": 35 },
     { "name": "VDATU",   "label": "납품요청일",       "sheet": "DELIVERY DATE",        "type": "date" },
     { "name": "ZTERM",   "label": "지급조건",         "sheet": "TERMS OF PAYM",        "max_len": 4 },

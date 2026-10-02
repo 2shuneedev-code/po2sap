@@ -8,7 +8,7 @@
 #    모르는 값은 비워 두고 `required: warn` 으로 **노랗게 표시만** 한다.
 #    거래처 규칙이 확정되면 그 거래처 파일에서 `true` 로 올려 차단하면 된다.
 #
-#  ★ 판매처·출하처·최종고객(KUNNR1/2/3)은 기본이 **고객코드**다 (standard.yaml).
+#  ★ 판매처·출하처(KUNNR1/2)은 기본이 **고객코드**다 (standard.yaml).
 #    다른 거래처만 전용 파일에서 예외로 덮어쓴다 (MSC 의 출하처별 KUNNR2 처럼).
 #    그 밖에 정해진 기본이 없는 값은 추측하지 않고 비워 둔다.
 #
@@ -51,6 +51,6 @@ extraction:
 split:
   by: none
 
-# ZBRAND · KUNNR1/2/3 · BSTKD · MATNR · KWMENG 는 profiles/standard.yaml 이
+# ZBRAND · KUNNR1/2 · BSTKD · MATNR · KWMENG 는 profiles/standard.yaml 이
 # 이미 기본값을 준다(csv_choice · meta.customer_no). 이 프로필은 전용 규칙이
 # 없는 거래처를 위한 **추출 힌트**가 전부다 — fields/rules 를 다시 적지 않는다.

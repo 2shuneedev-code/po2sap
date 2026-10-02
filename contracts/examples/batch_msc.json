@@ -8,7 +8,7 @@
       "error": "품목표를 찾지 못했습니다. 원문을 확인해 주세요." }
   ],
   "columns": [
-    "AUART","VKORG","VTWEG","VBELN","KUNNR1","KUNNR2","KUNNR3","BSTKD","VDATU","ZTERM",
+    "AUART","VKORG","VTWEG","VBELN","KUNNR1","KUNNR2","BSTKD","VDATU","ZTERM",
     "INCO1","INCO2","ZBRAND","ZSHCO","ZPKRE1","MATNR","MAKTX","KWMENG","LGORT","ETDAT",
     "BATCH","VALTY","ZPKRE2","EMPST","VSART","PRICE","WAERK","BSTDK_E","POSEX","DELCO",
     "BSTKD_E","AUGRU","VKAUS","IHREZ_E","VGBEL","VGPOS"
@@ -26,7 +26,7 @@
       "_group": "ELKHART", "_line_no": 1,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
-        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "100249",
         "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
         "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1634585", "MAKTX": "", "KWMENG": "30", "LGORT": "", "ETDAT": "",
@@ -41,7 +41,7 @@
       "_group": "ELKHART", "_line_no": 2,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
-        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "100249",
         "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
         "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "", "MAKTX": "", "KWMENG": "30", "LGORT": "", "ETDAT": "",
@@ -60,7 +60,7 @@
       "_group": "ELKHART", "_line_no": 3,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
-        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "100249",
         "BSTKD": "7988114(ELKHART)", "VDATU": "", "ZTERM": "",
         "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1620202B", "MAKTX": "", "KWMENG": "20", "LGORT": "", "ETDAT": "",
@@ -79,7 +79,7 @@
       "_group": "RENO", "_line_no": 1,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
-        "KUNNR1": "100249", "KUNNR2": "319678", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "319678",
         "BSTKD": "7988114(RENO)", "VDATU": "", "ZTERM": "",
         "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1697506", "MAKTX": "", "KWMENG": "35", "LGORT": "", "ETDAT": "",
@@ -94,7 +94,7 @@
       "_group": "RENO", "_line_no": 2,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "", "VBELN": "",
-        "KUNNR1": "100249", "KUNNR2": "319678", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "319678",
         "BSTKD": "7988114(RENO)", "VDATU": "", "ZTERM": "",
         "INCO1": "", "INCO2": "", "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T2660506", "MAKTX": "", "KWMENG": "10", "LGORT": "", "ETDAT": "",

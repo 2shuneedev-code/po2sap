@@ -48,7 +48,7 @@ split:
 fields:
   # ── profiles/standard.yaml 과 **다른 것만** 적는다 ────────────────
   #  36개를 다시 나열하지 않는다. 병합 결과가 전량을 채우면 검증을 통과한다.
-  #  판매처·출하처·최종고객(KUNNR1/2/3)은 기본이 고객코드, 브랜드는 SAP 후보,
+  #  판매처·출하처(KUNNR1/2)은 기본이 고객코드, 브랜드는 SAP 후보,
   #  출하조건·운송수단은 Shipping Master 에서 온다 — **예외일 때만** 덮어쓴다.
 
   BSTKD:   { from: doc,   path: header.po_number, required: true }

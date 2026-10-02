@@ -6,7 +6,6 @@
     { "field": "AUART",  "label": "오더유형",   "value": "ZEXP" },
     { "field": "VKORG",  "label": "판매조직",   "value": "1000" },
     { "field": "KUNNR1", "label": "판매처",     "value": "100249" },
-    { "field": "KUNNR3", "label": "최종고객",   "value": "100249" },
     { "field": "ZSHCO",  "label": "출하조건",   "value": "A" },
     { "field": "VSART",  "label": "운송수단",   "value": "04" }
   ],

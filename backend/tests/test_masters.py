@@ -341,13 +341,13 @@ def test_profile_override_replaces_the_whole_spec(workspace):
 
 
 def test_customer_code_comes_from_meta_not_a_literal(masters_dir):
-    """KUNNR1/KUNNR3 은 프로필에서 meta.customer_no 로 한 번만 적는다."""
+    """KUNNR1 은 프로필에서 meta.customer_no 로 한 번만 적는다."""
     import yaml
     from app.masters.loader import load_customer
 
     for code in ("msc", "kl", "ygjp"):
         m = load_customer(code, masters_dir)
-        for field in ("KUNNR1", "KUNNR3"):
+        for field in ("KUNNR1",):
             assert m.fields[field]["expr"] == "meta.customer_no", f"{code}.{field}"
         raw = yaml.safe_load((masters_dir / "customers" / f"{code}.yaml").read_text("utf-8"))
         assert "KUNNR1" not in (raw.get("fields") or {}), code

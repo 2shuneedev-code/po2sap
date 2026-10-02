@@ -71,7 +71,7 @@ def test_ship_to_routing_picks_kunnr2_per_shipment(msc_result):
     a, b = msc_result.rows
     assert a.fields["BSTKD"] == b.fields["BSTKD"] == "PO-SAMPLE-0001"
     assert (a.fields["KUNNR2"], b.fields["KUNNR2"]) == ("100249", "319677")
-    assert a.fields["KUNNR1"] == a.fields["KUNNR3"] == "100249"
+    assert a.fields["KUNNR1"] == "100249"
     assert a.fields["AUART"] == "ZEXP"
 
 
@@ -115,7 +115,7 @@ def test_no_split_customer_uses_top_level_lines(masters_dir):
     assert row.group == ""                                     # 분할 없음
     assert row.fields["BSTKD"] == "10972"                       # 기본: doc 그대로
     assert row.fields["WAERK"] == "JPY"                         # 기본: currency 규칙
-    assert row.fields["KUNNR1"] == row.fields["KUNNR3"] == "3200"
+    assert row.fields["KUNNR1"] == "3200"
     assert row.fields["KUNNR2"] == "3200"                       # 기본: KUNNR 과 동일
 
 

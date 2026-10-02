@@ -97,7 +97,6 @@ fields:
   # 달라져 결정표를 건다).
   KUNNR1:  { from: expr, expr: 'meta.customer_no', required: true }
   KUNNR2:  { from: expr, expr: 'meta.customer_no', required: warn }
-  KUNNR3:  { from: expr, expr: 'meta.customer_no', required: true }
 
   # ── 발주서에서 읽는 값 ────────────────────────────────────────
   BSTKD:   { from: doc, path: header.po_number,  required: warn }

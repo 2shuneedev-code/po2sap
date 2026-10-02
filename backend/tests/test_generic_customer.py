@@ -111,7 +111,7 @@ def test_customer_number_fills_sold_to(masters_dir):
 
 
 def test_kunnr2_defaults_to_the_same_customer_number(masters_dir):
-    """KUNNR1/2/3 은 기본이 전부 같은 값이다 — 조건이 생기면 거래처 파일이 덮어쓴다."""
+    """KUNNR1/2 는 기본이 둘 다 같은 값이다 — 조건이 생기면 거래처 파일이 덮어쓴다."""
     _, result = rows_for(masters_dir, MANY_KUNNR)
     assert all(r.fields["KUNNR2"] == MANY_KUNNR for r in result.rows)
 

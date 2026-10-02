@@ -153,14 +153,6 @@
         "todo": ""
       },
       {
-        "field": "KUNNR3",
-        "label": "최종고객",
-        "max_len": "10",
-        "source": "meta.customer_no",
-        "explain": "",
-        "todo": ""
-      },
-      {
         "field": "BSTKD",
         "label": "고객발주번호",
         "max_len": "35",

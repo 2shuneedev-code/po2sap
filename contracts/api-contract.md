@@ -171,7 +171,7 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
       "_line_no": 1,
       "fields": {
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "",
-        "KUNNR1": "100249", "KUNNR2": "100249", "KUNNR3": "100249",
+        "KUNNR1": "100249", "KUNNR2": "100249",
         "BSTKD": "7988114(ELKHART)", "ZBRAND": "205", "ZSHCO": "A",
         "MATNR": "T1634585", "KWMENG": "30", "ZPKRE2": "C", "VSART": "04"
       },

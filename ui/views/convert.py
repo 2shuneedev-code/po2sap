@@ -262,14 +262,32 @@ def _bulk_fill(batch: Batch, edited: pd.DataFrame, visible) -> None:
             value = mid.text_input("값", key=f"bulk_val_{column}")
         scope = right.radio("대상", ["빈 칸만", "모든 행"], key="bulk_scope", horizontal=True)
         if go.button("채우기", type="primary", key="bulk_go"):
+            # 표에 보이는 행 — 표의 미저장 수정을 이어받는다.
             frame = edited.copy()
             current = frame[column].fillna("").astype(str).str.strip()
             mask = current == "" if scope == "빈 칸만" else pd.Series(True, index=frame.index)
             frame.loc[mask, column] = value
             _apply(batch, frame, visible)
+            # 파일·그룹 필터로 가려진 행도 채운다 — "모든 행"은 배치 전체다.
+            filled = int(mask.sum()) + _fill_hidden(batch, visible, column, value, scope == "빈 칸만")
             st.session_state[_GRID_VERSION] = st.session_state.get(_GRID_VERSION, 0) + 1
-            st.toast(f"{field_title(specs, column)} — {int(mask.sum())}행을 채웠습니다.", icon="✅")
+            st.toast(f"{field_title(specs, column)} — {filled}행을 채웠습니다.", icon="✅")
             st.rerun()
+
+
+def _fill_hidden(batch: Batch, visible, column: str, value: str, blank_only: bool) -> int:
+    """필터로 표에 안 보이는 행에 같은 값을 넣는다. 채운 행 수를 돌려준다."""
+    shown = {row.row_id for row in visible}
+    edits = [
+        {"row_id": row.row_id, "fields": {column: value}}
+        for row in batch.live_rows
+        if row.row_id not in shown
+        and not (blank_only and str(row.fields.get(column, "")).strip())
+    ]
+    if edits:
+        merge_edits(batch, edits, settings())
+        repo().save(batch)
+    return len(edits)
 
 
 def _to_frame(rows, columns: list[str]) -> tuple[pd.DataFrame, dict]:

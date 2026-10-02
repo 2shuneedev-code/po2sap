@@ -52,7 +52,7 @@
 |---|---|---|---|
 | 오더유형 - AUART | AUART | 자재번호 - MATNR | MATNR |
 | 판매조직 - VKORG | VKORG (전송 전용, 표에 안 보임) | 수량 - KWMENG | KWMENG |
-| Sold-to - KUNNR | KUNNR1 | Packing Spec - ZPKRE | ZPKRE2 |
+| Sold-to - KUNNR | KUNNR1 | Packing Spec - ZPKRE | ZPKRE |
 | Ship-to - KUNWE | KUNNR2 | Remark - EMPST | EMPST |
 | 고객발주번호 - BSTKD | BSTKD | Shipping Type - VSART | VSART |
 | PO품목번호 - POSEX | POSEX | 단가 - PRICE | PRICE |
@@ -199,7 +199,7 @@ fields:
   KUNNR2: { from: table, table: ship_to_routing, required: warn }
   BSTKD:  { from: expr, expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)', required: warn }
   ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
-  ZPKRE2: { from: expr, expr: 'join(",", compact([_pack_base, sid_ref.color_ring, sid_ref.hertel_no]))' }
+  ZPKRE: { from: expr, expr: 'join(",", compact([_pack_base, sid_ref.color_ring, sid_ref.hertel_no]))' }
 checks:
   - { id: shipment_total_match, severity: warn }
 ```
@@ -247,7 +247,7 @@ rules:
 fields:
   BSTKD:  { from: rule, rule: po_base, required: warn }
   POSEX:  { from: doc, path: line.posex, format: integer }
-  ZPKRE2: { from: rule, rule: brand_mark }
+  ZPKRE: { from: rule, rule: brand_mark }
   EMPST:  { from: rule, rule: brand_mark }
 ```
 
@@ -330,9 +330,9 @@ checks:
 | Q6 | YGJP ZSHCO | ZBRAND 가 471 또는 507 이면 A, 아니면 L — **브랜드를 못 찾아도 L**. 드롭다운 변경을 따라가도록 재계산(N1) | 2026-10-02 |
 | Q7 | YGJP Product ID 없음 / 수량 0 줄 | **제외하지 않는다.** 보통 행 + 노랑 경고, 사람이 지운다 | 2026-10-02 |
 | Q8 | YGJP BSTKD `01-` | **고정.** `01-{Created On 을 YYYYMMDD}-{Purchase Order ID}` | 2026-10-02 |
-| Q9 | YGJP 포장지시·비고 전송 | **보내지 않는다** (ZPKRE2·EMPST 빈 칸). 그리고 YGJP Ship-to(KUNNR2) = **319854 고정** | 2026-10-02 |
+| Q9 | YGJP 포장지시·비고 전송 | **보내지 않는다** (ZPKRE·EMPST 빈 칸). 그리고 YGJP Ship-to(KUNNR2) = **319854 고정** | 2026-10-02 |
 | Q10 | KL 브랜드 고정 여부 | **고정하지 않는다.** 공용 `csv_choice` 드롭다운 유지. KL 전용 브랜드 규칙 없음 | 2026-10-02 |
-| Q11 | KL WGT/KMT | **넣는다.** Brand 원문 WIDIA GTD → WGT, KENNAMETAL → KMT 를 ZPKRE2·EMPST 둘 다에. 둘 다 아니면 빈 칸 | 2026-10-02 |
+| Q11 | KL WGT/KMT | **넣는다.** Brand 원문 WIDIA GTD → WGT, KENNAMETAL → KMT 를 ZPKRE·EMPST 둘 다에. 둘 다 아니면 빈 칸 | 2026-10-02 |
 | Q12 | KL POSEX | **정수** (`00001` → `1`) | 2026-10-02 |
 | Q13 | KL BSTKD | **`/` 앞부분만.** 읽기는 원문 전체(Claude), 자르기는 엔진(`regex_extract`) | 2026-10-02 |
 | Q14 | KL Ship-to | **107525** (공용 기본 그대로) | 2026-10-02 |
@@ -363,9 +363,9 @@ checks:
 
 | # | 내용 | 파일 | 지금 엔진으로 가능? |
 |---|---|---|---|
-| Y1 | SID TOOL — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE2 · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/sid.yaml` | **가능** — 엔진 의존 없음 |
-| D3 | SID TOOL 포장 참조표 — `lookup` 규칙 `sid_ref` + ZPKRE2 식. **열 이름에 공백이 있어 식에서 참조할 수 없다** → `sid_ref.csv` 머리글을 `your_code,color_ring,hertel_no` 로 바꾸거나(권장, 다른 참조표와 같은 소문자 규칙), 엔진이 공백 열 이름을 받게 한다 | `masters/refs/sid_ref.csv` · `sid.yaml` | 파일 들어옴. 머리글 결정 후 Y1 과 함께 |
-| Y2 | KL — meta · hints(발주번호 원문 전체로 고침) · BSTKD `regex_extract` · POSEX `format: integer` · ZPKRE2·EMPST `keyword_map`(WGT/KMT, `on_no_match: empty`) | `masters/customers/kl.yaml` | **가능** — 엔진 의존 없음 |
+| Y1 | SID TOOL — meta · hints · `split: shipment` · 결정표(KUNNR2 · _city · _pack_base, warn) · BSTKD(도시 없으면 PO번호만) · ZPKRE · 브랜드 `keyword_map`(038/127/205/428, `value_check`) · 합계 검증(warn) | `masters/customers/sid.yaml` | **가능** — 엔진 의존 없음 |
+| D3 | SID TOOL 포장 참조표 — `lookup` 규칙 `sid_ref` + ZPKRE 식. **열 이름에 공백이 있어 식에서 참조할 수 없다** → `sid_ref.csv` 머리글을 `your_code,color_ring,hertel_no` 로 바꾸거나(권장, 다른 참조표와 같은 소문자 규칙), 엔진이 공백 열 이름을 받게 한다 | `masters/refs/sid_ref.csv` · `sid.yaml` | 파일 들어옴. 머리글 결정 후 Y1 과 함께 |
+| Y2 | KL — meta · hints(발주번호 원문 전체로 고침) · BSTKD `regex_extract` · POSEX `format: integer` · ZPKRE·EMPST `keyword_map`(WGT/KMT, `on_no_match: empty`) | `masters/customers/kl.yaml` | **가능** — 엔진 의존 없음 |
 | Y3 | YGJP — meta · hints(브랜드 줄 원문 그대로, `Remark: YG agent` 줄 구분) · KUNNR2 `319854` · BSTKD 식 · 브랜드 `csv_map`(마스터 이름 포함) · ZSHCO 식 · MATNR 덮어쓰기 | `masters/customers/ygjp.yaml` | **부분 가능** — 지금 바로 얹을 수 있다. N2(`order: longest_first`)·N3(`zero_quantity`)가 끝나면 각 한 줄을 더하고, N1 이 끝나면 ZSHCO 식이 최종 ZBRAND 를 보도록 바꾼다 |
 
 ### 구현 시 고려 — 테스트 픽스처와 이름이 겹친다

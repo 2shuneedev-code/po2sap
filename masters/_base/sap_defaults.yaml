@@ -31,6 +31,7 @@ extraction_defaults:
 #  2026-10-02 검수 표에 숨겨 두던 12개 삭제 — 보낼 필요 없음(사용자 결정). 필요하면 다시 추가:
 #    VDATU · ZTERM · INCO1 · INCO2 · ETDAT · BSTDK_E · DELCO · AUGRU · VKAUS · IHREZ_E · VGBEL · VGPOS
 #    (PRICE · WAERK 는 같은 날 되살렸다 — 검수 표에 보인다)
+#  2026-10-02 ZPKRE2 → ZPKRE 로 전송 키 변경 (사용자 결정).
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
@@ -52,13 +53,13 @@ field_specs:
   KDMAT:   { label: "고객자재번호",      sheet: "YOUR CODE",            max_len: 35, added: "2026-09-30 템플릿 수정" }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
   KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
-  ZPKRE2:  { label: "Packing Spec",     code: ZPKRE, sheet: "PACKING REMARK",       max_len: 50 }
+  ZPKRE:   { label: "Packing Spec",     sheet: "PACKING REMARK",       max_len: 50 }
   EMPST:   { label: "Remark",           sheet: "REMARK",               max_len: 25 }
   VSART:   { label: "Shipping Type",    sheet: "SHIPPING TYPE",        max_len: 2 }
   PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
   WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
 
 # ── 주의 ───────────────────────────────────────────────────────
-# ZPKRE1/ZPKRE2/EMPST 는 코드값이 아니라 **자유 텍스트 비고**다.
-#   (실물 예: ZPKRE2 = "C,Blue RING")
+# ZPKRE/EMPST 는 코드값이 아니라 **자유 텍스트 비고**다.
+#   (실물 예: ZPKRE = "C,Blue RING")
 # 이전 설계의 "포장구분 코드" 해석은 오류였다.

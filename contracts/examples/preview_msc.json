@@ -28,7 +28,7 @@
       "kind": "table",
       "label": "출하처(Ship To) 분기",
       "note": "출하처 블록의 창고명에서 도시를 찾습니다",
-      "columns": ["출하처에 포함", "→ KUNNR2", "→ ZPKRE2 기본값"],
+      "columns": ["출하처에 포함", "→ KUNNR2", "→ ZPKRE 기본값"],
       "rows": [
         ["ELKHART", "100249", "C"],
         ["HARRISBURG", "319677", "N"],
@@ -40,7 +40,7 @@
       "id": "ref_codes",
       "kind": "lookup",
       "label": "참조표 조회",
-      "note": "거래처 품번으로 참조표를 조회해 ZPKRE2 에 추가합니다 (예: \"C,Blue RING\")",
+      "note": "거래처 품번으로 참조표를 조회해 ZPKRE 에 추가합니다 (예: \"C,Blue RING\")",
       "columns": [],
       "rows": []
     }

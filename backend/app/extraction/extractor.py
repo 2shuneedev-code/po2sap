@@ -2,7 +2,7 @@
 
 책임 경계를 지킨다.
   · 이 모듈은 "원문에서 값 읽기"까지만 한다.
-  · SAP 코드 결정(ZBRAND/KUNNR2/ZPKRE2…)은 rules 엔진(D2)의 몫이다.
+  · SAP 코드 결정(ZBRAND/KUNNR2/ZPKRE…)은 rules 엔진(D2)의 몫이다.
 
 **문서 1건 ≠ 호출 1회다** (design.md §3.3). 출력 토큰이 병목이라 큰 문서는 나눠 읽는다.
 

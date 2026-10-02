@@ -123,7 +123,7 @@ fields:
   # 검수 화면에서 사람이 넣는다. **추측해서 채우지 않는다** — 빈 칸은
   # 눈에 띄지만 그럴듯한 값은 안 띈다.
   EMPST:   { from: const, value: "" }
-  ZPKRE2:  { from: const, value: "" }
+  ZPKRE:  { from: const, value: "" }
 
 grid:
   pinned: [BSTKD, POSEX, KDMAT, MATNR, KWMENG]   # 템플릿 순서 그대로 앞에

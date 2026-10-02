@@ -10,7 +10,7 @@
   "columns": [
     "AUART","VKORG","VTWEG","VBELN","KUNNR1","KUNNR2","BSTKD",
     "ZBRAND","ZSHCO","ZPKRE1","MATNR","MAKTX","KWMENG","LGORT",
-    "BATCH","VALTY","ZPKRE2","EMPST","VSART","POSEX",
+    "BATCH","VALTY","ZPKRE","EMPST","VSART","POSEX",
     "BSTKD_E"
   ],
   "grid": {
@@ -18,7 +18,7 @@
     "hidden": ["VTWEG","VBELN","ZPKRE1","MAKTX","LGORT",
                "BATCH","VALTY","EMPST","POSEX",
                "BSTKD_E"],
-    "width": { "MATNR": 140, "ZPKRE2": 180, "BSTKD": 180 }
+    "width": { "MATNR": 140, "ZPKRE": 180, "BSTKD": 180 }
   },
   "rows": [
     {
@@ -30,7 +30,7 @@
         "BSTKD": "7988114(ELKHART)",
         "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1634585", "MAKTX": "", "KWMENG": "30", "LGORT": "",
-        "BATCH": "", "VALTY": "", "ZPKRE2": "C", "EMPST": "", "VSART": "04",
+        "BATCH": "", "VALTY": "", "ZPKRE": "C", "EMPST": "", "VSART": "04",
         "POSEX": "",
         "BSTKD_E": ""
       },
@@ -45,7 +45,7 @@
         "BSTKD": "7988114(ELKHART)",
         "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "", "MAKTX": "", "KWMENG": "30", "LGORT": "",
-        "BATCH": "", "VALTY": "", "ZPKRE2": "C,Blue RING", "EMPST": "", "VSART": "04",
+        "BATCH": "", "VALTY": "", "ZPKRE": "C,Blue RING", "EMPST": "", "VSART": "04",
         "POSEX": "",
         "BSTKD_E": ""
       },
@@ -64,12 +64,12 @@
         "BSTKD": "7988114(ELKHART)",
         "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1620202B", "MAKTX": "", "KWMENG": "20", "LGORT": "",
-        "BATCH": "", "VALTY": "", "ZPKRE2": "C", "EMPST": "", "VSART": "04",
+        "BATCH": "", "VALTY": "", "ZPKRE": "C", "EMPST": "", "VSART": "04",
         "POSEX": "",
         "BSTKD_E": ""
       },
       "issues": [
-        { "field": "ZPKRE2", "severity": "warn", "code": "REF_NOT_FOUND",
+        { "field": "ZPKRE", "severity": "warn", "code": "REF_NOT_FOUND",
           "message": "참조표에 없는 품번입니다 (38012910)" }
       ],
       "edited": []
@@ -83,7 +83,7 @@
         "BSTKD": "7988114(RENO)",
         "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T1697506", "MAKTX": "", "KWMENG": "35", "LGORT": "",
-        "BATCH": "", "VALTY": "", "ZPKRE2": "O", "EMPST": "", "VSART": "04",
+        "BATCH": "", "VALTY": "", "ZPKRE": "O", "EMPST": "", "VSART": "04",
         "POSEX": "",
         "BSTKD_E": ""
       },
@@ -98,7 +98,7 @@
         "BSTKD": "7988114(RENO)",
         "ZBRAND": "205", "ZSHCO": "A", "ZPKRE1": "",
         "MATNR": "T2660506", "MAKTX": "", "KWMENG": "10", "LGORT": "",
-        "BATCH": "", "VALTY": "", "ZPKRE2": "O,Green RING", "EMPST": "", "VSART": "04",
+        "BATCH": "", "VALTY": "", "ZPKRE": "O,Green RING", "EMPST": "", "VSART": "04",
         "POSEX": "",
         "BSTKD_E": ""
       },

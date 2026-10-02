@@ -55,7 +55,7 @@ fields:
   MATNR:   { from: doc,   path: line.item_code, required: true, required_unless: [KDMAT] }
 
   # 필요할 때만 추가로 덮어쓴다 (기본값은 프로필에 있다)
-  # ZPKRE2:  { from: doc,   path: header.packing_spec }
+  # ZPKRE:  { from: doc,   path: header.packing_spec }
   # EMPST:   { from: doc,   path: line.remark, fallback: header.remark_default }
   # POSEX:   { from: doc,   path: line.posex, format: integer }
 

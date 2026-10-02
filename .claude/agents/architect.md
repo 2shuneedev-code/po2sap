@@ -48,9 +48,9 @@ model: opus
 HERTEL→38, INTERSTATE→127, ACCUPRO→205, CLASS C→428
 * Ship To 도시 인식 대상: ATLANTA, ELKHART, HARRISBURG, RENO
 * 도시 → KUNNR2: ELKHART→100249, HARRISBURG→319677, RENO→319678, ATLANTA→319679
-* 도시 → ZPKRE2 기본값: ELKHART→C, HARRISBURG→N, RENO→O, ATLANTA→A
+* 도시 → ZPKRE 기본값: ELKHART→C, HARRISBURG→N, RENO→O, ATLANTA→A
 * our\_item(거래처 자재번호)을 참조 테이블(기존 MSC\_REF.xlsx)로 조회해
-B코드·C코드를 ZPKRE2에 콤마로 추가 (참조 테이블은 그대로 유지하거나
+B코드·C코드를 ZPKRE에 콤마로 추가 (참조 테이블은 그대로 유지하거나
 DB화 검토)
 * 고정값: ZSHCO="A", VSART="04"
 
@@ -58,7 +58,7 @@ DB화 검토)
 
 * 브랜드 고정값: "2" (OEM)
 * 원문 브랜드 텍스트 분류: "WIDIA GTD" 포함 → "WGT" / "KENNAMETAL" 포함 → "KMT"
-→ 이 값을 ZPKRE2, EMPST 필드에 동일하게 사용
+→ 이 값을 ZPKRE, EMPST 필드에 동일하게 사용
 * 고정값: VSART="04"
 
 ### YGJP (고객코드 3200)
@@ -78,7 +78,7 @@ YG BRAND (IBIDEN)→482, NEW CENTURY BRAND(COMINIX)→507
 
 AUART, VKORG, VTWEG, VBELN, KUNNR1, KUNNR2, KUNNR3, BSTKD, VDATU, ZTERM,
 INCO1, INCO2, ZBRAND, ZSHCO, ZPKRE1, MATNR, MAKTX, KWMENG, LGORT, ETDAT,
-BATCH, VALTY, ZPKRE2, EMPST, VSART, PRICE, WAERK, BSTDK\_E, POSEX, DELCO,
+BATCH, VALTY, ZPKRE, EMPST, VSART, PRICE, WAERK, BSTDK\_E, POSEX, DELCO,
 BSTKD\_E, AUGRU, VKAUS
 
 이 필드 구조는 기존 SAP S/O 업로드 양식 그대로이며, JSON 스키마 설계 시

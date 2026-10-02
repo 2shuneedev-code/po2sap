@@ -16,7 +16,7 @@
     { "name": "LGORT",   "label": "저장위치",         "sheet": "STOR. LOC",            "max_len": 4 },
     { "name": "BATCH",   "label": "배치",             "sheet": "BATCH",                "max_len": 10 },
     { "name": "VALTY",   "label": "평가유형",         "sheet": "VAL TY",               "max_len": 4 },
-    { "name": "ZPKRE2",  "label": "포장비고",         "sheet": "PACKING REMARK",       "max_len": 50 },
+    { "name": "ZPKRE",  "label": "포장비고",         "sheet": "PACKING REMARK",       "max_len": 50 },
     { "name": "EMPST",   "label": "비고",             "sheet": "REMARK",               "max_len": 25 },
     { "name": "VSART",   "label": "운송수단",         "sheet": "SHIPPING TYPE",        "max_len": 2 },
     { "name": "PRICE",   "label": "단가",             "sheet": "PRICE",                "type": "decimal" },

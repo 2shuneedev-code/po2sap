@@ -43,7 +43,7 @@ samples/
 | `<사>/raw/*` | 문서 구조 확인 → `masters/customers/<사>.yaml` 의 `extraction.hints` 교정 |
 | `<사>/expected/*` | **정답지.** 규칙엔진 출력이 기존 운영 결과와 같은지 대조 |
 
-> `expected/` 가 가장 가치가 큽니다. 기존 결과가 있으면 브랜드코드·ZPKRE2 같은
+> `expected/` 가 가장 가치가 큽니다. 기존 결과가 있으면 브랜드코드·ZPKRE 같은
 > 규칙 적용 결과를 **추측이 아니라 대조로** 맞출 수 있습니다. 없으면 `raw/` 만이라도 됩니다.
 
 전송 필드의 이름·순서·자릿수는 이미 `masters/_base/sap_defaults.yaml` 에 확정되어 있다

@@ -73,7 +73,7 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
       "id": "ship_to_routing",
       "kind": "table",
       "label": "출하처(Ship To) 분기",
-      "columns": ["출하처에 포함", "→ KUNNR2", "→ ZPKRE2 기본값"],
+      "columns": ["출하처에 포함", "→ KUNNR2", "→ ZPKRE 기본값"],
       "rows": [["ELKHART","100249","C"],["HARRISBURG","319677","N"],
                ["RENO","319678","O"],["ATLANTA","319679","A"]]
     },
@@ -81,7 +81,7 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
       "id": "ref_codes",
       "kind": "lookup",
       "label": "참조표 조회",
-      "note": "거래처 품번으로 참조표를 조회해 ZPKRE2 에 추가합니다",
+      "note": "거래처 품번으로 참조표를 조회해 ZPKRE 에 추가합니다",
       "columns": [], "rows": []
     }
   ],
@@ -173,7 +173,7 @@ GET /api/... 에 ?mock=1  또는  헤더 X-Mock: 1
         "AUART": "ZEXP", "VKORG": "1000", "VTWEG": "",
         "KUNNR1": "100249", "KUNNR2": "100249",
         "BSTKD": "7988114(ELKHART)", "ZBRAND": "205", "ZSHCO": "A",
-        "MATNR": "T1634585", "KWMENG": "30", "ZPKRE2": "C", "VSART": "04"
+        "MATNR": "T1634585", "KWMENG": "30", "ZPKRE": "C", "VSART": "04"
       },
       "issues": [
         { "field": "MATNR", "severity": "error",

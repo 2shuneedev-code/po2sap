@@ -843,7 +843,7 @@ rules:
 ```yaml
 # 실물 참조표가 들어오기 전까지의 모양
 fields:
-  ZPKRE2:
+  ZPKRE:
     from: expr
     expr: 'coalesce(_pack_base, "")'
     required: warn

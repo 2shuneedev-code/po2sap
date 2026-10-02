@@ -96,7 +96,7 @@ fields:
   ZBRAND: { from: rule, rule: brand_code, required: true }
   ZSHCO: { from: const, value: "A" }
   MATNR: { from: doc, path: line.item_code, required: true }
-  ZPKRE2:
+  ZPKRE:
     from: expr
     expr: 'join(",", compact([_pack_base, ref_codes.b_code, ref_codes.c_code]))'
 checks:

@@ -260,7 +260,7 @@ def _bulk_fill(batch: Batch, edited: pd.DataFrame, visible) -> None:
             )
         else:
             value = mid.text_input("값", key=f"bulk_val_{column}")
-        scope = right.radio("대상", ["빈 칸만", "보이는 행 전체"], key="bulk_scope", horizontal=True)
+        scope = right.radio("대상", ["빈 칸만", "모든 행"], key="bulk_scope", horizontal=True)
         if go.button("채우기", type="primary", key="bulk_go"):
             frame = edited.copy()
             current = frame[column].fillna("").astype(str).str.strip()

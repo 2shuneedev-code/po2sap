@@ -119,11 +119,16 @@ def build_lines_prompt(
     chunk_text: str,
     start: int,
     end: int,
+    *,
+    continuation: str = "",
+    mid_block: bool = False,
 ) -> str:
     """LINES 호출 — 구간 하나의 품목만 읽힌다 (design.md §3.3.2).
 
     `chunk_text` 는 `SourceDoc.numbered_text(start, end)` 다. 번호는 문서 통번호 그대로다.
     `header_excerpt` 는 표 머리글·컬럼을 이해하기 위한 문맥이며 품목을 읽는 대상이 아니다.
+    `continuation` 은 구간 뒤의 몇 줄이다. 구간 끝에서 **시작한** 품목의 나머지 줄을 읽는
+    데만 쓴다 — 나눠 읽는 경계가 품목 한가운데에 걸려도 그 품목이 통째로 읽힌다.
     """
     parts = _head(customer_name, hints)
     if header_excerpt and header_excerpt.strip():
@@ -132,12 +137,42 @@ def build_lines_prompt(
             f"{header_excerpt}"
         )
     parts.append(f"# 읽을 구간: L{start:06d} ~ L{end:06d}\n\n{chunk_text}")
-    parts.append(
-        f"위 **L{start:06d} ~ L{end:06d} 구간의 품목만** 판독해 제공된 도구로 반환하세요.\n"
-        "- 이 구간 밖의 줄은 참조하지 마세요. src 는 반드시 이 구간 안의 번호여야 합니다.\n"
-        "- 구간의 모든 품목을 빠짐없이 포함하세요. 품목이 없으면 빈 배열을 반환하세요.\n"
+    has_tail = bool(continuation.strip())
+    tail_rules = (
         "- 품목마다 그 품목이 적힌 줄 번호(src)와 confidence 를 붙이고, "
         "원문에 없는 필드는 키를 생략하세요.\n"
         "- 헤더·합계는 반환하지 마세요."
     )
+    if not has_tail and not mid_block:
+        # 경계에 걸릴 일이 없는 구간(블록 하나를 통째로 읽는 등)은 예전 지시 그대로 —
+        # 쓸데없는 "앞 품목 줄은 무시" 가 블록 머리(SHIP TO 등)와 함께 품목까지 버리게 만든 적이 있다.
+        parts.append(
+            f"위 **L{start:06d} ~ L{end:06d} 구간의 품목만** 판독해 제공된 도구로 반환하세요.\n"
+            "- 이 구간 밖의 줄은 참조하지 마세요. src 는 반드시 이 구간 안의 번호여야 합니다.\n"
+            "- 구간의 모든 품목을 빠짐없이 포함하세요. 품목이 없으면 빈 배열을 반환하세요.\n"
+            + tail_rules
+        )
+        return "\n\n".join(parts)
+
+    if has_tail:
+        parts.append(
+            "# 이어 읽을 줄 (구간 끝에서 시작한 품목의 나머지 줄 — "
+            f"**여기서 시작하는 품목은 읽지 마세요**)\n\n{continuation}"
+        )
+    rules = [
+        f"위 **L{start:06d} ~ L{end:06d} 구간에서 시작하는 품목만** 판독해 제공된 도구로 반환하세요.",
+        "- 품목의 src(시작 줄)는 반드시 이 구간 안의 번호여야 합니다.",
+    ]
+    if mid_block:
+        rules.append(
+            "- 구간이 앞 품목의 중간에서 시작할 수 있습니다. 첫 품목 번호 줄이 나오기 전의 "
+            "품명·Brand 같은 줄은 앞 구간 품목의 것이니 무시하세요. 표의 품목 줄은 무시하지 마세요."
+        )
+    if has_tail:
+        rules.append(
+            "- 구간 끝에서 시작한 품목의 줄(품명·Brand 등)이 '이어 읽을 줄'로 넘어가면 그 줄까지 "
+            "읽어 그 품목을 완성하세요. 이때 src_end 와 값의 근거 줄은 '이어 읽을 줄'의 번호여도 됩니다."
+        )
+    rules.append("- 구간에서 시작하는 모든 품목을 빠짐없이 포함하세요. 품목이 없으면 빈 배열을 반환하세요.")
+    parts.append("\n".join(rules) + "\n" + tail_rules)
     return "\n\n".join(parts)

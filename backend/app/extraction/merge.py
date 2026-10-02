@@ -106,6 +106,10 @@ def merge(
 
         for item in items:
             src = _int(item.get("src"))
+            # 품목은 **시작 줄**이 든 구간의 것이다. 이어 읽을 줄(end 뒤)에서 시작한 품목은
+            # 다음 구간이 읽으므로 버린다 — 두 번 들어가지 않게.
+            if src is not None and chunk.read_end is not None and chunk.end < src <= chunk.tail_end:
+                continue
             if src is not None and src in seen[chunk.shipment_index]:
                 issues.append(GroundingIssue(
                     level="warn",
@@ -121,7 +125,7 @@ def merge(
                 seen[chunk.shipment_index].add(src)
 
             kept = dict(item)
-            kept[CHUNK_KEY] = [chunk.start, chunk.end]
+            kept[CHUNK_KEY] = [chunk.start, chunk.tail_end]    # 근거 줄은 이어 읽은 줄까지 허용
             kept["page"] = doc.page_of(src) if src is not None else None
             target.append(kept)
 

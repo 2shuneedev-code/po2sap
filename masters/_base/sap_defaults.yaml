@@ -20,6 +20,7 @@ extraction_defaults:
     tokens_per_line: 80          # 품목 1줄이 만들어내는 출력 토큰 추정치
     safety_ratio: 0.7            # max_tokens 대비 실제로 쓸 비율
     header_context_lines: 40     # 청크에 함께 붙여 보낼 문서 앞머리 줄 수
+    continuation_lines: 20       # 청크 끝에서 시작한 품목의 나머지 줄을 읽으려고 더 붙이는 줄 수
 
 # ── SAP 전송 필드 ──────────────────────────────────────────────
 #  순서 = 업로드 양식 컬럼 순서. label = 양식의 영문 헤더.

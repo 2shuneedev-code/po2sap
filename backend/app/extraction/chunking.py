@@ -37,6 +37,7 @@ CHUNKING_KEYS = (
     "tokens_per_line",
     "safety_ratio",
     "header_context_lines",
+    "continuation_lines",
 )
 
 
@@ -60,6 +61,16 @@ class Chunk:
     chunk_index: int
     start: int
     end: int
+    # 이어 읽을 끝 줄 — `end` 에서 **시작한** 품목의 나머지 줄(품명·Brand 등)이 경계를 넘어
+    # 이어지면 여기까지 읽는다. 품목은 `start`~`end` 에서 시작한 것만 이 구간의 것이다
+    # (design §3.3.2 — 경계가 품목 한가운데에 걸려도 품목이 쪼개지지 않는다). None = `end`.
+    read_end: int | None = None
+    # 블록 중간에서 시작하는 구간인가 — 맨 앞에 앞 품목의 나머지 줄이 걸쳐 있을 수 있다
+    mid_block: bool = False
+
+    @property
+    def tail_end(self) -> int:
+        return self.end if self.read_end is None else max(self.end, self.read_end)
 
     @property
     def size(self) -> int:
@@ -124,6 +135,7 @@ def plan(
 
     limit = line_limit(policy, max_tokens)
     enabled = bool(policy.get("enabled", True))
+    tail = max(0, int(policy.get("continuation_lines") or 0))
 
     chunks: list[Chunk] = []
     for shipment_index, src, end in blocks:
@@ -134,7 +146,9 @@ def plan(
         start = src
         for i in range(parts):
             stop = start + size + (1 if i < extra else 0) - 1
-            chunks.append(Chunk(shipment_index, len(chunks) + 1, start, stop))
+            # 이어 읽기는 같은 블록 안에서만 — 다음 출하처 블록의 줄을 앞 품목에 붙이지 않는다
+            read_end = min(stop + tail, end) if stop < end else None
+            chunks.append(Chunk(shipment_index, len(chunks) + 1, start, stop, read_end, mid_block=i > 0))
             start = stop + 1
     return chunks
 

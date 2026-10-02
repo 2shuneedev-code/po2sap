@@ -505,5 +505,5 @@ def test_extraction_defaults_is_allowed_at_the_top_level(validate_masters, maste
     assert "extraction_defaults" in validate_masters.TOP_LEVEL_KEYS
     assert set(validate_masters.CHUNKING_KEYS) == {
         "enabled", "max_lines_per_chunk", "tokens_per_line", "safety_ratio",
-        "header_context_lines",
+        "header_context_lines", "continuation_lines",
     }

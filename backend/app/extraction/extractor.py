@@ -403,9 +403,13 @@ class Extractor:
         부분 결과는 쓰지 않는다. 쪼갤 깊이(`LLM_CHUNK_SPLIT_DEPTH`)를 다 쓰고도 잘리면 **그
         조각만** 실패로 두고, 함께 쪼개진 다른 조각의 결과는 살린다.
         """
-        part = replace(base, start=start, end=end)
+        # 쪼갠 앞 조각도 경계에서 시작한 품목은 끝까지 — 이어 읽기는 원래 구간의 끝을 넘지 않는다
+        tail = max(0, int(run.policy.get("continuation_lines") or 0))
+        read_end = min(end + tail, base.tail_end) if end < base.tail_end else None
+        part = replace(base, start=start, end=end, read_end=read_end,
+                       mid_block=base.mid_block or start > base.start)
         try:
-            result, cached = self._call_lines(run, base, start, end, depth)
+            result, cached = self._call_lines(run, part, start, end, depth)
         except LLMTruncatedError as exc:
             if depth < int(self._settings.llm_chunk_split_depth) and end > start:
                 mid = (start + end) // 2
@@ -449,6 +453,7 @@ class Extractor:
     ) -> tuple[ToolCallResult, bool]:
         doc, master = run.doc, run.master
         excerpt, body = lines_text(doc, start, end, int(run.policy["header_context_lines"]))
+        continuation = doc.numbered_text(end + 1, chunk.tail_end) if chunk.tail_end > end else ""
         # 청크 픽스처는 **계획대로의 청크**(depth 0)만 가리킨다. 절단으로 쪼갠 조각은
         # 이름으로 지정할 수 없다.
         fixture = None
@@ -462,14 +467,15 @@ class Extractor:
             pass_kind="lines",
             tool=build_lines_tool(run.extra_fields),
             prompt=build_lines_prompt(
-                master.name, master.extraction.get("hints"), excerpt, body, start, end
+                master.name, master.extraction.get("hints"), excerpt, body, start, end,
+                continuation=continuation, mid_block=chunk.mid_block,
             ),
             # 캐시 키의 재료는 **그 호출에 실제로 보낸 텍스트**다 (읽을 구간 + 발췌 + 본문).
             # 구간을 넣는 것이 중요하다 — 발췌(앞머리)와 본문이 이어져 있으면 구간이 달라도
             # 텍스트가 같아질 수 있고(절반으로 쪼갠 뒤쪽 조각 = 통째 호출), 그러면 캐시가
-            # 다른 질문의 답을 돌려준다.
+            # 다른 질문의 답을 돌려준다. 이어 읽을 줄도 보낸 텍스트이므로 넣는다.
             document=DocumentInput(
-                text=f"# 읽을 구간: L{start:06d} ~ L{end:06d}\n{excerpt}\n{body}",
+                text=f"# 읽을 구간: L{start:06d} ~ L{end:06d}\n{excerpt}\n{body}\n{continuation}",
                 filename=doc.filename,
             ),
             deadline=run.deadline,

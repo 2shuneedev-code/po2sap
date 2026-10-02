@@ -287,7 +287,8 @@ def test_a_second_run_is_served_entirely_from_the_cache(tmp_path, masters_dir, m
 
 
 def test_only_the_changed_chunk_is_called_again(tmp_path, masters_dir, msc):
-    """캐시 키는 그 호출에 **실제로 보낸 텍스트**다 — 문서 끝의 한 줄이 바뀌면 마지막 청크만 다시 부른다."""
+    """캐시 키는 그 호출에 **실제로 보낸 텍스트**다 — 문서 끝의 한 줄이 바뀌면 그 줄을 보낸 청크만
+    다시 부른다. 마지막 청크와, 이어 읽을 줄(continuation_lines)로 그 줄을 함께 보낸 앞 청크들이다."""
     doc, blocks = make_doc([30])
     make(tmp_path, masters_dir, FakeProvider(doc, outline_payload(doc, blocks))) \
         .extract_payload(doc, msc)
@@ -300,8 +301,11 @@ def test_only_the_changed_chunk_is_called_again(tmp_path, masters_dir, msc):
     make(tmp_path, masters_dir, fake).extract_payload(edited, msc)
 
     assert len(fake.of("outline_purchase_order")) == 1      # 전체 텍스트가 바뀌었으니 골격은 다시
-    assert len(fake.of("extract_lines")) == 1               # 나머지 청크는 캐시에서
-    assert fake.of("extract_lines")[0].end >= blocks[0][1] - 1
+    changed = blocks[0][1]                                  # 바뀐 줄 = 블록 마지막 품목
+    tail = int(msc.extraction["chunking"]["continuation_lines"])
+    again = fake.of("extract_lines")
+    assert again                                            # 그 줄을 보낸 청크는 다시 부르고
+    assert all(c.start <= changed <= c.end + tail for c in again)   # 그 밖의 청크는 캐시에서
 
 
 def test_the_cache_key_separates_pass_kinds_and_texts(masters_dir):

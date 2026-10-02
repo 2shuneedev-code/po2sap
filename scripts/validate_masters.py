@@ -57,7 +57,7 @@ EXTRACTION_KEYS = {                     # §4.2
 # §4.2 chunking — 허용 키는 엔진이 쓰는 목록(`extraction/chunking.py`)과 같다.
 # 양수여야 하는 수치. `header_context_lines` 만 0 을 허용한다 (앞머리를 붙이지 않는다는 뜻).
 CHUNKING_POSITIVE = ("max_lines_per_chunk", "tokens_per_line", "safety_ratio")
-CHUNKING_INTEGERS = ("max_lines_per_chunk", "header_context_lines")
+CHUNKING_INTEGERS = ("max_lines_per_chunk", "header_context_lines", "continuation_lines")
 FIELD_FROM = {"const", "base", "doc", "table", "rule", "expr", "gen"}     # §4.6
 FIELD_OPTIONS = {
     "from", "value", "path", "table", "rule", "expr", "generator",
@@ -198,7 +198,8 @@ def check_extraction(report: Report, master: Any) -> None:
     if "enabled" in chunking and not isinstance(chunking["enabled"], bool):
         report.error(12, f"extraction.chunking.enabled 는 true | false 여야 합니다: {chunking['enabled']!r}")
 
-    for key in ("max_lines_per_chunk", "tokens_per_line", "safety_ratio", "header_context_lines"):
+    for key in ("max_lines_per_chunk", "tokens_per_line", "safety_ratio", "header_context_lines",
+                "continuation_lines"):
         if key not in chunking:
             continue
         value = chunking[key]
@@ -207,7 +208,7 @@ def check_extraction(report: Report, master: Any) -> None:
             continue
         if key in CHUNKING_POSITIVE and value <= 0:
             report.error(12, f"extraction.chunking.{key} 는 양수여야 합니다: {value!r}")
-        if key == "header_context_lines" and value < 0:
+        if key in ("header_context_lines", "continuation_lines") and value < 0:
             report.error(12, f"extraction.chunking.{key} 는 0 이상이어야 합니다: {value!r}")
         if key in CHUNKING_INTEGERS and value != int(value):
             report.error(12, f"extraction.chunking.{key} 는 정수여야 합니다: {value!r}")

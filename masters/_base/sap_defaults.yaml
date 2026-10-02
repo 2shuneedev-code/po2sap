@@ -31,13 +31,16 @@ extraction_defaults:
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
 #
+#  `code` — 화면에 보이는 SAP 필드 코드가 키와 다를 때만. 전송 키는 그대로 왼쪽 키다.
+#    (KUNNR1 은 화면에 KUNNR 로 보이지만 EAI 로는 KUNNR1 로 나간다)
+#
 #  `send_only: true` — 전송(EAI)에만 들어가고 검수 표·규칙 카드에는 안 보인다.
 #    사람이 볼 일도 고칠 일도 없는 값(판매조직 등)을 표에서 치운다.
 field_specs:
   AUART:   { label: "오더유형",          sheet: "SALES ORDER TYPE",     max_len: 4 }
   VKORG:   { label: "판매조직",          sheet: "SALES ORG.",           max_len: 4, send_only: true }
-  KUNNR1:  { label: "판매처",            sheet: "SOLD-TO PARTY",        max_len: 10 }
-  KUNNR2:  { label: "출하처",            sheet: "SHIP-TO PARTY",        max_len: 10 }
+  KUNNR1:  { label: "Sold-to",          code: KUNNR, sheet: "SOLD-TO PARTY",        max_len: 10 }
+  KUNNR2:  { label: "Ship-to",          code: KUNWE, sheet: "SHIP-TO PARTY",        max_len: 10 }
   KUNNR3:  { label: "최종고객",          sheet: "END CUSTOM",           max_len: 10 }
   BSTKD:   { label: "고객발주번호",      sheet: "CUSTOMER PO",          max_len: 35 }
   POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
@@ -46,14 +49,14 @@ field_specs:
   INCO1:   { label: "인도조건1",         sheet: "INCOTERMS1",           max_len: 3 }
   INCO2:   { label: "인도조건2",         sheet: "INCOTERMS2",           max_len: 28 }
   ZBRAND:  { label: "브랜드",            sheet: "BRAND",                max_len: 4 }
-  ZSHCO:   { label: "출하조건",          sheet: "SHIPPING CONDITION",   max_len: 2 }
+  ZSHCO:   { label: "Shipping Condition", sheet: "SHIPPING CONDITION",   max_len: 2 }
   KDMAT:   { label: "고객자재번호",      sheet: "YOUR CODE",            max_len: 35, added: "2026-09-30 템플릿 수정" }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
   KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
   ETDAT:   { label: "품목납기일",        sheet: "ITEM DEL. DATE",       type: date }
-  ZPKRE2:  { label: "포장비고",          sheet: "PACKING REMARK",       max_len: 50 }
-  EMPST:   { label: "비고",              sheet: "REMARK",               max_len: 25 }
-  VSART:   { label: "운송수단",          sheet: "SHIPPING TYPE",        max_len: 2 }
+  ZPKRE2:  { label: "Packing Spec",     code: ZPKRE, sheet: "PACKING REMARK",       max_len: 50 }
+  EMPST:   { label: "Remark",           sheet: "REMARK",               max_len: 25 }
+  VSART:   { label: "Shipping Type",    sheet: "SHIPPING TYPE",        max_len: 2 }
   PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
   WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
   BSTDK_E: { label: "발주일",            sheet: "PO ORDER DATE",        type: date }

@@ -303,7 +303,10 @@ def _grid_columns(batch: Batch) -> list[str]:
 
 
 def _column_config(batch: Batch) -> dict:
-    """헤더는 `SAP 필드명 · 한글명`. 숨김 컬럼은 접어두되 전송에는 그대로 들어간다."""
+    """헤더는 `필드명 - 필드코드`. 숨김 컬럼은 접어두되 전송에는 그대로 들어간다.
+
+    필드코드는 `_base` 의 `code`(화면용 SAP 코드)가 있으면 그것, 없으면 전송 키.
+    """
     from ui.service import field_specs_for
 
     specs = field_specs_for(batch.customer)
@@ -316,13 +319,15 @@ def _column_config(batch: Batch) -> dict:
     }
     choices = choices_for(batch.customer)
     for name in _grid_columns(batch):
-        label = str((specs.get(name) or {}).get("label") or name)
-        help_text = f"{label} ({name})" + (
+        spec = specs.get(name) or {}
+        label = str(spec.get("label") or name)
+        code = str(spec.get("code") or name)
+        header = f"{label} - {code}"
+        help_text = header + (f" (전송 필드 {name})" if code != name else "") + (
             " — 보기에서 접힌 컬럼. 전송에는 들어갑니다." if name in hidden else ""
         )
-        header = f"{name} · {label}"
         if name in choices:
-            config[name] = _choice_column(name, label, help_text, choices[name])
+            config[name] = _choice_column(header, help_text, choices[name])
             continue
         config[name] = st.column_config.TextColumn(
             header, help=help_text, width=int(widths.get(name) or _fit(header)),
@@ -337,10 +342,10 @@ def _fit(header: str) -> int:
     return max(56, int(text) + 40)
 
 
-def _choice_column(name: str, label: str, help_text: str, options: list[list[str]]):
+def _choice_column(header: str, help_text: str, options: list[list[str]]):
     """후보가 여럿인 필드 — 드롭다운. 값은 코드, 보이는 글자는 `코드 · 이름`."""
     names = {o[0]: o[1] for o in options if len(o) > 1 and o[1]}
-    header = f"▾ {name} · {label}"
+    header = f"▾ {header}"
     longest = max((f"{o[0]} · {o[1]}" if len(o) > 1 else o[0] for o in options), key=len)
     return st.column_config.SelectboxColumn(
         header,

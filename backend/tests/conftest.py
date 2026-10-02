@@ -74,13 +74,17 @@ def root() -> Path:
 def masters_dir(tmp_path_factory) -> Path:
     """실물 `masters/` 사본 + 테스트 전용 거래처(`fixtures/customers/`).
 
-    실물에는 전용 규칙 파일이 없다 (2026-09-30 전부 공용 기준으로 초기화).
-    테스트는 결정표·분할·힌트 같은 모양을 여전히 봐야 하므로, 예전
-    MSC·KL·YGJP 파일을 **합성 거래처**로 픽스처에 두고 사본에만 얹는다.
-    실물 규칙이 바뀌어도 테스트가 따라 죽지 않는다.
+    테스트는 결정표·분할·힌트 같은 모양을 봐야 하므로, 예전 MSC·KL·YGJP 파일을
+    **합성 거래처**로 픽스처에 두고 사본에만 얹는다. 실물 거래처 파일은 사본에서
+    **뺀다** — 같은 고객코드(예: 실물 sid.yaml 과 픽스처 msc.yaml 이 둘 다 100249)가
+    겹치면 어느 쪽이 쓰일지 테스트가 정하지 못한다. 실물 규칙은
+    `test_real_masters.py` 가 원본 그대로 검사한다.
     """
     dst = tmp_path_factory.mktemp("masters_root") / "masters"
     shutil.copytree(ROOT / "masters", dst)
+    for path in (dst / "customers").glob("*.yaml"):
+        if not path.name.startswith("_"):
+            path.unlink()
     for path in (FIXTURES / "customers").glob("*.yaml"):
         shutil.copy2(path, dst / "customers" / path.name)
     # 출하 마스터는 화면에서 계속 채워진다 — 사본은 머리글만 남겨 빈 표에서 시작한다.

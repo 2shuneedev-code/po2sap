@@ -28,8 +28,10 @@ from ..domain.models import (
 from ..mapping.row_builder import build_row
 from ..masters.loader import CustomerMaster
 from ..validation.validator import validate_batch, validate_row
+from . import expr as expr_mod
 from .context import EvalContext
 from .decision_table import evaluate_table
+from .expr import ExprError
 from .mapping_rules import evaluate_rule
 
 __all__ = ["build"]
@@ -165,14 +167,38 @@ def _first_field(table: dict[str, Any]) -> str:
     return ""
 
 
+def _rules_used_as_values(master: CustomerMaster) -> set[str]:
+    """필드 값에 쓰이는 규칙 — `from: rule` 이 가리키거나 식(`expr`)이 참조하는 것."""
+    rules = set(master.rules or {})
+    used: set[str] = set()
+    for spec in (master.fields or {}).values():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("from") == "rule":
+            used.add(str(spec.get("rule") or ""))
+        elif spec.get("from") == "expr":
+            try:
+                info = expr_mod.analyze(str(spec.get("expr") or ""))
+            except ExprError:
+                continue
+            if info.ok:
+                used.update(p.root for p in expr_mod.paths(info.ast) if p.root in rules)
+    return used
+
+
 def _run_rules(
     master: CustomerMaster, ctx: EvalContext, masters_dir: Path, issues: list[RowIssue]
 ) -> None:
-    """⑤ RULES — 규칙끼리는 서로 참조할 수 없다. 조합이 필요하면 expr 에서 한다."""
+    """⑤ RULES — 규칙끼리는 서로 참조할 수 없다. 조합이 필요하면 expr 에서 한다.
+
+    경고는 **값으로 쓰이는 규칙**만 낸다. 드롭다운 후보만 주는 규칙(`choices`)이
+    "후보가 7개입니다"를 내면, 전용 규칙이 이미 값을 채운 행에도 고르라는 말이 붙는다.
+    """
+    used = _rules_used_as_values(master)
     for name, rule in (master.rules or {}).items():
         outcome = evaluate_rule(name, rule, ctx, masters_dir)
         ctx.rules[name] = outcome.value
-        if outcome.severity:
+        if outcome.severity and name in used:
             issues.append(RowIssue(
                 field="", severity=outcome.severity,
                 code="RULE_NO_MATCH", message=outcome.message,

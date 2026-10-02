@@ -1,0 +1,160 @@
+# ═══════════════════════════════════════════════════════════════
+#  SID TOOL CO., INC.  (고객코드 100249)
+#  스키마: masters/SCHEMA.md · 설계와 결정 근거: CUSTOMER_RULES.md §4.1
+#
+#  ※ 옛 별칭 "MSC" 는 쓰지 않는다.
+#  공용(profiles/standard.yaml)과 **다른 것만** 적는다:
+#    · 출하 창고별로 오더를 나눈다 (split: shipment)
+#    · 창고 도시 → Ship-to(KUNNR2) · Packing Remark 기본값
+#    · BSTKD = PO번호(도시)
+#    · Packing Remark(ZPKRE) = 창고 기본값 + sid_ref.csv(Color RING · HERTEL Number)
+#    · 브랜드 = ORDERED FROM 문구 (못 찾으면 빈 칸 + 드롭다운)
+#  막지 않는다 — 모르면 노랗게만 띄운다 (CUSTOMER_RULES.md §1).
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+meta:
+  code: SID
+  name: "SID TOOL CO., INC."
+  customer_no: "100249"
+  status: active
+  file_types: [htm, html]
+
+extends: [_base/sap_defaults, profiles/standard]
+
+extraction:
+  input: text
+  page_limit: 40
+  hints: |
+    SID TOOL(MSC Industrial) 표준 발주서(HTM)다. 표는 전처리를 거쳐
+    한 줄에 셀 | 셀 | 셀 형태로 넘어온다.
+
+    [PO 번호]
+      <title> 의 "PO#7588650" 또는 "Purchase Order #7588650" 의 숫자.
+
+    [브랜드 원문]
+      "ORDERED FROM" 블록의 첫 줄을 원문 그대로 brand_text 에 담을 것.
+      예: "HERTEL (GP END MILLS) (APO)" / "ACCUPRO-CARBIDE DRILL MILL (AP"
+      ※ 품명(Description)이 아니라 ORDERED FROM 에 있다.
+
+    [출하처 — 두 가지 형태가 있다. 반드시 구분할 것] ★
+      (A) 단일 출하처
+          헤더 "SHIP TO" 블록에 창고명+주소가 그대로 있다.
+          → shipments 1건. 상단 품목표가 그 shipment 의 품목이다.
+
+      (B) 복수 출하처
+          헤더 SHIP TO 가 "Check complete attachment for shipping instructions" 이고
+          Receiving Location 이 "See Shipment" 이면 이 경우다.
+          문서 하단에 아래 블록이 출하처 수만큼 반복된다.
+              SHIP TO
+              Shipment No.......:    001
+              Receiving Loc.....:    ELK
+              SID TOOL - ELKHART WAREHOUSE
+              ...주소...
+              (이어서 그 출하처 전용 품목표)
+          → shipment 블록마다 별도 shipments 항목을 만들고,
+            품목은 반드시 그 블록의 품목표에서 가져올 것.
+          ※ 상단 요약 품목표는 전 출하처 합계다. 품목으로 읽지 않는다. 합계만 읽는다.
+
+      창고명에 도시명(ATLANTA / ELKHART / HARRISBURG / RENO)이 들어 있고
+      대소문자가 섞인다("SID TOOL Harrisburg Warehouse").
+      주소의 도시는 다를 수 있으므로(ATLANTA 창고 → Mableton, GA)
+      창고명 줄을 포함한 블록 전체를 ship_to_text 에 담을 것.
+
+    [품목표] — 컬럼명이 SID TOOL 기준이라 우리와 반대다. 혼동 금지 ★
+      "Quantity Ordered"  → quantity
+      "Our Item Number"   → our_item    (SID TOOL 품번. 8자리 숫자)
+      "Your Item Number"  → item_code   (우리 YG 품번)
+      "Description"       → description
+      "Price"             → unit_price  ("Line Cost" 합계금액과 혼동 금지)
+      ※ shipment 블록 품목표에는 Price 컬럼이 없다. 없으면 비워 둘 것.
+
+    [기타]
+      "Date of Order" / "Ship on Or Before" 는 M/D/YY(2/17/26). 원문 그대로.
+      "P.O Priced In" 은 "United States Dollars" 같은 문장. 원문 그대로.
+      페이지마다 표 머리글이 반복된다. 머리글을 품목으로 넣지 말 것.
+
+split:
+  by: shipment
+  label: "출하 창고별로 오더를 나눈다"
+  group_label: _city
+  description: |
+    발주서 1부가 출하 창고 수만큼의 오더로 쪼개진다. 화면에는 한 표로 보이고,
+    창고마다 Ship-to · Packing Remark · BSTKD 가 달라진다.
+
+tables:
+  ship_to_routing:
+    label: "출하 창고 → Ship-to · Packing Remark 기본값"
+    scope: shipment
+    description: |
+      출하처 블록의 창고 도시명으로 Ship-to(KUNWE)와 Packing Remark 기본값을 정한다.
+      도시를 못 찾으면 비워 두고 노랗게만 띄운다 — 전송 후 SAP 에서 고칠 수 있다.
+    when:
+      - source: shipment.ship_to_text
+        fallback_source: header.ship_to_text
+        op: contains_ci
+        label: "출하처 블록에 포함"
+    then: [KUNNR2, _city, _pack_base]
+    rows:
+      - { when: ["ELKHART"],    then: ["100249", "ELKHART",    "C"] }
+      - { when: ["HARRISBURG"], then: ["319677", "HARRISBURG", "N"] }
+      - { when: ["RENO"],       then: ["319678", "RENO",       "O"] }
+      - { when: ["ATLANTA"],    then: ["319679", "ATLANTA",    "A"] }
+    on_no_match:
+      action: warn
+      message: "출하 창고 도시를 인식하지 못했습니다 (ATLANTA / ELKHART / HARRISBURG / RENO) — Ship-to 를 확인하세요"
+
+rules:
+  brand_text_match:
+    kind: keyword_map
+    label: "브랜드 — ORDERED FROM 문구"
+    description: |
+      ORDERED FROM 블록 문구에 키워드가 있으면 그 코드. 위에서부터 첫 일치.
+      못 찾으면 빈 칸 — 검수 표 드롭다운(브랜드 마스터 후보)에서 고른다.
+    source: header.brand_text
+    fallback_source: header.order_text
+    case_insensitive: true
+    entries:
+      - { contains: "HERTEL",     value: "038" }
+      - { contains: "INTERSTATE", value: "127" }
+      - { contains: "ACCUPRO",    value: "205" }
+      - { contains: "CLASS C",    value: "428" }
+    value_check:
+      table_file: refs/brand_master.csv
+      value_column: zbrand
+      filter_column: kunnr
+    on_no_match:
+      action: warn
+      message: "브랜드 문구를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요"
+
+  sid_ref:
+    kind: lookup
+    label: "Packing Remark 추가 — Color RING · HERTEL Number"
+    description: |
+      고객자재번호(KDMAT, Your Code)가 refs/sid_ref.csv 에 있으면 그 행의
+      Color RING 또는 HERTEL Number 값을 창고 기본값 뒤에 이어 붙인다.
+      표에 없는 품번이 대부분이라 없으면 조용히 넘어간다.
+    table_file: refs/sid_ref.csv
+    key: line.our_item
+    key_column: your_code
+    return: [color_ring, hertel_no]
+    on_no_match: { action: empty }
+
+fields:
+  # ── profiles/standard.yaml 과 **다른 것만** ──────────────────────
+  KUNNR2: { from: table, table: ship_to_routing, required: warn }
+  BSTKD:
+    from: expr
+    expr: 'if(_city, concat(header.po_number, "(", _city, ")"), header.po_number)'
+    required: warn
+    explain: "PO번호(창고 도시). 도시를 못 찾으면 PO번호만"
+  ZBRAND: { from: rule, rule: brand_text_match, choices: brand_code, required: warn }
+  ZPKRE:
+    from: expr
+    expr: 'join(",", compact([_pack_base, sid_ref.color_ring, sid_ref.hertel_no]))'
+    explain: "창고 기본값(C/N/O/A) + Color RING 또는 HERTEL Number. 예: A,Blue RING"
+
+checks:
+  - id: shipment_total_match
+    label: "창고별 수량 합계 = 발주서 합계"
+    severity: warn

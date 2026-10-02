@@ -81,6 +81,7 @@ rules:
     key_column: zbrant
     value_column: zbrand
     case_insensitive: true
+    order: longest_first          # "YG BRAND" 가 "YG BRAND (COMINIX)" 를 가로채지 않게
     on_no_match:
       action: warn
       message: "브랜드를 인식하지 못했습니다: {brand_text} — 드롭다운에서 고르세요"

@@ -74,8 +74,9 @@ RULE_OPTIONS = {
     "case_insensitive", "normalize", "entries", "on_no_match", "on_many",
     "table_file", "key", "key_column", "return", "optional",
     "value_column", "mode_column", "filter_column", "label_column", "value_check",
-    "pattern", "group", "value", "preview", "preview_note",
+    "pattern", "group", "value", "preview", "preview_note", "order",
 }
+CSV_MAP_ORDERS = {"file", "longest_first"}       # §4.5 csv_map `order`
 PREVIEW_MODES = {"card", "fixed", "hidden"}                                    # §4.5
 NORMALIZE_OPS = {"trim", "collapse_spaces", "upper", "lower"}
 TABLE_OPS = {"contains_ci", "equals", "equals_ci", "regex", "starts_with"}     # §4.4
@@ -504,6 +505,12 @@ def check_csv_map(
         return
 
     rows, header = _read_csv(path)
+
+    order = rule.get("order")
+    if order is not None and order not in CSV_MAP_ORDERS:
+        report.error(
+            2, f"{where}.order: 허용 목록 밖입니다: {order!r} (허용: {', '.join(sorted(CSV_MAP_ORDERS))})"
+        )
 
     required = {"key_column": rule.get("key_column"), "value_column": rule.get("value_column")}
     optional = {"mode_column": rule.get("mode_column"), "filter_column": rule.get("filter_column")}

@@ -95,7 +95,13 @@ def _csv_map(
     value_col = str(rule.get("value_column") or "")
     mode_col = rule.get("mode_column")
 
-    for row in rows:                       # 파일 순서 = 우선순위 (SCHEMA §4.5)
+    # 기본은 파일 순서 = 우선순위 (SCHEMA §4.5). `order: longest_first` 면 긴 문구부터 —
+    # 마스터처럼 사람이 순서를 정하지 않는 표에서 "YG BRAND" 가 "YG BRAND (COMINIX)" 를
+    # 가로채지 않게 한다. 길이가 같으면 파일 순서를 지킨다(안정 정렬).
+    if rule.get("order") == "longest_first":
+        rows = sorted(rows, key=lambda r: len(r.get(key_col, "")), reverse=True)
+
+    for row in rows:
         needle = row.get(key_col, "")
         if not needle:
             continue

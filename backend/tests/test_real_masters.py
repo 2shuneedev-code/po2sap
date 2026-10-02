@@ -228,3 +228,16 @@ def test_ygjp_missing_product_id_warns_even_with_your_code():
     row = build(_ygjp_po("YG BRAND", item_code=""), load_customer("ygjp", REAL), REAL).rows[0]
     assert row.fields["KDMAT"] == "1515X16"
     assert any(i.field == "MATNR" and i.severity == "warn" for i in row.issues)
+
+
+def test_ygjp_longer_brand_name_wins(tmp_path):
+    """`order: longest_first` — 짧은 이름이 파일 위에 있어도 긴 이름이 먼저 걸린다."""
+    import shutil
+
+    masters = tmp_path / "masters"
+    shutil.copytree(REAL, masters)
+    with (masters / "refs" / "brand_master.csv").open("a", encoding="utf-8", newline="") as fh:
+        fh.write('\n3200,"YG-1 JAPAN CO., LTD.",901,ZZ BRAND\n')
+        fh.write('3200,"YG-1 JAPAN CO., LTD.",902,ZZ BRAND (COMINIX)\n')
+    row = build(_ygjp_po("ZZ BRAND (COMINIX) YG STD."), load_customer("ygjp", masters), masters).rows[0]
+    assert row.fields["ZBRAND"] == "902"

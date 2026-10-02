@@ -28,9 +28,9 @@ extraction_defaults:
 #  뺀 8개: VTWEG · VBELN · ZPKRE1 · MAKTX · LGORT · BATCH · VALTY · BSTKD_E
 #  2026-09-30 템플릿 수정 — POSEX 를 BSTKD 옆으로 옮기고 KDMAT(YOUR CODE) 추가.
 #  2026-10-02 KUNNR3(END CUSTOM · 최종고객) 삭제 — 사용자 결정. 전송에서도 뺀다.
-#  2026-10-02 검수 표에 숨겨 두던 14개 삭제 — 보낼 필요 없음(사용자 결정). 필요하면 다시 추가:
-#    VDATU · ZTERM · INCO1 · INCO2 · ETDAT · PRICE · WAERK · BSTDK_E · DELCO · AUGRU ·
-#    VKAUS · IHREZ_E · VGBEL · VGPOS  (WAERK 의 통화 규칙 `currency` 는 standard.yaml 에 남아 있다)
+#  2026-10-02 검수 표에 숨겨 두던 12개 삭제 — 보낼 필요 없음(사용자 결정). 필요하면 다시 추가:
+#    VDATU · ZTERM · INCO1 · INCO2 · ETDAT · BSTDK_E · DELCO · AUGRU · VKAUS · IHREZ_E · VGBEL · VGPOS
+#    (PRICE · WAERK 는 같은 날 되살렸다 — 검수 표에 보인다)
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
@@ -55,6 +55,8 @@ field_specs:
   ZPKRE2:  { label: "Packing Spec",     code: ZPKRE, sheet: "PACKING REMARK",       max_len: 50 }
   EMPST:   { label: "Remark",           sheet: "REMARK",               max_len: 25 }
   VSART:   { label: "Shipping Type",    sheet: "SHIPPING TYPE",        max_len: 2 }
+  PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
+  WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
 
 # ── 주의 ───────────────────────────────────────────────────────
 # ZPKRE1/ZPKRE2/EMPST 는 코드값이 아니라 **자유 텍스트 비고**다.

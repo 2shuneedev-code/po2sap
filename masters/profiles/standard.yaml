@@ -107,11 +107,13 @@ fields:
   #   품번에 괄호는 없다 — "D1103036(1pc)" 처럼 붙어 오면 괄호째 뗀다.
   MATNR:   { from: doc, path: line.item_code, format: strip_parens, required: warn, required_unless: [KDMAT] }
   KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
+  PRICE:   { from: doc, path: line.unit_price }
   POSEX:   { from: doc, path: line.posex }
   # KDMAT = 고객 자재번호 = **거래처 품번**(our_item). MATNR(우리 품번)과 반대다.
   KDMAT:   { from: doc, path: line.our_item }
 
   # ── 규칙·마스터가 정한다 ──────────────────────────────────────
+  WAERK:   { from: rule, rule: currency, required: warn }
   ZBRAND:  { from: rule, rule: brand_code, required: warn }
   ZSHCO:   { from: rule, rule: shipping_condition, required: warn }
   VSART:   { from: rule, rule: shipping_type, required: warn }

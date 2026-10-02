@@ -19,7 +19,9 @@
         "KWMENG": "10",
         "ZPKRE2": "",
         "EMPST": "",
-        "VSART": ""
+        "VSART": "",
+        "PRICE": "",
+        "WAERK": "USD"
       },
       "issues": [
         {
@@ -67,7 +69,9 @@
         "KWMENG": "15",
         "ZPKRE2": "",
         "EMPST": "",
-        "VSART": ""
+        "VSART": "",
+        "PRICE": "",
+        "WAERK": "USD"
       },
       "issues": [
         {
@@ -111,7 +115,9 @@
     "KWMENG",
     "ZPKRE2",
     "EMPST",
-    "VSART"
+    "VSART",
+    "PRICE",
+    "WAERK"
   ],
   "grid": {
     "pinned": [

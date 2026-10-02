@@ -19,6 +19,8 @@
     { "name": "ZPKRE2",  "label": "포장비고",         "sheet": "PACKING REMARK",       "max_len": 50 },
     { "name": "EMPST",   "label": "비고",             "sheet": "REMARK",               "max_len": 25 },
     { "name": "VSART",   "label": "운송수단",         "sheet": "SHIPPING TYPE",        "max_len": 2 },
+    { "name": "PRICE",   "label": "단가",             "sheet": "PRICE",                "type": "decimal" },
+    { "name": "WAERK",   "label": "통화",             "sheet": "CURRENCY",             "max_len": 5 },
     { "name": "POSEX",   "label": "PO품목번호",       "sheet": "PO ITEM",              "max_len": 6 },
     { "name": "BSTKD_E", "label": "발주번호(출하처)", "sheet": "PO NUMBER(SHIP-TO)",   "max_len": 35 }
   ]

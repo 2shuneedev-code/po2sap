@@ -195,6 +195,9 @@ def _review_section(batch: Batch) -> None:
         help="숨겨진 컬럼도 **전송에는 그대로 들어갑니다**(빈 값). 보기에서만 접어둔 것입니다.",
     )
 
+    # 일괄 채우기는 표 **위에** 보이되, 표의 미저장 수정을 이어받아야 하므로
+    # 자리만 먼저 잡고 내용은 표를 그린 뒤에 채운다.
+    bulk_slot = st.container()
     frame, issues_by_row = _to_frame(visible, _grid_columns(batch))
     edited = st.data_editor(
         frame,
@@ -208,7 +211,8 @@ def _review_section(batch: Batch) -> None:
             f"_{st.session_state.get(_GRID_VERSION, 0)}",
     )
 
-    _bulk_fill(batch, edited, visible)
+    with bulk_slot:
+        _bulk_fill(batch, edited, visible)
 
     if st.button("검증", help="고친 값을 서버 스냅샷에 반영하고 다시 검사합니다"):
         _apply(batch, edited, visible)

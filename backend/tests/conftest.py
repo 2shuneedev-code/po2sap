@@ -83,6 +83,9 @@ def masters_dir(tmp_path_factory) -> Path:
     shutil.copytree(ROOT / "masters", dst)
     for path in (FIXTURES / "customers").glob("*.yaml"):
         shutil.copy2(path, dst / "customers" / path.name)
+    # 출하 마스터는 화면에서 계속 채워진다 — 사본은 머리글만 남겨 빈 표에서 시작한다.
+    shipping = dst / "refs" / "shipping_master.csv"
+    shipping.write_text(shipping.read_text("utf-8").splitlines()[0] + "\n", "utf-8")
     return dst
 
 

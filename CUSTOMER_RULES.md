@@ -145,21 +145,21 @@ YAML 예시는 모양만 보여 줍니다. 값은 2026-10-02 결정(§5) 기준�
 
 | 항목 | POC | 새 방식 (장치) | 상태 |
 |---|---|---|---|
-| 오더 나누기 | SHIP TO 에 `CHECK COMPLETE` 가 있으면 섹션별 | `split.by: shipment`. 출하처 블록 알아보는 법은 `hints` 에 (fixture 의 hints 재사용) | 전용 규칙 필요 |
-| 출하 창고 도시 | ATLANTA/ELKHART/HARRISBURG/RENO 포함 여부 | 결정표 `tables.ship_to_routing` — Claude 는 창고 블록 원문만, 도시 판정은 결정표 | 전용 규칙 필요 |
-| Ship-to - KUNWE | ELKHART 100249 · HARRISBURG 319677 · RENO 319678 · ATLANTA 319679 | 같은 결정표 `then: [KUNNR2, _city, _pack_base]` | 전용 규칙 필요 (업로드 결과와 일치) |
-| 도시를 못 찾을 때 | 빈 칸 그대로 | `on_no_match: warn` — Ship-to·도시·포장 기본값이 빈 칸 + 노랑. 막지 않는다 | 전용 규칙 필요 |
-| 고객발주번호 - BSTKD | `PO번호(도시)` | `if(_city, concat(PO번호, "(", _city, ")"), PO번호)` — 도시를 못 찾으면 PO번호만 | 전용 규칙 필요 (업로드 결과 `7588650(ATLANTA)` 형식과 일치) |
-| 브랜드 - ZBRAND | ORDERED FROM 키워드: HERTEL→38, INTERSTATE→127, ACCUPRO→205, CLASS C→428 | 전용 `keyword_map`(`brand_text_match`): HERTEL→`038` · INTERSTATE→`127` · ACCUPRO→`205` · CLASS C→`428`. 못 찾으면 빈 칸 + 노랑 + 드롭다운(후보 7개) | 전용 규칙 필요 |
+| 오더 나누기 | SHIP TO 에 `CHECK COMPLETE` 가 있으면 섹션별 | `split.by: shipment`. 출하처 블록 알아보는 법은 `hints` 에 (fixture 의 hints 재사용) | ✅ `sid.yaml` |
+| 출하 창고 도시 | ATLANTA/ELKHART/HARRISBURG/RENO 포함 여부 | 결정표 `tables.ship_to_routing` — Claude 는 창고 블록 원문만, 도시 판정은 결정표 | ✅ `sid.yaml` |
+| Ship-to - KUNWE | ELKHART 100249 · HARRISBURG 319677 · RENO 319678 · ATLANTA 319679 | 같은 결정표 `then: [KUNNR2, _city, _pack_base]` | ✅ `sid.yaml` |
+| 도시를 못 찾을 때 | 빈 칸 그대로 | `on_no_match: warn` — Ship-to·도시·포장 기본값이 빈 칸 + 노랑. 막지 않는다 | ✅ `sid.yaml` |
+| 고객발주번호 - BSTKD | `PO번호(도시)` | `if(_city, concat(PO번호, "(", _city, ")"), PO번호)` — 도시를 못 찾으면 PO번호만 | ✅ `sid.yaml` |
+| 브랜드 - ZBRAND | ORDERED FROM 키워드: HERTEL→38, INTERSTATE→127, ACCUPRO→205, CLASS C→428 | 전용 `keyword_map`(`brand_text_match`): HERTEL→`038` · INTERSTATE→`127` · ACCUPRO→`205` · CLASS C→`428`. 못 찾으면 빈 칸 + 노랑 + 드롭다운(후보 7개) | ✅ `sid.yaml` |
 | Shipping Condition - ZSHCO | `A` 고정 | Shipping Master 를 따른다 (지금 100249 = 빈 칸 → 노랑) | 공용으로 이미 됨 |
 | Shipping Type - VSART | `04` | Shipping Master 100249 = `04` | 공용으로 이미 됨 |
-| Packing Spec - ZPKRE | 도시 기본값 + 참조표 B·C열 | 도시 기본값(ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A`, 결정표 `_pack_base`) + **고객자재번호(KDMAT, Your Code)가 `refs/sid_ref.csv` 에 있으면** 그 행의 Color RING 또는 HERTEL Number 값을 쉼표로 이어 붙인다 (예: `A,Blue RING` · `C,4006205`). 표에 없으면 기본값만, 경고 없음 | 전용 규칙 필요 |
+| Packing Spec - ZPKRE | 도시 기본값 + 참조표 B·C열 | 도시 기본값(ELKHART `C` · HARRISBURG `N` · RENO `O` · ATLANTA `A`, 결정표 `_pack_base`) + **고객자재번호(KDMAT, Your Code)가 `refs/sid_ref.csv` 에 있으면** 그 행의 Color RING 또는 HERTEL Number 값을 쉼표로 이어 붙인다 (예: `A,Blue RING` · `C,4006205`). 표에 없으면 기본값만, 경고 없음 | ✅ `sid.yaml` |
 | 자재번호 - MATNR | your_item | 공용 (`line.item_code`). hints 가 "Your Item Number = item_code" 를 지킨다 | 공용으로 이미 됨 |
 | 고객자재번호 - KDMAT | (없음) | 공용 (`line.our_item`, SID TOOL 8자리 품번) | 공용으로 이미 됨 |
 | PO품목번호 - POSEX | 넣지 않음 | 공용 (문서에 없으면 빈 칸) | 공용으로 이미 됨 |
 | 단가 - PRICE | 보내지 않음 | 공용. 창고별 블록 품목표에는 Price 열이 없어 여러 창고 문서는 빈 칸 — **괜찮다**(SAP 가격 마스터가 채운다) | 공용으로 이미 됨 |
 | 통화 - WAERK | 보내지 않음 | 공용 (`United States Dollars` → USD) | 공용으로 이미 됨 |
-| 합계 검증 | 없음 | `checks: shipment_total_match`, `severity: warn` — 창고별 수량 합 ≠ 요약표 합계면 노랑(블록을 빠뜨렸다는 신호) | 전용 규칙 필요 |
+| 합계 검증 | 없음 | `checks: shipment_total_match`, `severity: warn` — 창고별 수량 합 ≠ 요약표 합계면 노랑(블록을 빠뜨렸다는 신호) | ✅ `sid.yaml` |
 
 ```yaml
 # masters/customers/sid.yaml (모양만)
@@ -211,10 +211,10 @@ checks:
 
 | 항목 | POC | 새 방식 (장치) | 상태 |
 |---|---|---|---|
-| 고객발주번호 - BSTKD | `Document No. 4507628839 / 040` 에서 `/` 앞 | Claude 는 `Document No.` 뒤 **원문 전체**(`4507628839 / 040`)를 `po_number` 로 읽고, `/` 앞 자르기는 `regex_extract` 규칙이 한다. **fixture 의 hints("슬래시 앞만")는 변환 지시라 고친다**(P1) | 전용 규칙 필요 |
+| 고객발주번호 - BSTKD | `Document No. 4507628839 / 040` 에서 `/` 앞 | Claude 는 `Document No.` 뒤 **원문 전체**(`4507628839 / 040`)를 `po_number` 로 읽고, `/` 앞 자르기는 `regex_extract` 규칙이 한다. **fixture 의 hints("슬래시 앞만")는 변환 지시라 고친다**(P1) | ✅ `kl.yaml` |
 | 브랜드 - ZBRAND | `2` (OEM) 고정 | **고정하지 않는다.** 공용 `csv_choice` 그대로 — 후보 002 OEM BRAND · 058 NO BRAND 라 빈 칸 + 드롭다운. 후보 정리는 브랜드 마스터에서 | 공용으로 이미 됨 |
-| Packing Spec - ZPKRE / Remark - EMPST | 품목 `Brand:` 원문에 `WIDIA GTD` → WGT, `KENNAMETAL` → KMT | 라인 원문 `line.brand_text` 에 `keyword_map` 1개(`WIDIA GTD` 를 위에), 두 필드가 같은 규칙을 참조. 둘 다 아니면 **빈 칸**(`on_no_match: empty`) | 전용 규칙 필요 |
-| PO품목번호 - POSEX | `00001` → `1` | `format: integer` | 전용 규칙 필요 |
+| Packing Spec - ZPKRE / Remark - EMPST | 품목 `Brand:` 원문에 `WIDIA GTD` → WGT, `KENNAMETAL` → KMT | 라인 원문 `line.brand_text` 에 `keyword_map` 1개(`WIDIA GTD` 를 위에), 두 필드가 같은 규칙을 참조. 둘 다 아니면 **빈 칸**(`on_no_match: empty`) | ✅ `kl.yaml` |
+| PO품목번호 - POSEX | `00001` → `1` | `format: integer` | ✅ `kl.yaml` |
 | 자재번호 - MATNR | 항상 빈 칸 (우리 품번이 문서에 없음) | 공용 그대로 — KDMAT 가 있으면 경고 없음 | 공용으로 이미 됨 |
 | 고객자재번호 - KDMAT | Kennametal Mat. No. | 공용 (`line.our_item`) | 공용으로 이미 됨 |
 | Ship-to - KUNWE | 넣지 않음 | 공용 = 107525 | 공용으로 이미 됨 |
@@ -258,15 +258,15 @@ fields:
 
 | 항목 | POC | 새 방식 (장치) | 상태 |
 |---|---|---|---|
-| Ship-to - KUNWE | `319854` 고정 | `fields.KUNNR2: { from: const, value: "319854" }` | 전용 규칙 필요 |
-| 고객발주번호 - BSTKD | `01-{Created On YYYYMMDD}-{Purchase Order ID}` | Claude 는 날짜·번호를 원문대로, 조립은 `concat("01-", date_yyyymmdd(header.po_date), "-", header.po_number)`. `01-` 은 고정 | 전용 규칙 필요 |
-| 브랜드 - ZBRAND (읽기) | 하단 줄이 표와 완전일치 | Claude 는 하단 블록에서 **브랜드가 적힌 줄을 원문 그대로** `header.brand_text` 에 담는다. 포장지시가 같은 줄에 붙어 있어도 **가르지 않는다**. `Remark: YG agent : …` 줄은 브랜드가 아니라고 hints 에 적는다 | 전용 규칙 필요 (hints) |
-| 브랜드 - ZBRAND (판정) | POC 자체 표 25개 | **브랜드 마스터가 기준.** `csv_map` — `refs/brand_master.csv` 의 3200 행에서 **브랜드명(zbrant)이 원문에 포함되면** 그 코드(zbrand). 대소문자 무시. 못 찾으면 빈 칸 + 노랑 + 드롭다운. POC 25개 표는 버린다 | 전용 규칙 필요 (긴 이름 우선 보장은 N2) |
-| Shipping Condition - ZSHCO | 브랜드 471·507 → `A`, 그 외 `L` | YGJP 파일에서 `expr` 로 덮어쓴다: `if(in(브랜드, ["471", "507"]), "A", "L")` — **브랜드를 못 찾아도 `L`**. `in()` 사용(`contains()` 금지) | 전용 규칙 필요 |
-| 브랜드를 사람이 바꿨을 때 | (해당 없음 — 엑셀을 직접 고침) | 드롭다운에서 ZBRAND 를 바꾸면 ZSHCO 가 따라가야 한다. 지금 엔진은 검수 화면 저장 시 **검증만 다시** 돌아 ZSHCO 가 옛 값으로 남는다 | **엔진 확장 필요 N1** |
+| Ship-to - KUNWE | `319854` 고정 | `fields.KUNNR2: { from: const, value: "319854" }` | ✅ `ygjp.yaml` |
+| 고객발주번호 - BSTKD | `01-{Created On YYYYMMDD}-{Purchase Order ID}` | Claude 는 날짜·번호를 원문대로, 조립은 `concat("01-", date_yyyymmdd(header.po_date), "-", header.po_number)`. `01-` 은 고정 | ✅ `ygjp.yaml` |
+| 브랜드 - ZBRAND (읽기) | 하단 줄이 표와 완전일치 | Claude 는 하단 블록에서 **브랜드가 적힌 줄을 원문 그대로** `header.brand_text` 에 담는다. 포장지시가 같은 줄에 붙어 있어도 **가르지 않는다**. `Remark: YG agent : …` 줄은 브랜드가 아니라고 hints 에 적는다 | ✅ `ygjp.yaml` |
+| 브랜드 - ZBRAND (판정) | POC 자체 표 25개 | **브랜드 마스터가 기준.** `csv_map` — `refs/brand_master.csv` 의 3200 행에서 **브랜드명(zbrant)이 원문에 포함되면** 그 코드(zbrand). 대소문자 무시. 못 찾으면 빈 칸 + 노랑 + 드롭다운. POC 25개 표는 버린다 | ✅ `ygjp.yaml` (N2 `order: longest_first` 포함) |
+| Shipping Condition - ZSHCO | 브랜드 471·507 → `A`, 그 외 `L` | YGJP 파일에서 `expr` 로 덮어쓴다: `if(in(브랜드, ["471", "507"]), "A", "L")` — **브랜드를 못 찾아도 `L`**. `in()` 사용(`contains()` 금지) | ✅ `ygjp.yaml` |
+| 브랜드를 사람이 바꿨을 때 | (해당 없음 — 엑셀을 직접 고침) | 드롭다운에서 ZBRAND 를 바꾸면 ZSHCO 가 따라가야 한다. 지금 엔진은 검수 화면 저장 시 **검증만 다시** 돌아 ZSHCO 가 옛 값으로 남는다 | ✅ `ygjp.yaml` + 엔진 N1 (`field.ZBRAND`) |
 | Shipping Type - VSART | `04` | Shipping Master 를 따른다 (지금 3200 = `05`) | 공용으로 이미 됨 |
-| Product ID 없는 줄 | 제외 | **제외하지 않는다.** 보통 행으로 깔고 MATNR 노랑 경고. 사람이 지운다 | 전용 규칙 필요 (MATNR 덮어쓰기) |
-| 수량 0 인 줄 | 제외 | **제외하지 않는다.** 보통 행으로 깔고 수량 노랑 경고. 사람이 지운다 | **엔진 확장 필요 N3** |
+| Product ID 없는 줄 | 제외 | **제외하지 않는다.** 보통 행으로 깔고 MATNR 노랑 경고. 사람이 지운다 | ✅ `ygjp.yaml` |
+| 수량 0 인 줄 | 제외 | **제외하지 않는다.** 보통 행으로 깔고 수량 노랑 경고. 사람이 지운다 | ✅ `ygjp.yaml` + 엔진 N3 (`nonzero: warn`) |
 | Packing Spec - ZPKRE / Remark - EMPST | S/O 업로드에는 넣지 않음 | **보내지 않는다** — 공용 그대로 빈 칸 | 공용으로 이미 됨 |
 | 고객자재번호 - KDMAT | Your Code | 공용 (`line.our_item`) | 공용으로 이미 됨 |
 | PO품목번호 - POSEX | 있으면 | 공용 | 공용으로 이미 됨 |
@@ -346,6 +346,32 @@ checks:
 ---
 
 ## 6. 구현 목록
+
+### 구현 현황 (2026-10-02)
+
+| 항목 | 상태 | 위치 |
+|---|---|---|
+| N4 SCHEMA 예시 정리 + `fields.*.choices` 엔진 구현 | ✅ | `masters/SCHEMA.md` §4.5 · `backend/app/preview.py` |
+| Y1 SID TOOL · D3 sid_ref | ✅ | `masters/customers/sid.yaml` · `masters/refs/sid_ref.csv` |
+| Y2 KL | ✅ | `masters/customers/kl.yaml` |
+| Y3 YGJP | ✅ | `masters/customers/ygjp.yaml` |
+| N2 `csv_map order: longest_first` | ✅ | `backend/app/rules/mapping_rules.py` |
+| N3 `nonzero: warn` (수량 0 경고) | ✅ | `backend/app/validation/validator.py` |
+| N1 파생 필드 `field.*` (검수 저장 때 다시 계산) | ✅ | `backend/app/rules/derived.py` · 계약 §6.1 |
+| 값으로 쓰이지 않는 규칙은 경고를 내지 않음 | ✅ (구현 중 발견) | `backend/app/rules/engine.py` |
+
+**실물 검증**
+- SID TOOL: `samples/MSC` 발주서 9건(창고 4곳 1건 + 1곳 8건)을 실제 업로드 CSV 와 대조 — 575행.
+  Ship-to · BSTKD · 브랜드 · 수량 · Packing Remark · VSART 전부 일치. 다른 것은 ZSHCO(Shipping Master 결정, Q2)와
+  아래 MATNR 뿐이다.
+- KL: 실물 1건 22행. BSTKD · POSEX · 수량이 POC 출력과 일치. WGT 21행 / 1행은 Claude 가 Brand 줄을 놓쳐 빈 칸(아래).
+- YGJP: `samples/YGJP` 에 PDF 원본이 없어 합성 발주서로만 검증.
+
+**구현 중 발견 — 결정 필요**
+- SID TOOL 단일 창고 발주서 8건의 222행은 원문의 `Your Item Number` 가 `Our Item Number` 와 **같은 값**(SID 품번)이다.
+  우리 품번이 문서에 없어 MATNR 에 SID 품번이 들어간다. 실제 업로드에는 사람이 찾은 우리 품번이 들어가 있다.
+- KL 은 Brand 원문을 Claude 가 놓치면 ZPKRE·EMPST 가 경고 없이 빈 칸이 된다(결정: 둘 다 아니면 빈 칸).
+
 
 ### 6-a. 엔진·코드 변경
 

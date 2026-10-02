@@ -213,6 +213,9 @@ def merge_edits(
             # 없다는 뜻이라 화면에서 고칠 수 없다. 검증 버튼으로 지워지면 빠진 품목을 안고
             # 전송이 열린다 — 서버가 들고 있는 그 이슈는 그대로 둔다 (다시 변환해야 풀린다).
             carried = [i for i in row.issues if i.code == IssueCode.CHUNK_FAILED]
+            # "Claude 가 놓쳤을 수 있음" 은 칸이 아직 비어 있는 동안만 남긴다
+            carried += [i for i in row.issues
+                        if i.code == IssueCode.LIKELY_MISSED and not row.fields.get(i.field)]
             row.issues = _dedupe(carried + validate_row(row.fields, fields, field_specs))
 
     batch.status = batch.recompute_status()

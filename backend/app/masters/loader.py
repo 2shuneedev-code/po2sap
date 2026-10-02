@@ -32,6 +32,8 @@ class CustomerMaster:
     fields: dict[str, Any] = field(default_factory=dict)
     grid: dict[str, Any] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
+    # 거래처 파일에 **직접** 적은 필드 (프로필에서 물려받은 것 제외) — 거래처 전용 로직
+    own_fields: list[str] = field(default_factory=list)
 
 
 def customers_dir(masters_dir: Path) -> Path:
@@ -71,6 +73,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
         return _generic_customer(code, masters_dir)
 
     data = _load_yaml(str(path), path.stat().st_mtime)
+    own_fields = list((data.get("fields") or {}).keys())
     data = _apply_extends(data, masters_dir)
     data = _resolve_chunking(data)
 
@@ -90,6 +93,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
         fields=data.get("fields") or {},
         grid=data.get("grid") or {},
         raw=data,
+        own_fields=own_fields,
     )
 
 

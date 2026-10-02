@@ -286,3 +286,38 @@ def test_ygjp_shipping_condition_typed_by_hand_is_not_overwritten(tmp_path):
     merge_edits(batch, [{"row_id": "r_0001", "fields": {"ZSHCO": "X"}}], cfg)
     merge_edits(batch, [{"row_id": "r_0001", "fields": {"ZBRAND": "471", "ZSHCO": "X"}}], cfg)
     assert batch.rows[0].fields["ZSHCO"] == "X"            # 사람이 넣은 값이 최종 진실 (P5)
+
+
+# ── 공통: 거래처 전용 로직 필드가 한 행만 비면 "Claude 가 놓쳤을 수 있음" ──
+def test_kl_one_row_missing_brand_while_others_have_it_is_flagged(kl):
+    rows = build(_kl_po(["WIDIA GTD", "WIDIA GTD", "", "WIDIA GTD"]), kl, REAL).rows
+    flagged = [r.line_no for r in rows if any(i.code == "LIKELY_MISSED" for i in r.issues)]
+    assert flagged == [3]
+    assert {i.field for i in rows[2].issues if i.code == "LIKELY_MISSED"} == {"ZPKRE", "EMPST"}
+
+
+def test_mostly_empty_column_is_not_flagged(kl):
+    """대부분 비어 있으면 '놓쳤다'가 아니라 원래 없는 것이다."""
+    rows = build(_kl_po(["WIDIA GTD", "", "", ""]), kl, REAL).rows
+    assert not [i for r in rows for i in r.issues if i.code == "LIKELY_MISSED"]
+
+
+def test_likely_missed_stays_until_the_cell_is_filled(kl, tmp_path):
+    from app.batch_service import merge_edits
+    from app.config import Settings
+    from app.domain.models import Batch, BatchRow
+
+    result = build(_kl_po(["WIDIA GTD", "WIDIA GTD", ""]), kl, REAL)
+    batch = Batch(batch_id="b", customer="KL", status="NEEDS_REVIEW", columns=result.columns, rows=[
+        BatchRow(row_id=f"r{n}", original=dict(r.fields), fields=dict(r.fields), issues=list(r.issues))
+        for n, r in enumerate(result.rows)
+    ])
+    cfg = Settings(masters_dir=REAL, storage_dir=tmp_path)
+
+    def missed():
+        return {i.field for i in batch.rows[2].issues if i.code == "LIKELY_MISSED"}
+
+    merge_edits(batch, [{"row_id": "r2", "fields": {}}], cfg)
+    assert missed() == {"ZPKRE", "EMPST"}                  # 검증만 눌렀다 — 그대로
+    merge_edits(batch, [{"row_id": "r2", "fields": {"ZPKRE": "WGT"}}], cfg)
+    assert missed() == {"EMPST"}                           # 채운 칸만 풀린다

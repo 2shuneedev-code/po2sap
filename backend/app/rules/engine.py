@@ -19,6 +19,7 @@ from typing import Any
 from ..domain.models import (
     BuildResult,
     ExtractedValue,
+    IssueCode,
     POLine,
     POShipment,
     RawPO,
@@ -138,11 +139,43 @@ def build(
     for issue in batch_issues:
         for row in rows:
             row.issues.append(issue)
+    _flag_likely_missed(rows, master, field_specs)
 
     # `send_only` 필드는 행에 값이 들어가 전송되지만 검수 표에는 그리지 않는다.
     send_only = [n for n, s in field_specs.items() if isinstance(s, dict) and s.get("send_only")]
     grid = {**(master.grid or {}), "send_only": send_only}
     return BuildResult(rows=rows, columns=field_order, grid=grid)
+
+
+def _flag_likely_missed(rows: list[SapRow], master: CustomerMaster, field_specs: dict) -> None:
+    """거래처 전용 로직 필드가 **다른 행엔 다 들어갔는데** 이 행만 비면 🟡.
+
+    원문은 같은 모양인데 한 행만 비는 것은 대개 Claude 가 그 줄을 놓친 것이다
+    (예: 나눠 읽는 경계에 걸린 품목). 빈 행이 소수일 때만 — 값이 든 행이 더 많아야
+    "다른 건 다 들어갔다"고 볼 수 있다. 그 칸에 이미 다른 경고가 있으면 겹쳐 달지 않는다.
+    대상은 거래처 파일에 직접 적은 필드 중 고정값(const)이 아닌 것.
+    """
+    targets = [
+        name for name in master.own_fields
+        if isinstance((master.fields or {}).get(name), dict)
+        and master.fields[name].get("from") != "const"
+    ]
+    for name in targets:
+        empty = [r for r in rows if not r.fields.get(name)]
+        if not empty or len(rows) - len(empty) <= len(empty):
+            continue
+        spec = field_specs.get(name) or {}
+        label = f"{spec.get('label') or name}({spec.get('code') or name})"
+        for row in empty:
+            if any(i.field == name for i in row.issues):
+                continue
+            row.issues.append(RowIssue(
+                field=name, severity="warn", code=IssueCode.LIKELY_MISSED,
+                message=(
+                    f"다른 행은 {label} 이 들어갔는데 이 행만 비었습니다 — "
+                    "Claude 가 원문을 놓쳤을 수 있습니다. 원문을 확인하세요."
+                ),
+            ))
 
 
 def _run_tables(master: CustomerMaster, ctx: EvalContext, issues: list[RowIssue]) -> dict[str, str]:

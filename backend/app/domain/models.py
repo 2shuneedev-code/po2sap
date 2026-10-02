@@ -151,6 +151,8 @@ class IssueCode:
     CHUNK_FAILED = "CHUNK_FAILED"               # 🔴 그 구간을 못 읽음 → 전송 차단
     EMPTY_CHUNK = "EMPTY_CHUNK"                 # 🟡 구간에서 품목 0건
     DUPLICATE_LINE = "DUPLICATE_LINE"           # 🟡 인접 청크에서 같은 src 가 두 번
+    # 거래처 전용 로직 필드가 다른 행엔 들어갔는데 이 행만 빔 — 발행은 `rules/engine.py`
+    LIKELY_MISSED = "LIKELY_MISSED"             # 🟡 Claude 가 원문을 놓쳤을 수 있음
 
 
 class GroundingIssue(BaseModel):

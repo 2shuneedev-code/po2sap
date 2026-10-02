@@ -1,4 +1,4 @@
-"""Brand Master — 고객별 ZBRAND 후보. **SAP 원본(`brand_master.csv`)을 직접 고친다.**
+"""Brand Master — 고객별 ZBRAND 후보. `refs/brand_master.csv` 를 직접 고친다.
 
 ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다. 1개면 자동, 여럿이면
 검수 표의 드롭다운에서 사람이 고른다. 발주서 문구는 보지 않는다.
@@ -37,8 +37,7 @@ def render() -> None:
     st.title("Brand Master")
     st.caption(
         "고객별 ZBRAND 후보입니다. **후보가 1개면 자동으로 채우고, 여럿이면 검수 표에서 "
-        "드롭다운으로 고릅니다.** 이 표가 SAP 원본(`refs/brand_master.csv`)이고, 저장하면 "
-        "원본이 바로 바뀝니다."
+        "드롭다운으로 고릅니다.** 저장하면 `refs/brand_master.csv` 에 반영됩니다."
     )
 
     if entry is None:

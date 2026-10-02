@@ -30,8 +30,8 @@ def render() -> None:
 
     st.title("Shipping Master")
     st.caption(
-        "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 이 표가 원본"
-        "(`refs/shipping_master.csv`)이고, 저장하면 원본이 바로 바뀝니다. 여기 적힌 값이 "
+        "고객별 **출하조건(ZSHCO)** 과 **운송수단(VSART)** 입니다. 저장하면 "
+        "`refs/shipping_master.csv` 에 반영됩니다. 여기 적힌 값이 "
         "전송 행에 그대로 들어갑니다. 행이 없으면 빈 칸으로 두고 검수 표에 노랗게 표시만 "
         "합니다 (전송은 막지 않습니다)."
     )

@@ -241,3 +241,11 @@ def test_ygjp_longer_brand_name_wins(tmp_path):
         fh.write('3200,"YG-1 JAPAN CO., LTD.",902,ZZ BRAND (COMINIX)\n')
     row = build(_ygjp_po("ZZ BRAND (COMINIX) YG STD."), load_customer("ygjp", masters), masters).rows[0]
     assert row.fields["ZBRAND"] == "902"
+
+
+def test_ygjp_zero_quantity_line_is_kept_with_a_warning():
+    raw = _ygjp_po("YG BRAND")
+    raw.lines[0].quantity = ev("0")
+    row = build(raw, load_customer("ygjp", REAL), REAL).rows[0]
+    assert row.fields["KWMENG"] == "0"                     # 빼지 않는다
+    assert any(i.field == "KWMENG" and i.code == "ZERO_VALUE" and i.severity == "warn" for i in row.issues)

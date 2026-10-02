@@ -52,6 +52,17 @@ def validate_row(
                 message=message,
             ))
 
+        # nonzero: warn → 숫자로 0 이면 🟡 (예: 수량 0 인 줄 — 빼지 않고 사람이 지운다)
+        if spec.get("nonzero") and value and _to_decimal(value) == 0:
+            label = str((field_specs.get(name) or {}).get("label") or name)
+            code = str((field_specs.get(name) or {}).get("code") or name)
+            issues.append(RowIssue(
+                field=name,
+                severity="error" if spec["nonzero"] is True else "warn",
+                code="ZERO_VALUE",
+                message=f"{label}({code}) 이 0 입니다. 이 줄이 필요한지 확인하세요.",
+            ))
+
         max_len = (field_specs.get(name) or {}).get("max_len")
         if max_len and len(value) > int(max_len):
             issues.append(RowIssue(

@@ -8,7 +8,7 @@
 #    · 브랜드 = 브랜드 마스터의 3200 브랜드명이 발주서 문구에 들어 있으면 그 코드
 #      (못 찾으면 빈 칸 + 드롭다운). 마스터가 기준이다 — POC 코드표는 쓰지 않는다
 #    · ZSHCO = 브랜드가 471 또는 507 이면 A, 아니면 L
-#    · Product ID(MATNR)가 없으면 노랑 (KDMAT 가 있어도)
+#    · Product ID(MATNR)가 없거나 수량이 0 이면 노랑 (줄은 빼지 않는다)
 #  포장지시·비고는 보내지 않는다 (ZPKRE·EMPST 공용 그대로 빈 칸).
 # ═══════════════════════════════════════════════════════════════
 version: 1
@@ -101,3 +101,5 @@ fields:
     explain: "브랜드가 471 또는 507 이면 A, 아니면 L"
   # Product ID 가 없는 줄은 KDMAT 가 있어도 노랑 — 공용의 required_unless 를 뺀다
   MATNR: { from: doc, path: line.item_code, format: strip_parens, required: warn }
+  # 수량 0 인 줄은 빼지 않고 노랑 — 사람이 지운다
+  KWMENG: { from: doc, path: line.quantity, format: integer, required: true, nonzero: warn }

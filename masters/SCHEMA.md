@@ -834,6 +834,7 @@ MATNR:
   fallback: line.our_item      # path 가 비면 이걸 사용
   required: true               # 비면 🔴 전송 차단
   required_unless: [KDMAT]     # 이 필드들 중 하나라도 값이 있으면 비어도 통과
+  nonzero: warn                # 숫자로 0 이면 🟡 (true 면 🔴). 검수 저장 때도 다시 본다
   format: integer | decimal3 | date_yyyymmdd | upper | trim | strip_parens   # strip_parens: 괄호째 삭제 ("D1103036(1pc)" → "D1103036")
   default: ""                  # 최종 폴백
   choices: brand_code          # 검수 화면 드롭다운 후보 — csv_choice 규칙 이름 (아래)

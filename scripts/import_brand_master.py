@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""SAP 브랜드 마스터 재추출본 → masters/refs/brand_master.csv
+"""브랜드 마스터 재추출본 → masters/refs/brand_master.csv
 
     python scripts/import_brand_master.py <SAP추출.csv>            # 계획 보고 확인
     python scripts/import_brand_master.py <SAP추출.csv> --dry-run  # 계획만
     python scripts/import_brand_master.py <SAP추출.csv> --yes      # 확인 없이
 
-이 파일은 **SAP 원본이라 읽기 전용**이다. 사람이 손으로 고치지 않고 재추출본으로
+이 파일은 **브랜드 마스터 원본**이다. 사람이 손으로 고치지 않고 재추출본으로
 통째로 갈아끼운다. 사람이 얹은 보정(`brand_master_manual.csv`)은 **건드리지
 않는다** — 대신 새 추출과 대조해 보고한다 (SCHEMA §4.5-A):
 
@@ -139,7 +139,7 @@ def write(rows: list[dict[str, str]]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="SAP 브랜드 마스터 재추출본 반영")
+    parser = argparse.ArgumentParser(description="브랜드 마스터 재추출본 반영")
     parser.add_argument("export", help="SAP 에서 뽑은 CSV")
     parser.add_argument("--dry-run", action="store_true", help="계획만 보고 쓰지 않는다")
     parser.add_argument("--masters", default="",

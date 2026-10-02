@@ -25,7 +25,7 @@ Injected = Annotated[Settings, Depends(get_settings)]
 def customers(settings: Injected) -> list[dict]:
     """업로드 화면의 거래처 선택 목록 — 규칙이 설정된 곳만.
 
-    SAP 브랜드 마스터의 전 고객은 §10.1 이 준다 (`/api/brands/customers`).
+    브랜드 마스터의 전 고객은 §10.1 이 준다 (`/api/brands/customers`).
     """
     try:
         return [
@@ -45,7 +45,7 @@ def customers(settings: Injected) -> list[dict]:
 def catalog(
     settings: Injected, q: str = "", scope: str = "all", sort: str = "name",
 ) -> dict:
-    """SAP 브랜드 마스터의 **전 고객** + 규칙 설정 여부. 검색·정렬 포함.
+    """브랜드 마스터의 **전 고객** + 규칙 설정 여부. 검색·정렬 포함.
 
     규칙이 없는 고객은 `code` 가 `""` 다 — 화면은 업로드를 막아야 한다.
     """

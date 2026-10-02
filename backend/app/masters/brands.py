@@ -1,6 +1,6 @@
-"""브랜드 참조표 — SAP 원본 + 사람이 얹는 보정(오버레이). SCHEMA §4.5-A.
+"""브랜드 참조표 — 원본 + 사람이 얹는 보정(오버레이). SCHEMA §4.5-A.
 
-  brand_master.csv         SAP 원본. 재추출로 통째 교체된다(`scripts/import_brand_master.py`).
+  brand_master.csv         원본. 재추출로 통째 교체된다(`scripts/import_brand_master.py`).
                            2026-09-30 부터 화면 스프레드시트가 **직접** 고친다
                            (`set_sap_rows`) — 덮어쓰기 전 사본을 남긴다.
   brand_master_manual.csv  사람이 얹는 보정. 재추출 사이의 유일한 보정 창구다.
@@ -76,7 +76,7 @@ def _to_brand(r: dict[str, str]) -> Brand:
 
 
 def load_sap(masters_dir: Path) -> list[Brand]:
-    """SAP 원본만. 오버레이 검증(override/suppress 대상 확인)에 쓴다."""
+    """원본만. 오버레이 검증(override/suppress 대상 확인)에 쓴다."""
     return [_to_brand(r) for r in _read(masters_dir / MASTER_FILE) if r.get("kunnr")]
 
 
@@ -126,7 +126,7 @@ def validate_manual(masters_dir: Path, kunnr: str, rows: list[ManualRow]) -> Non
 
         if row.action in ("override", "suppress") and row.zbrand not in sap:
             raise BrandError(
-                f"{where} — SAP 원본에 없는 코드는 {row.action} 할 수 없습니다. "
+                f"{where} — 브랜드 마스터에 없는 코드는 {row.action} 할 수 없습니다. "
                 "새 후보라면 add 를 쓰세요."
             )
         if row.action == "add" and row.zbrand in sap:
@@ -145,7 +145,7 @@ class SapRow:
 
 
 def load_sap_rows(masters_dir: Path) -> list[SapRow]:
-    """SAP 원본 파일 그대로 — 병합 전. 스프레드시트 편집용."""
+    """`brand_master.csv` 그대로 — 병합 전. 스프레드시트 편집용."""
     return [
         SapRow(kunnr=r["kunnr"], zbrand=r.get("zbrand", ""),
                zbrant=r.get("zbrant", ""), name1=r.get("name1", ""))
@@ -162,7 +162,7 @@ def set_sap_rows(
     storage_dir: Path | None = None,
     backup_keep: int = 30,
 ) -> list[SapRow]:
-    """화면 스프레드시트 저장 — **SAP 원본 CSV 를 직접** 고친다.
+    """화면 스프레드시트 저장 — **`brand_master.csv` 를 직접** 고친다.
 
     `kunnr` 를 주면 그 고객 행만 바꾸고(자리 유지), 없으면 파일 전체를 바꾼다.
     빈 줄은 버린다. 검사를 하나라도 통과 못 하면 파일을 건드리지 않는다.
@@ -237,7 +237,7 @@ def set_manual(
     if not any(b.kunnr == kunnr for b in load_sap(masters_dir)) and any(
         r.action != "add" for r in rows
     ):
-        raise BrandError(f"고객 {kunnr} 이 SAP 브랜드 마스터에 없습니다. add 만 쓸 수 있습니다.")
+        raise BrandError(f"고객 {kunnr} 이 브랜드 마스터에 없습니다. add 만 쓸 수 있습니다.")
     validate_manual(masters_dir, kunnr, rows)
 
     customer_name = next(

@@ -1,4 +1,4 @@
-"""좌측 거래처 선택 — SAP 브랜드 마스터의 전 고객(430곳)에서 고른다.
+"""좌측 거래처 선택 — 브랜드 마스터의 전 고객(430곳)에서 고른다.
 
 규칙이 없는 고객도 목록에 있다. 브랜드 원문 키를 미리 채워둘 수 있고,
 어디까지 설정됐는지 한눈에 보이기 때문이다. 다만 **업로드는 막는다** —
@@ -11,12 +11,6 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.service import CatalogEntry, catalog
-
-SCOPES = {
-    "전체": "all",
-    "규칙 있음": "configured",
-    "규칙 없음": "unconfigured",
-}
 
 # 정렬은 **이름순 하나**다. 사이드바는 좁고, 고객을 찾는 길은 검색이면 된다.
 # 선택지를 늘리면 매번 고르게 만들 뿐 찾는 속도가 빨라지지 않는다.
@@ -46,10 +40,10 @@ section[data-testid="stSidebar"] .st-key-customer_list [data-testid="stVerticalB
 def customer_picker(key: str) -> CatalogEntry | None:
     """사이드바 거래처 목록. 고른 고객을 돌려준다.
 
-    목록은 **SAP 브랜드 마스터의 전 고객(430곳)** 이다. 규칙이 없는 곳도 보여야
+    목록은 **브랜드 마스터의 전 고객(430곳)** 이다. 규칙이 없는 곳도 보여야
     브랜드를 미리 채워둘 수 있고 어디까지 왔는지 보인다.
 
-    거르는 수단은 **검색과 범위 드롭다운 둘뿐**이다. 정렬은 이름순 고정 —
+    거르는 수단은 **검색 하나**다. 규칙 유무는 목록의 표시(✅·🟡)로 보인다. 정렬은 이름순 고정 —
     사이드바는 좁고, 고객을 찾는 길은 검색이면 충분하다.
     """
     state_key = f"{key}_kunnr"
@@ -61,11 +55,8 @@ def customer_picker(key: str) -> CatalogEntry | None:
             help="고객명 · SAP 명 · 고객코드 · 거래처코드를 함께 찾습니다",
             label_visibility="collapsed",
         )
-        scope_label = st.selectbox(
-            "범위", list(SCOPES), key=f"{key}_scope", label_visibility="collapsed",
-        )
 
-        rows = catalog(q, SCOPES[scope_label], _SORT)
+        rows = catalog(q, "all", _SORT)
         st.caption(f"{len(rows):,}곳")
 
         if not rows:

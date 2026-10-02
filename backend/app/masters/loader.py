@@ -96,7 +96,7 @@ def load_customer(code: str, masters_dir: Path) -> CustomerMaster:
 def _generic_customer(code: str, masters_dir: Path) -> CustomerMaster:
     """전용 YAML 이 없는 거래처를 **공용 프로필로** 세운다.
 
-    SAP 브랜드 마스터에 브랜드가 등록된 고객이면 전용 규칙 없이도 발주서를
+    브랜드 마스터에 브랜드가 등록된 고객이면 전용 규칙 없이도 발주서를
     올려 브랜드까지 뽑아볼 수 있어야 한다 — 전 거래처 테스트 배포가 그래야
     가능하다. 브랜드 마스터에도 없는 코드는 그대로 오류다.
 

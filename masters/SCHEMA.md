@@ -37,7 +37,7 @@ masters/
 │   ├── kl.yaml
 │   └── ygjp.yaml
 └── refs/
-    ├── brand_master.csv        ← SAP 원본 4컬럼(kunnr,name1,zbrand,zbrant). 읽기 전용,
+    ├── brand_master.csv        ← 4컬럼(kunnr,name1,zbrand,zbrant). 화면 Brand Master 에서 편집,
     │                              재추출로 통째 교체 (§4.5-A)
     ├── brand_master_manual.csv ← 현업이 화면에서 채우는 오버레이. SAP 재추출과 별개로
     │                              보존된다 (§4.5-A). 없으면 없는 대로 동작
@@ -67,9 +67,9 @@ masters/
 > 우연히 키가 맞는 품번이 들어오면 **조용히 틀린 값이 전송되기** 때문이다.
 
 **`brand_keys.csv` 폐기가 "사람이 브랜드 후보를 못 고친다"는 뜻은 아니다.**
-`brand_master.csv` 자체는 여전히 SAP 원본·읽기 전용이지만, 그 옆에 사람이 직접
+`brand_master.csv` 자체는 여전히 원본이지만, 그 옆에 사람이 직접
 행을 채우는 **오버레이 파일**(`refs/brand_master_manual.csv`)을 따로 둔다.
-SAP 원본을 침범하지 않으면서 오탈자 수정·신규 브랜드 추가·잘못된 후보 제외를
+원본을 침범하지 않으면서 오탈자 수정·신규 브랜드 추가·잘못된 후보 제외를
 가능하게 하는 장치다. 상세는 **§4.5-A**.
 
 **해석 순서**: `extends` 를 **적힌 순서대로** 깔고 거래처 파일이 덮어쓴다.
@@ -522,7 +522,7 @@ rules:
     kind: csv_choice
     label: "브랜드 — 이 고객에 등록된 코드"
     description: |
-      SAP 브랜드 마스터에서 이 고객(kunnr) 행만 본다.
+      브랜드 마스터에서 이 고객(kunnr) 행만 본다.
       후보가 1개면 그 값을 채우고, 2개 이상이면 **비워 두고** 검수 화면
       드롭다운에서 사람이 고른다. 추측해서 하나를 집지 않는다.
     table_file: refs/brand_master.csv
@@ -578,11 +578,11 @@ kunnr,name1,zbrand,zbrant
 | 컬럼 | 내용 |
 |---|---|
 | `kunnr` | 고객코드(KUNNR) |
-| `name1` | 고객명 (SAP 원본 — `meta.name` 폴백의 원천, §3) |
+| `name1` | 고객명 (`meta.name` 폴백의 원천, §3) |
 | `zbrand` | 브랜드 코드 |
 | `zbrant` | 브랜드명 |
 
-`vkorg`·`vtweg` 는 **더 이상 쓰지 않는다.** SAP 브랜드 마스터가 영업조직·유통
+`vkorg`·`vtweg` 는 **더 이상 쓰지 않는다.** 브랜드 마스터가 영업조직·유통
 채널과 무관하게 고객·브랜드 단위로만 등록되어 있어 두 컬럼이 항상 비거나
 무의미했다 — 코드 어디에서도 참조하지 않았으므로 스키마에서 완전히 뺀다.
 **헤더는 다른 참조표와 같은 관례로 소문자**(`kunnr,name1,zbrand,zbrant`)를 쓴다 —
@@ -597,7 +597,7 @@ kunnr,name1,zbrand,zbrant
 > (`brand_master_manual.csv`)은 **아직 미구현**이다.
 
 **오버레이 — 사람이 후보를 고치는 창구.** `brand_master.csv` 자체는 여전히
-SAP 원본·읽기 전용이다(재추출 시 `import_brand_master.py` 가 통째 교체). 대신
+원본이다(재추출 시 `import_brand_master.py` 가 통째 교체). 대신
 **같은 모양의 별도 파일** `masters/refs/brand_master_manual.csv` 를 두고,
 `ui/views/brands.py` 는 **이 오버레이 파일만** 쓴다.
 
@@ -645,7 +645,7 @@ masters/brands.py::load_master()` 는 이 병합 함수를 재사용하는 얇�
 (`brand_keys`, 폐기)를 편집하지 않는다. 이제 **그 고객의 `brand_master_manual.csv`
 행**을 편집한다.
 
-- 표는 그 고객의 **병합된 후보 전부**를 보여준다. SAP 원본 행은 회색(읽기전용)으로,
+- 표는 그 고객의 **병합된 후보 전부**를 보여준다. 원본 행은 회색(읽기전용)으로,
   오버레이 행은 편집 가능하게 — `action` 컬럼이 있는 행만 사람이 만든 것이다.
 - "오탈자 수정" = SAP 행을 고르고 `override` 행을 새로 추가(`zbrant` 를 고친 값으로).
 - "신규 브랜드 추가" = `add` 행 추가. `zbrand` 는 SAP 에 아직 없는 코드일 수 있다 —
@@ -655,7 +655,7 @@ masters/brands.py::load_master()` 는 이 병합 함수를 재사용하는 얇�
   거부할 수 있습니다" 배지를 띄운다.
 - "잘못된 후보 삭제" = `suppress` 행 추가. `brand_master.csv` 자체는 건드리지 않는다.
 - 저장 전 검증: `zbrand`+`kunnr`+`action` 조합 중복 금지, `note` 필수, `action` 값이
-  셋 중 하나인지, `suppress`/`override` 의 대상이 **현재 병합 전** SAP 원본에
+  셋 중 하나인지, `suppress`/`override` 의 대상이 **현재 병합 전** 원본에
   실제로 존재하는지(없는 것을 override/suppress 하는 것은 오류 — `add` 를 써야 한다).
 - 저장은 `brand_store.set_keys()` 가 했던 것과 같은 안전장치를 그대로 쓴다 — 저장
   전 사본(`storage_dir`), 원자적 쓰기, 편집 잠금(`MASTER_EDIT_PASSWORD`), 저장 후
@@ -1072,7 +1072,7 @@ checks:
 대신 `ui/views/brands.py` 는 **브랜드 마스터 오버레이**(`brand_master_manual.csv`,
 §4.5-A) 편집기로 성격이 바뀌어 **남는다** — SAP 재추출 주기 사이에 오탈자·신규
 브랜드·잘못된 후보를 고칠 창구가 없으면 그 기간 내내 잘못된 판정이 계속되기
-때문이다. `brand_master.csv` 자체는 여전히 SAP 원본이라 사람이 고치지 않는다.
+때문이다. `brand_master.csv` 자체는 원본이다.
 
 **출하 마스터**(`refs/shipping_master.csv` — `kunnr · name1 · zshco · vsart`, 고객 1곳 = 행 1개)도
 화면(`ui/views/shipping.py`)에서 고친다. `profiles/standard.yaml` 의 `csv_choice` 두 개
@@ -1111,5 +1111,5 @@ checks:
 | 15 | `meta.name` 이 `brand_master.csv` 의 `NAME1` 과 다른가 | 경고 |
 | 16 | `csv_choice` 의 후보가 2개 이상인 거래처 목록 (드롭다운으로 뜬다) | 리포트 |
 | 17 | `brand_master_manual.csv` 의 `action` 이 `add`/`override`/`suppress` 중 하나이고 `note` 가 비어있지 않은가 | 오류 |
-| 18 | `override`/`suppress` 행의 대상 (`kunnr`,`zbrand`) 이 `brand_master.csv`(SAP 원본)에 실제로 있는가 — 없으면 `add` 를 썼어야 한다 | 오류 |
+| 18 | `override`/`suppress` 행의 대상 (`kunnr`,`zbrand`) 이 `brand_master.csv`(원본)에 실제로 있는가 — 없으면 `add` 를 썼어야 한다 | 오류 |
 | 19 | `brand_master_manual.csv` 전 행 목록 (수동 편집 감사용, §4.5-A) | 리포트 |

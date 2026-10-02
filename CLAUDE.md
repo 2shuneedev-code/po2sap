@@ -79,7 +79,7 @@ cd backend && uvicorn app.main:app --reload        # → /api/health
 python scripts/mock_eai_server.py
 python scripts/mock_eai_server.py --fail 500       # 재시도 확인
 
-# SAP 브랜드 마스터 재추출본 반영 — 보정(override) 대상이 사라지면 쓰지 않는다
+# 브랜드 마스터 재추출본 반영 — 보정(override) 대상이 사라지면 쓰지 않는다
 python scripts/import_brand_master.py <SAP추출.csv> --dry-run   # 무엇이 달라지는지
 python scripts/import_brand_master.py <SAP추출.csv>             # 확인 후 교체
 
@@ -131,8 +131,8 @@ masters/          ★ 규칙의 단일 원천 (코드 수정 없이 YAML만 고�
 │                   generic.yaml  — **전용 규칙이 없는 거래처**가 쓰는 최소 설정
 ├── customers/      거래처 1곳 = 파일 1개. 프로필과 **다른 것만**
 ├── refs/           참조표 CSV
-│   ├── brand_master.csv   SAP 원본 (화면 Brand Master 에서 편집 · 재추출은 `import_brand_master.py`)
-│   ├── brand_master_manual.csv  SAP 원본 위의 보정 (add·override·suppress). 판정에 합쳐지나 화면 편집은 없다
+│   ├── brand_master.csv   원본 (화면 Brand Master 에서 편집 · 재추출은 `import_brand_master.py`)
+│   ├── brand_master_manual.csv  원본 위의 보정 (add·override·suppress). 판정에 합쳐지나 화면 편집은 없다
 │   └── shipping_master.csv  고객별 ZSHCO·VSART (화면 Shipping Master 에서 편집)
 └── 거래처마스터.xlsx  현업 편집용 **생성물** (Git 제외. export 로 뽑는다)
 contracts/        ★ 백엔드↔프론트 유일 접점 (변경은 양쪽 합의 후 단독 PR)

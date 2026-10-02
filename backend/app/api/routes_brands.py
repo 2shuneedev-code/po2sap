@@ -1,7 +1,7 @@
 """브랜드 후보 콘솔 API — contracts/api-contract.md §10.
 
 ZBRAND 는 `csv_choice` 가 **고객의 후보 수**로 정한다 (SCHEMA §4.5). 후보 목록은
-SAP 원본(`brand_master.csv`, 읽기 전용)에 사람이 얹은 보정
+브랜드 마스터(`brand_master.csv`)에 사람이 얹은 보정
 (`brand_master_manual.csv`)을 합친 것이다. 이 라우터는 보정만 쓴다.
 """
 

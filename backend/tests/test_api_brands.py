@@ -34,7 +34,7 @@ def client(workspace):
 
 
 def master_rows(workspace):
-    """SAP 브랜드 마스터 원본. 테스트가 기대치를 여기서 끌어온다."""
+    """브랜드 마스터 원본. 테스트가 기대치를 여기서 끌어온다."""
     path = workspace / "refs" / "brand_master.csv"
     with path.open(encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
@@ -162,8 +162,8 @@ def test_empty_rows_clear_the_customer_overlay(client, workspace):
 
 
 @pytest.mark.parametrize("row, why", [
-    ({"zbrand": "99999", "zbrant": "X", "action": "override", "note": "n"}, "SAP 원본에 없는"),
-    ({"zbrand": "99999", "action": "suppress", "note": "n"}, "SAP 원본에 없는"),
+    ({"zbrand": "99999", "zbrant": "X", "action": "override", "note": "n"}, "브랜드 마스터에 없는"),
+    ({"zbrand": "99999", "action": "suppress", "note": "n"}, "브랜드 마스터에 없는"),
     ({"zbrand": "__FIRST__", "zbrant": "X", "action": "add", "note": "n"}, "이미 SAP 에"),
     ({"zbrand": "9999", "zbrant": "", "action": "add", "note": "n"}, "브랜드명"),
 ])

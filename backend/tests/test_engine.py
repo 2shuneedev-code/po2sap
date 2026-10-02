@@ -114,7 +114,6 @@ def test_no_split_customer_uses_top_level_lines(masters_dir):
     row = result.rows[0]
     assert row.group == ""                                     # 분할 없음
     assert row.fields["BSTKD"] == "10972"                       # 기본: doc 그대로
-    assert row.fields["WAERK"] == "JPY"                         # 기본: currency 규칙
     assert row.fields["KUNNR1"] == "3200"
     assert row.fields["KUNNR2"] == "3200"                       # 기본: KUNNR 과 동일
 

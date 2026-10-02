@@ -28,6 +28,9 @@ extraction_defaults:
 #  뺀 8개: VTWEG · VBELN · ZPKRE1 · MAKTX · LGORT · BATCH · VALTY · BSTKD_E
 #  2026-09-30 템플릿 수정 — POSEX 를 BSTKD 옆으로 옮기고 KDMAT(YOUR CODE) 추가.
 #  2026-10-02 KUNNR3(END CUSTOM · 최종고객) 삭제 — 사용자 결정. 전송에서도 뺀다.
+#  2026-10-02 검수 표에 숨겨 두던 14개 삭제 — 보낼 필요 없음(사용자 결정). 필요하면 다시 추가:
+#    VDATU · ZTERM · INCO1 · INCO2 · ETDAT · PRICE · WAERK · BSTDK_E · DELCO · AUGRU ·
+#    VKAUS · IHREZ_E · VGBEL · VGPOS  (WAERK 의 통화 규칙 `currency` 는 standard.yaml 에 남아 있다)
 #
 #  ※ 템플릿 리더가 붙으면 **템플릿 2행이 이 목록을 대신한다.** 그때까지는
 #    여기가 유효 필드 목록이다 (NEXT.md §2-D).
@@ -44,28 +47,14 @@ field_specs:
   KUNNR2:  { label: "Ship-to",          code: KUNWE, sheet: "SHIP-TO PARTY",        max_len: 10 }
   BSTKD:   { label: "고객발주번호",      sheet: "CUSTOMER PO",          max_len: 35 }
   POSEX:   { label: "PO품목번호",        sheet: "PO ITEM",              max_len: 6 }
-  VDATU:   { label: "납품요청일",        sheet: "DELIVERY DATE",        type: date }
-  ZTERM:   { label: "지급조건",          sheet: "TERMS OF PAYM",        max_len: 4 }
-  INCO1:   { label: "인도조건1",         sheet: "INCOTERMS1",           max_len: 3 }
-  INCO2:   { label: "인도조건2",         sheet: "INCOTERMS2",           max_len: 28 }
   ZBRAND:  { label: "브랜드",            sheet: "BRAND",                max_len: 4 }
   ZSHCO:   { label: "Shipping Condition", sheet: "SHIPPING CONDITION",   max_len: 2 }
   KDMAT:   { label: "고객자재번호",      sheet: "YOUR CODE",            max_len: 35, added: "2026-09-30 템플릿 수정" }
   MATNR:   { label: "자재번호",          sheet: "MATERIAL",             max_len: 18 }
   KWMENG:  { label: "수량",              sheet: "ORDER QTY",            type: decimal }
-  ETDAT:   { label: "품목납기일",        sheet: "ITEM DEL. DATE",       type: date }
   ZPKRE2:  { label: "Packing Spec",     code: ZPKRE, sheet: "PACKING REMARK",       max_len: 50 }
   EMPST:   { label: "Remark",           sheet: "REMARK",               max_len: 25 }
   VSART:   { label: "Shipping Type",    sheet: "SHIPPING TYPE",        max_len: 2 }
-  PRICE:   { label: "단가",              sheet: "PRICE",                type: decimal }
-  WAERK:   { label: "통화",              sheet: "CURRENCY",             max_len: 5 }
-  BSTDK_E: { label: "발주일",            sheet: "PO ORDER DATE",        type: date }
-  DELCO:   { label: "납기소요일",        sheet: "DELIVERY TIME",        max_len: 4 }
-  AUGRU:   { label: "오더사유",          sheet: "ORDER REASON",         max_len: 3 }
-  VKAUS:   { label: "용도",              sheet: "USAGE",                max_len: 3 }
-  IHREZ_E: { label: "무상단가",          sheet: "FREE PRICE",           max_len: 20, added: "2026-09 신규양식" }
-  VGBEL:   { label: "참조전표",          sheet: "REFERENCE",            max_len: 10, added: "2026-09 신규양식" }
-  VGPOS:   { label: "참조전표품목",      sheet: "REF ITEM NO.",         max_len: 6,  added: "2026-09 신규양식" }
 
 # ── 주의 ───────────────────────────────────────────────────────
 # ZPKRE1/ZPKRE2/EMPST 는 코드값이 아니라 **자유 텍스트 비고**다.

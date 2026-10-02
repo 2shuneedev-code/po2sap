@@ -192,7 +192,8 @@ def _review_section(batch: Batch) -> None:
         st.info("필터에 해당하는 행이 없습니다.")
         return
 
-    show_all = bar[2].toggle(
+    # 숨김 컬럼이 없으면 토글도 없다 — 눌러도 바뀌는 게 없는 스위치는 헷갈린다.
+    show_all = bool(batch.grid.get("hidden")) and bar[2].toggle(
         "숨김 컬럼까지 보기",
         key="show_hidden",
         help="숨겨진 컬럼도 **전송에는 그대로 들어갑니다**(빈 값). 보기에서만 접어둔 것입니다.",

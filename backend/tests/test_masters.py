@@ -239,9 +239,9 @@ def test_fault_is_detected_as_error(validate_masters, workspace, label, old, new
 
 def test_field_missing_from_merged_result_is_an_error(validate_masters, workspace):
     """§7-1 — 프로필에서 빠지면 그 프로필을 쓰는 전 거래처가 걸린다."""
-    break_profile(workspace, '  VGPOS:   { from: const, value: "" }\n', "")
+    break_profile(workspace, '  EMPST:   { from: const, value: "" }\n', "")
     report = run(validate_masters, workspace, "kl")
-    assert any("VGPOS" in e for e in report.errors), report.errors
+    assert any("EMPST" in e for e in report.errors), report.errors
 
 
 def test_profile_is_not_listed_as_a_customer(validate_masters, masters_dir):

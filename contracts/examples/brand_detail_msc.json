@@ -177,26 +177,10 @@
         "todo": ""
       },
       {
-        "field": "PRICE",
-        "label": "단가",
-        "max_len": "",
-        "source": "doc · line.unit_price",
-        "explain": "",
-        "todo": ""
-      },
-      {
         "field": "POSEX",
         "label": "PO품목번호",
         "max_len": "6",
         "source": "doc · line.posex",
-        "explain": "",
-        "todo": ""
-      },
-      {
-        "field": "WAERK",
-        "label": "통화",
-        "max_len": "5",
-        "source": "rule · currency",
         "explain": "",
         "todo": ""
       },

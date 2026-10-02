@@ -58,7 +58,6 @@ fields:
   # ZPKRE2:  { from: doc,   path: header.packing_spec }
   # EMPST:   { from: doc,   path: line.remark, fallback: header.remark_default }
   # POSEX:   { from: doc,   path: line.posex, format: integer }
-  # WAERK:   { from: const, value: "USD" }
 
 # grid:                    # 화면 배치가 프로필과 다를 때만 작성.
 #   pinned: [BSTKD, MATNR, KWMENG]

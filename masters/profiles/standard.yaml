@@ -92,7 +92,7 @@ fields:
   AUART:   { from: base }
   VKORG:   { from: base }
 
-  # ── 거래처 식별 — 셋 다 기본은 고객코드와 같은 값 ─────────────
+  # ── 거래처 식별 — 둘 다 기본은 고객코드와 같은 값 ─────────────
   # 다른 거래처는 그 파일에서 덮어쓴다 (MSC 는 출하처에 따라 KUNNR2 가
   # 달라져 결정표를 건다).
   KUNNR1:  { from: expr, expr: 'meta.customer_no', required: true }
@@ -107,13 +107,11 @@ fields:
   #   품번에 괄호는 없다 — "D1103036(1pc)" 처럼 붙어 오면 괄호째 뗀다.
   MATNR:   { from: doc, path: line.item_code, format: strip_parens, required: warn, required_unless: [KDMAT] }
   KWMENG:  { from: doc, path: line.quantity, format: integer, required: true }
-  PRICE:   { from: doc, path: line.unit_price }
   POSEX:   { from: doc, path: line.posex }
   # KDMAT = 고객 자재번호 = **거래처 품번**(our_item). MATNR(우리 품번)과 반대다.
   KDMAT:   { from: doc, path: line.our_item }
 
   # ── 규칙·마스터가 정한다 ──────────────────────────────────────
-  WAERK:   { from: rule, rule: currency, required: warn }
   ZBRAND:  { from: rule, rule: brand_code, required: warn }
   ZSHCO:   { from: rule, rule: shipping_condition, required: warn }
   VSART:   { from: rule, rule: shipping_type, required: warn }
@@ -122,22 +120,9 @@ fields:
   # 양식에는 있으나 **채우지 않는다.** 필요해지면 거래처 파일에서 덮어쓰거나
   # 검수 화면에서 사람이 넣는다. **추측해서 채우지 않는다** — 빈 칸은
   # 눈에 띄지만 그럴듯한 값은 안 띈다.
-  AUGRU:   { from: const, value: "" }
-  BSTDK_E: { from: const, value: "" }
-  DELCO:   { from: const, value: "" }
   EMPST:   { from: const, value: "" }
-  ETDAT:   { from: const, value: "" }
-  IHREZ_E: { from: const, value: "" }
-  INCO1:   { from: const, value: "" }
-  INCO2:   { from: const, value: "" }
-  VDATU:   { from: const, value: "" }
-  VGBEL:   { from: const, value: "" }
-  VGPOS:   { from: const, value: "" }
-  VKAUS:   { from: const, value: "" }
   ZPKRE2:  { from: const, value: "" }
-  ZTERM:   { from: const, value: "" }
 
 grid:
   pinned: [BSTKD, POSEX, KDMAT, MATNR, KWMENG]   # 템플릿 순서 그대로 앞에
-  hidden: [VDATU, ZTERM, INCO1, INCO2, ETDAT, PRICE, WAERK, BSTDK_E, DELCO, AUGRU, VKAUS, IHREZ_E, VGBEL, VGPOS]
   width:  { MATNR: 140 }

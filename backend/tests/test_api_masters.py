@@ -151,11 +151,11 @@ def test_todos_surface_unconfirmed_values(client, workspace):
     """
     kl = workspace / "customers" / "kl.yaml"
     data = yaml.safe_load(kl.read_text("utf-8"))
-    data.setdefault("fields", {})["INCO1"] = {"from": "const", "value": "", "todo": "인코텀즈 확인"}
+    data.setdefault("fields", {})["EMPST"] = {"from": "const", "value": "", "todo": "비고 확인"}
     kl.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), "utf-8")
 
     body = client.get("/api/masters/customers/KL/preview").json()
-    assert [t for t in body["todos"] if t["field"] == "INCO1"]
+    assert [t for t in body["todos"] if t["field"] == "EMPST"]
 
 
 def test_split_tells_the_front_whether_orders_are_divided(client):

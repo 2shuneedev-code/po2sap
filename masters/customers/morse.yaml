@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════════
+#  MORSE — Morse Cutting Tools  (고객코드 104237)
+#  스키마: masters/SCHEMA.md
+#
+#  공용(profiles/standard.yaml)과 **다른 것만** 적는다:
+#    · 추출 hints 만 전용 — 품번 두 칸의 위치를 고정한다
+#
+#  ★ 이 발주서 PDF 는 양식(머리글·칸 선·로고)이 **페이지 전체 그림**이고
+#    값만 글자로 얹혀 있다. 텍스트 레이어에 머리글이 없어 공용 hints 로는
+#    "OUR PART #" / "MFG PART #" 를 구분하지 못해 MATNR·KDMAT 이 뒤바뀌었다
+#    (PO 7206834, 2026-10-06). 칸 순서가 고정이라 텍스트 모드 + 위치 서술로 푼다.
+# ═══════════════════════════════════════════════════════════════
+version: 1
+
+meta:
+  code: MORSE
+  name: "Morse Cutting Tools"
+  customer_no: "104237"
+  status: active
+  file_types: [pdf]
+
+extends: [_base/sap_defaults, profiles/standard]
+
+extraction:
+  input: text
+  page_limit: 20
+  hints: |
+    Morse Cutting Tools 발주서 PDF다. 양식(머리글·칸 이름)은 그림이라 텍스트에
+    **머리글이 나오지 않는다.** 값만 아래 순서로 나온다. 칸 이름은 이 설명을 따른다.
+
+    [헤더] — 페이지마다 반복된다
+      첫 줄의 숫자 (예: "7206834")              → po_number  (PURCHASE ORDER NO.)
+      "MORSE CUTTING TOOLS 8/28/2026 1" 의 날짜 → po_date (원문 그대로. 끝 숫자는 페이지 번호)
+      그 아래 "OCEAN CARRIER" (SHIP VIA) · "COL 8748W6" (FREIGHT TERMS) 는 넣지 않는다
+      "WT 10 DAYS" 류                           → payment_terms_text (PAYMENT TERMS)
+      "YG-1 CO LTD" 줄부터 오른쪽에 붙은 주소     → ship_to_text
+        예) "NOVI CDC / 40333 W 14 MILE RD / NOVI, MI / 48377-1609"
+        왼쪽 "YG-1 CO LTD ... INCHEON KOREA" 는 공급자(우리) 주소다. 출하처가 아니다.
+
+    [품목] — 원래 칸 순서: LINE # · QUANTITY · UM · OUR PART # · MFG PART # · PRICE
+      한 품목은 이런 블록이다.
+        1 30.00 EA 43417 10920
+        US TARIFF CODE: 4819400040
+        1896 9/32 X 3/8 2FL DE 5.27
+      첫 줄: <LINE#> <수량> <단위> <OUR PART #> <MFG PART #>
+        LINE#         → line_no, posex
+        수량          → quantity
+        단위          → unit
+        4번째 값 (OUR PART #, 예 "43417")  → our_item   ★ Morse 의 품번
+        5번째 값 (MFG PART #, 예 "10920", "MRT45104", "U2205706") → item_code  ★ 제조사(YG-1) 품번
+        ※ 두 품번을 바꿔 넣지 말 것. 5번째 값이 우리 품번이다.
+      "US TARIFF CODE:" 줄은 있을 수도 없을 수도 있다 → remark 에 원문 그대로
+      마지막 줄: 품명 + 맨 끝 숫자
+        맨 끝 숫자 (예 "5.27") → unit_price
+        그 앞 전부 (예 "1896 9/32 X 3/8 2FL DE") → description
+          ※ 앞의 "1896" 같은 숫자는 품명 일부다. 품번이 아니다.
+
+    [품목 아님]
+      "**********TERMS AND CONDITIONS**********" 이후 번호 매긴 문장은 약관이다.
+      페이지 2 이후로 이어져도 품목이 아니다.
+      "WEIGHT / PIECES / VALUE" (예 "43.8200 305.00 2696.55") 은 합계다.
+
+split:
+  by: none
+
+fields: {}

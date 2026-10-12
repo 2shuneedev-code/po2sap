@@ -1,0 +1,61 @@
+# 외부 공개 소스
+
+`stock.naver.com` JSON API로 답할 수 없을 때도 임의의 HTML fallback을 만들지 않습니다. 아래 두 스크립트와 고정된 host/path/query allowlist만 사용합니다.
+
+## 선택 순서
+
+1. 같은 의미의 `stock.naver.com` JSON API가 있으면 그 API와 기존 스크립트를 사용합니다.
+2. 현재 종목 정보 페이지가 연결하는 기업분석 탭이면 `scripts/wisereport.py`를 사용합니다.
+3. 신버전에 대응 화면이 없는 조건검색 7종이면 `scripts/legacy_screeners.py`를 사용합니다.
+4. 그 밖의 `finance.naver.com`, WiseReport 또는 외부 iframe 요청은 지원 범위로 추정하지 않습니다.
+
+두 스크립트는 쿠키·인증 헤더를 보내지 않으며 GET만 사용합니다. 응답은 5 MiB, 타임아웃은 60초로 제한합니다. 모든 HTTP redirect는 목적지 요청을 보내기 전에 거절하며 같은 host/path라도 자동으로 따라가지 않습니다. HTTP 403·429는 자동 재시도하지 않고, 오류 진단은 최대 2 KiB만 읽은 뒤 응답 스트림을 닫습니다.
+
+## WiseReport v3
+
+현재 네이버 증권 종목 정보 페이지가 연결하는 `navercomp.wisereport.co.kr/v3/company/` 공개 iframe입니다. 네이버 증권 JSON API가 아니며 별도 외부 소스임을 결과에 표시합니다.
+
+2026-09-07 삼성전자 종목분석의 아래 8개 탭에 실제 진입해 v3 iframe 경로 대응을 재확인했습니다. 같은 날 8개 고정 경로 각각에 `cmp_cd=005930`만 보내 HTTP 200과 스크립트의 표 파싱을 확인했습니다. 각 출력은 최대 2개 표·표당 2행으로 제한했고, 일부 탭의 첫 표는 1행이었습니다. 원본 순서의 앞쪽 표를 확인한 결과이므로 동적 재무 표·필터 전체의 검증을 뜻하지 않습니다. 웹 iframe의 추가 `theme=light&cn=` 표시는 helper의 허용 query 확대 근거로 삼지 않습니다.
+
+| `--kind` | 화면 의미 | 고정 경로 |
+| --- | --- | --- |
+| `status` | 기업현황 | `c1010001.aspx` |
+| `overview` | 기업개요 | `c1020001.aspx` |
+| `financial-analysis` | 재무분석 | `c1030001.aspx` |
+| `indicators` | 투자지표 | `c1040001.aspx` |
+| `consensus` | 컨센서스 | `c1050001.aspx` |
+| `industry` | 업종분석 | `c1060001.aspx` |
+| `shareholders` | 주주현황 | `c1070001.aspx` |
+| `sector` | 섹터분석 | `c1090001.aspx` |
+
+표는 원본 순서의 2차원 `rows`로 내보냅니다. `rowspan`·`colspan`으로 합쳐진 머리글은 추정해서 재구성하지 않습니다. `--max-tables`는 1~50, `--max-rows`는 표당 1~500입니다.
+
+WiseReport의 `cmp_cd`는 숫자 6자리만 허용합니다. 국내 JSON의 영숫자 ETF 코드 지원을 이 외부 HTML 경계에 적용하지 않으며 `0193W0` 같은 입력은 요청 전에 거절합니다.
+
+## 레거시 조건검색
+
+정확히 다음 7개 `finance.naver.com` 공개 HTML 화면만 허용합니다.
+
+| 명령 | 종류 | 시장 선택 |
+| --- | --- | --- |
+| `technical` | `golden-cross`, `gap-up`, `disparity-overheat`, `sentiment-overheat`, `relative-strength-overheat` | 없음. 원본 화면이 시장 selector를 제공하지 않음 |
+| `price-position` | `low-up`, `high-down` | `KOSPI`, `KOSDAQ` |
+
+`low-up`의 첫 지표는 `저가대비등락률`, `high-down`의 첫 지표는 `고가대비등락률`로 출력해 같은 표의 일간 `등락률`과 구분합니다. `--limit`은 원격 페이징 크기를 바꾸지 않고 해당 페이지에서 내보낼 행만 제한합니다.
+
+2026-09-07 기술 조건검색 5종과 가격 위치 2종의 KOSPI·KOSDAQ 조합을 각각 직접 조회했습니다. 9개 요청 모두 HTTP 200이었으며, 각 스크립트 출력에서 종목 2행과 필수 헤더를 확인했습니다. 가격 위치의 기준 대비 등락률과 일간 등락률도 별도 필드로 파싱되었습니다. 이는 해당 날짜의 첫 페이지 소량 검증입니다.
+
+기술 조건검색의 `table.type_5`, 가격 위치의 `table.type_2` 또는 필수 `종목명`·`현재가` 헤더가 없으면 화면 변경/이용 불가 오류로 처리합니다. 정상 헤더만 있는 빈 표는 빈 목록을 유지합니다. `--page`는 서버에 전달하지만, 2026-09-07 기술 조건검색 5개 화면에는 페이지 링크가 보이지 않았으므로 이 옵션의 존재만으로 원격 페이징 지원을 보증하지 않습니다.
+
+2026-09-07 [기존 금융 홈](https://finance.naver.com/)과 국내증시·리서치의 배너는 9월 10일 기존 서비스 종료를 예고하고 [개편 공지](https://stock.naver.com/notice/149)로 연결했습니다. 이는 종료 예정 근거이며 개별 JSON/HTML endpoint가 이미 삭제되었다는 근거가 아닙니다. 종료 후 현재 화면과 위 7개 소스를 다시 확인하고, 리다이렉트·구조 변경을 빈 결과로 위장하지 않습니다. 레거시 종목분석은 WiseReport **v2** iframe을 연결하므로 현재 스크립트의 **v3**와 이름·경로를 섞지 않습니다. 레거시 시가총액의 `다음`은 단일 다음 페이지가 아니라 다음 10페이지 묶음으로 이동하는 사례를 확인했습니다.
+
+실행 예시는 [script-cookbook.md](script-cookbook.md)에만 둡니다.
+
+## 의도적으로 제외하는 레거시 범위
+
+- 현재 JSON API와 중복되는 시세, 차트, 수급, ETF/ETN, 업종/테마, 리서치, 환율과 해외지수 HTML.
+- 장외시장·포토·TV 뉴스와 기사/PDF 본문의 대량 수집.
+- DART·KRX 등 다른 제공자의 iframe을 네이버 API처럼 감싸는 기능.
+- WiseReport v2, 임의 URL, 임의 query, 로그인·개인화·mutation 경로.
+
+전체 레거시 구현을 비교할 때만 [dd3ok/naverfinance-api-skill](https://github.com/dd3ok/naverfinance-api-skill)을 참고합니다. 이 저장소로 코드를 되돌리는 fallback으로 사용하지 않습니다.

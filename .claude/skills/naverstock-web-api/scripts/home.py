@@ -1,0 +1,437 @@
+#!/usr/bin/env python3
+"""Fetch public Naver Stock home-page and cross-market payloads."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import re
+from typing import Any
+
+from naverstock_api import (
+    bounded_int,
+    build_path,
+    emit_output,
+    normalize_item_code,
+    render_json,
+    request_json,
+    validate_identifier,
+)
+
+
+DEFAULT_INDICATORS = "KOSPI,KOSDAQ,.DJI,.IXIC,.INX,FX_USDKRW,GCcv1,CLcv1"
+MARKET_STATUS_EXCHANGES = ("krx", "nxt", "nasdaq", "shanghai", "hongkong", "tokyo", "hanoi")
+SESSION_EXCHANGES = (*MARKET_STATUS_EXCHANGES, "shenzhen", "hochiminh")
+DOMESTIC_NOTABLE_ETF_ORDER_TYPES = (
+    "amount_etf",
+    "up_etf",
+    "1week_earn_rate",
+    "dividend_earn_rate",
+)
+FOREIGN_NOTABLE_ETF_ORDER_TYPES = ("priceTop", "up", "return1Month", "dividend")
+_INDICATOR_CODE = re.compile(r"^(?:\.?[A-Za-z0-9][A-Za-z0-9._=-]{0,31})$")
+_DOMESTIC_CODE = re.compile(r"^[A-Z0-9]{6}$")
+_THEME_CODE = re.compile(r"^(?:all|[A-Za-z0-9_-]{1,20})$")
+
+
+def _bounded_integer(name: str, minimum: int, maximum: int) -> Any:
+    def parse(value: str) -> int:
+        try:
+            return bounded_int(value, name=name, minimum=minimum, maximum=maximum)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(str(exc)) from exc
+
+    return parse
+
+
+def _iso_date(value: str) -> str:
+    try:
+        return dt.date.fromisoformat(value).isoformat()
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("date must be a valid YYYY-MM-DD date") from exc
+
+
+def _short_text(value: str) -> str:
+    clean = value.strip()
+    if not clean or len(clean) > 50 or any(ord(char) < 32 or ord(char) == 127 for char in clean):
+        raise argparse.ArgumentTypeError("value must be 1-50 printable characters")
+    return clean
+
+
+def _opaque_cursor(value: str) -> str:
+    clean = value.strip()
+    if not clean or len(clean) > 512 or re.search(r"[^A-Za-z0-9._~+=:/-]", clean):
+        raise argparse.ArgumentTypeError("page-token must be a URL-safe cursor of at most 512 characters")
+    return clean
+
+
+def _briefing_id(value: str) -> str:
+    try:
+        return validate_identifier(value, name="briefing-id")
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _domestic_code(value: str) -> str:
+    clean = normalize_item_code(value).upper()
+    if not _DOMESTIC_CODE.fullmatch(clean):
+        raise argparse.ArgumentTypeError("code must be a six-character domestic item code")
+    return clean
+
+
+def _indicator_codes(value: str) -> str:
+    codes = value.split(",")
+    if not 1 <= len(codes) <= 30 or any(not _INDICATOR_CODE.fullmatch(code) for code in codes):
+        raise argparse.ArgumentTypeError(
+            "indicator-codes must contain 1-30 comma-separated market codes without path separators"
+        )
+    return ",".join(codes)
+
+
+def _theme_code(value: str) -> str:
+    clean = value.strip()
+    if not _THEME_CODE.fullmatch(clean):
+        raise argparse.ArgumentTypeError("theme code must be 'all' or a short alphanumeric code")
+    return clean
+
+
+def fetch_market_info(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/domestic/market/{args.trade_type}/info")
+
+
+def fetch_market_status(args: argparse.Namespace) -> Any:
+    exchanges = list(MARKET_STATUS_EXCHANGES) if args.exchange is None else args.exchange
+    if (
+        not isinstance(exchanges, (list, tuple))
+        or not 1 <= len(exchanges) <= len(MARKET_STATUS_EXCHANGES)
+        or any(exchange not in MARKET_STATUS_EXCHANGES for exchange in exchanges)
+    ):
+        raise ValueError("market-status accepts 1-7 supported --exchange values")
+    return request_json(
+        build_path("/api/stockSecurity/market-status/current", {"exchanges": exchanges})
+    )
+
+
+def fetch_operating_time(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/foreign/operatingTime/exchange/{args.exchange}")
+
+
+def fetch_exchange_sessions(args: argparse.Namespace) -> Any:
+    exchanges = args.exchange or ["krx", "nxt"]
+    if len(exchanges) > len(SESSION_EXCHANGES) or any(x not in SESSION_EXCHANGES for x in exchanges):
+        raise ValueError("exchange-sessions accepts 1-9 supported exchanges")
+    return request_json(build_path("/api/stockSecurity/exchanges/market-status", {"exchanges": exchanges}))
+
+
+def fetch_market_briefing(args: argparse.Namespace) -> Any:
+    return request_json("/api/securityAi/marketBriefing/current?marketBriefing=domain")
+
+
+def _market_briefing_base(args: argparse.Namespace) -> str:
+    version = getattr(args, "api_version", "v1")
+    if version not in ("v1", "v2"):
+        raise ValueError("api-version must be v1 or v2")
+    if version == "v2":
+        return "/api/securityAi/v2/marketBriefing"
+    return "/api/securityAi/marketBriefing"
+
+
+def fetch_market_briefing_list(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            _market_briefing_base(args),
+            {"date": args.date, "size": args.size, "pageToken": args.page_token},
+        )
+    )
+
+
+def fetch_market_briefing_detail(args: argparse.Namespace) -> Any:
+    briefing_id = validate_identifier(args.briefing_id, name="briefing-id")
+    return request_json(f"{_market_briefing_base(args)}/{briefing_id}")
+
+
+def fetch_shorttents(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/shorttents",
+            {
+                "source": args.source,
+                "type": args.content_type,
+                "category_first": args.category_first,
+                "nscs": args.nscs,
+            },
+        )
+    )
+
+
+def fetch_money_story(args: argparse.Namespace) -> Any:
+    category_ids = args.main_category_id or [1]
+    return request_json(
+        build_path(
+            "/api/content/moneyStory",
+            {"mainCategoryIdList": category_ids, "size": args.size},
+        )
+    )
+
+
+def fetch_indicators(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/securityService/integration/indicators",
+            {"indicatorCodes": args.indicator_codes},
+        )
+    )
+
+
+def fetch_indicators_v1(args: argparse.Namespace) -> Any:
+    params = {}
+    for name, value in (
+        ("domesticIndexCodes", args.domestic_index_codes),
+        ("foreignIndexCodes", args.foreign_index_codes),
+        ("currencyCodes", getattr(args, "currency_codes", None)),
+        ("bondCodes", getattr(args, "bond_codes", None)),
+        ("commodityCodes", getattr(args, "commodity_codes", None)),
+    ):
+        if value is not None:
+            params[name] = _indicator_codes(value)
+    if not params:
+        raise ValueError("provide at least one index, currency, bond, or commodity code group")
+    if sum(len(value.split(",")) for value in params.values()) > 30:
+        raise ValueError("indicators-v1 accepts at most 30 codes across all groups")
+    for name, value in (("includeBreadth", args.include_breadth), ("includeTrend", args.include_trend)):
+        if value is not None and not isinstance(value, bool):
+            raise ValueError(f"{name} must be a boolean or omitted")
+        params[name] = value
+    return request_json(build_path("/api/securityService/integration/v1/indicators", params))
+
+
+def fetch_notable_etf(args: argparse.Namespace) -> Any:
+    large_code = getattr(args, "large_code", None)
+    middle_code = getattr(args, "middle_code", None)
+    if args.nation == "domestic" and (large_code is not None or middle_code is not None):
+        raise ValueError("--large-code and --middle-code require --nation foreign")
+    order_type = args.order_type or ("amount_etf" if args.nation == "domestic" else "up")
+    return request_json(
+        build_path(
+            f"/api/{args.nation}/market/home/notableETF",
+            {
+                "orderType": order_type,
+                "largeCode": _theme_code(large_code) if large_code is not None else None,
+                "middleCode": _theme_code(middle_code) if middle_code is not None else None,
+                "startIdx": args.start_idx,
+                "pageSize": args.page_size,
+            },
+        )
+    )
+
+
+def fetch_economic_upcoming(args: argparse.Namespace) -> Any:
+    nation_types = args.nation_type or ["KOR", "USA"]
+    return request_json(
+        build_path(
+            "/api/securityService/economic/indicator/nations/upcoming",
+            {
+                "gteImportance": args.gte_importance,
+                "limit": args.limit,
+                "nationTypeList": nation_types,
+            },
+        )
+    )
+
+
+def fetch_public_ranking(args: argparse.Namespace) -> Any:
+    ranking = "assetAmount" if args.ranking_type == "asset" else "earningRate"
+    return request_json(
+        build_path(
+            f"/api/domestic/home/ranking/{ranking}/all",
+            {"startIdx": args.start_idx, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_holding_stock_ranking(args: argparse.Namespace) -> Any:
+    return request_json("/api/securityService/home/v3/ranking/more/domestic/holdingStock/all")
+
+
+def fetch_related_stock(args: argparse.Namespace) -> Any:
+    return request_json(
+        f"/api/securityService/home/v3/stock/{normalize_item_code(args.code)}/related"
+    )
+
+
+def add_output(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--output")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    market_info = sub.add_parser("market-info", help="KRX or NXT market status")
+    market_info.add_argument("--trade-type", choices=["KRX", "NXT"], default="KRX")
+    add_output(market_info)
+    market_info.set_defaults(func=fetch_market_info)
+
+    market_status = sub.add_parser("market-status", help="Exchange sessions and current market status")
+    market_status.add_argument(
+        "--exchange", choices=MARKET_STATUS_EXCHANGES, action="append",
+        help="Repeat for multiple exchanges (max 7); omitted selects all seven",
+    )
+    add_output(market_status)
+    market_status.set_defaults(func=fetch_market_status)
+
+    sessions = sub.add_parser("exchange-sessions", help="Current exchange schedules grouped by stock/market type")
+    sessions.add_argument("--exchange", choices=SESSION_EXCHANGES, action="append",
+                          help="Repeat up to nine times; omitted selects krx and nxt")
+    add_output(sessions)
+    sessions.set_defaults(func=fetch_exchange_sessions)
+
+    operating_time = sub.add_parser("operating-time", help="Foreign exchange operating time")
+    operating_time.add_argument(
+        "--exchange",
+        choices=["NASDAQ", "SHANGHAI", "HONG_KONG", "TOKYO", "HANOI"],
+        default="NASDAQ",
+    )
+    add_output(operating_time)
+    operating_time.set_defaults(func=fetch_operating_time)
+
+    briefing = sub.add_parser("market-briefing", help="AI market briefing observed on the home page")
+    add_output(briefing)
+    briefing.set_defaults(func=fetch_market_briefing)
+
+    briefing_list = sub.add_parser("market-briefing-list", help="AI market briefing list by date")
+    briefing_list.add_argument("--date", type=_iso_date, required=True)
+    briefing_list.add_argument("--size", type=_bounded_integer("size", 1, 100), default=20)
+    briefing_list.add_argument("--page-token", type=_opaque_cursor)
+    briefing_list.add_argument(
+        "--api-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Use v2 for the current home-page briefing list; defaults to v1 for compatibility",
+    )
+    add_output(briefing_list)
+    briefing_list.set_defaults(func=fetch_market_briefing_list)
+
+    briefing_detail = sub.add_parser("market-briefing-detail", help="AI market briefing detail by ID")
+    briefing_detail.add_argument("--briefing-id", type=_briefing_id, required=True)
+    briefing_detail.add_argument(
+        "--api-version",
+        choices=["v1", "v2"],
+        default="v1",
+        help="Use v2 for the current home-page briefing detail; defaults to v1 for compatibility",
+    )
+    add_output(briefing_detail)
+    briefing_detail.set_defaults(func=fetch_market_briefing_detail)
+
+    shorttents = sub.add_parser("shorttents", help="Compact public finance content feed")
+    shorttents.add_argument("--source", choices=["pc.npay_finhome"], default="pc.npay_finhome")
+    shorttents.add_argument("--content-type", choices=["compact"], default="compact")
+    shorttents.add_argument("--category-first", type=_short_text, default="증권")
+    shorttents.add_argument("--nscs", type=_bounded_integer("nscs", 0, 100_000), default=0)
+    add_output(shorttents)
+    shorttents.set_defaults(func=fetch_shorttents)
+
+    money_story = sub.add_parser("money-story", help="Public money-story content")
+    money_story.add_argument(
+        "--main-category-id",
+        type=_bounded_integer("main-category-id", 1, 100_000),
+        action="append",
+    )
+    money_story.add_argument("--size", type=_bounded_integer("size", 1, 100), default=3)
+    add_output(money_story)
+    money_story.set_defaults(func=fetch_money_story)
+
+    indicators = sub.add_parser("indicators", help="Integrated home-page market indicators")
+    indicators.add_argument("--indicator-codes", type=_indicator_codes, default=DEFAULT_INDICATORS)
+    add_output(indicators)
+    indicators.set_defaults(func=fetch_indicators)
+
+    indicators_v1 = sub.add_parser(
+        "indicators-v1", help="Grouped indices, currencies, bonds and commodities; optional index breadth/trends"
+    )
+    indicators_v1.add_argument("--domestic-index-codes", type=_indicator_codes, help="Comma-separated codes")
+    indicators_v1.add_argument("--foreign-index-codes", type=_indicator_codes, help="Comma-separated codes")
+    for group in ("currency", "bond", "commodity"):
+        indicators_v1.add_argument(f"--{group}-codes", type=_indicator_codes, help="Comma-separated codes")
+    indicators_v1.add_argument(
+        "--include-breadth", action=argparse.BooleanOptionalAction, default=None,
+        help="Request or exclude market breadth; omitted leaves the server default",
+    )
+    indicators_v1.add_argument(
+        "--include-trend", action=argparse.BooleanOptionalAction, default=None,
+        help="Request or exclude investor/program trends; omitted leaves the server default",
+    )
+    add_output(indicators_v1)
+    indicators_v1.set_defaults(func=fetch_indicators_v1)
+
+    notable_etf = sub.add_parser("notable-etf", help="Domestic or foreign notable ETFs")
+    notable_etf.add_argument("--nation", choices=["domestic", "foreign"], default="domestic")
+    notable_etf.add_argument(
+        "--order-type",
+        choices=DOMESTIC_NOTABLE_ETF_ORDER_TYPES + FOREIGN_NOTABLE_ETF_ORDER_TYPES,
+        help="Defaults to amount_etf for domestic and up for foreign",
+    )
+    notable_etf.add_argument(
+        "--large-code", type=_theme_code, help="Optional foreign ETF large theme code"
+    )
+    notable_etf.add_argument(
+        "--middle-code",
+        type=_theme_code,
+        help="Optional foreign ETF middle theme code; current return1Month UI selects a theme, e.g. 0101",
+    )
+    notable_etf.add_argument("--start-idx", type=_bounded_integer("start-idx", 0, 10_000), default=0)
+    notable_etf.add_argument("--page-size", type=_bounded_integer("page-size", 1, 100), default=10)
+    add_output(notable_etf)
+    notable_etf.set_defaults(func=fetch_notable_etf)
+
+    economic = sub.add_parser("economic-upcoming", help="Important upcoming economic indicators")
+    economic.add_argument("--gte-importance", type=_bounded_integer("gte-importance", 1, 5), default=3)
+    economic.add_argument("--limit", type=_bounded_integer("limit", 1, 100), default=3)
+    economic.add_argument("--nation-type", choices=["KOR", "USA", "CHN", "JPN", "EUR"], action="append")
+    add_output(economic)
+    economic.set_defaults(func=fetch_economic_upcoming)
+
+    ranking = sub.add_parser("public-ranking", help="Public all-user asset or earning-rate ranking")
+    ranking.add_argument("--ranking-type", choices=["asset", "earning"], required=True)
+    ranking.add_argument("--start-idx", type=_bounded_integer("start-idx", 0, 10_000), default=0)
+    ranking.add_argument("--page-size", type=_bounded_integer("page-size", 1, 100), default=20)
+    add_output(ranking)
+    ranking.set_defaults(func=fetch_public_ranking)
+
+    holding = sub.add_parser("holding-stock-ranking", help="Public all-user holding-stock ranking")
+    add_output(holding)
+    holding.set_defaults(func=fetch_holding_stock_ranking)
+
+    related = sub.add_parser("related-stock", help="Public related stocks for a domestic code")
+    related.add_argument("--code", required=True, type=_domestic_code)
+    add_output(related)
+    related.set_defaults(func=fetch_related_stock)
+
+    args = parser.parse_args()
+    if args.command == "money-story" and args.main_category_id and len(args.main_category_id) > 20:
+        parser.error("money-story accepts at most 20 --main-category-id values")
+    if args.command == "economic-upcoming" and args.nation_type and len(args.nation_type) > 10:
+        parser.error("economic-upcoming accepts at most 10 --nation-type values")
+    if args.command == "notable-etf" and args.order_type:
+        allowed = (
+            DOMESTIC_NOTABLE_ETF_ORDER_TYPES
+            if args.nation == "domestic"
+            else FOREIGN_NOTABLE_ETF_ORDER_TYPES
+        )
+        if args.order_type not in allowed:
+            parser.error(f"{args.order_type} is not valid for --nation {args.nation}")
+    if args.command == "notable-etf" and args.nation == "domestic":
+        if args.large_code is not None or args.middle_code is not None:
+            parser.error("--large-code and --middle-code require --nation foreign")
+    if args.command in ("market-status", "exchange-sessions", "indicators-v1"):
+        try:
+            result = args.func(args)
+        except (ValueError, argparse.ArgumentTypeError) as exc:
+            parser.error(str(exc))
+    else:
+        result = args.func(args)
+    emit_output(render_json(result), args.output)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""Fetch public read-only Naver Stock foreign market and security payloads."""
+
+from __future__ import annotations
+
+import argparse
+import re
+from typing import Any, Callable
+
+from naverstock_api import (
+    build_path,
+    emit_output,
+    normalize_reuters_code_case,
+    render_json,
+    request_json,
+    validate_page_cursor,
+)
+
+
+NATIONS = ("usa", "chn", "hkg", "jpn", "vnm")
+NATION_API_NAMES = {nation: nation.upper() for nation in NATIONS}
+TRADE_TYPES = ("ALL", "NSQ", "NYS", "AMX", "SHH", "SHZ", "HKG", "TYO", "HSX", "HNX")
+STOCK_ORDER_TYPES = ("quantTop", "priceTop", "up", "down", "marketValue", "dividend")
+ETF_ORDER_TYPES = ("quantTop", "priceTop", "up", "down", "marketValue", "dividend")
+NOTABLE_ETF_ORDER_TYPES = ("priceTop", "up", "return1Month", "dividend")
+ETF_V2_SORTS = {
+    "priceTop": ("tradingValue", "desc"), "marketValue": ("marketCap", "desc"),
+    "up": ("changeRate", "desc"), "down": ("changeRate", "asc"),
+    "trading": ("tradingVolume", "desc"), "dividend": ("dividend", "desc"),
+}
+POLL_TYPES = ("stock", "etf", "index", "futures")
+EXCHANGES = ("NASDAQ", "NYSE", "AMEX")
+
+_REUTERS_CODE = re.compile(r"^(?:[A-Za-z0-9][A-Za-z0-9._-]{0,31}|\.[A-Za-z0-9][A-Za-z0-9._-]{0,30})$")
+_INDUSTRY_CODE = re.compile(r"^[0-9]{2,12}$")
+_THEME_CODE = re.compile(r"^(?:all|[A-Za-z0-9_-]{1,20})$")
+
+
+def bounded_int(name: str, minimum: int, maximum: int) -> Callable[[str], int]:
+    """Build an argparse integer parser with an explicit safe range."""
+
+    def parse(value: str) -> int:
+        try:
+            result = int(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"{name} must be an integer") from exc
+        if not minimum <= result <= maximum:
+            raise argparse.ArgumentTypeError(f"{name} must be between {minimum} and {maximum}")
+        return result
+
+    return parse
+
+
+def reuters_code(value: str) -> str:
+    """Normalize a public Reuters code without rewriting its underscore suffix."""
+
+    return normalize_reuters_code_case(poll_code(value))
+
+
+def poll_code(value: str) -> str:
+    """Validate a Reuters code before any security-specific case normalization."""
+
+    result = value.strip()
+    # Validate the original ASCII spelling before upper() can expand Unicode.
+    if not _REUTERS_CODE.fullmatch(result):
+        raise argparse.ArgumentTypeError(
+            "Reuters code must contain only letters, digits, dot, underscore, or hyphen"
+        )
+    return result
+
+
+def _canonical_poll_code(value: str, security_type: str) -> str:
+    if security_type != "futures":
+        return normalize_reuters_code_case(value)
+    continuous = re.fullmatch(r"(.+?)cv([0-9]+)", value, flags=re.IGNORECASE)
+    if continuous:
+        return f"{continuous.group(1).upper()}cv{continuous.group(2)}"
+    return value.upper()
+
+
+def industry_code(value: str) -> str:
+    result = value.strip()
+    if not _INDUSTRY_CODE.fullmatch(result):
+        raise argparse.ArgumentTypeError("industry code must contain 2-12 digits")
+    return result
+
+
+def theme_code(value: str) -> str:
+    result = value.strip()
+    if not _THEME_CODE.fullmatch(result):
+        raise argparse.ArgumentTypeError("theme code must be 'all' or a short alphanumeric code")
+    return result
+
+
+def fetch_stocks(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/foreign/market/stock/global",
+            {
+                "nation": args.nation,
+                "tradeType": args.trade_type,
+                "orderType": args.order_type,
+                "startIdx": args.start_idx,
+                "pageSize": args.page_size,
+            },
+        )
+    )
+
+
+def fetch_sectors(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/foreign/market/{NATION_API_NAMES[args.nation]}/upjong/list")
+
+
+def fetch_sector_stocks(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/foreign/market/{NATION_API_NAMES[args.nation]}/upjong/{args.industry_code}/list",
+            {"orderType": args.order_type, "startIdx": args.start_idx, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_sector_detail(args: argparse.Namespace) -> Any:
+    return request_json(
+        f"/api/stockSecurity/sectors/v2/foreign/{NATION_API_NAMES[args.nation]}/{args.industry_code}"
+    )
+
+
+def fetch_etfs_v2(args: argparse.Namespace) -> Any:
+    sort_type, direction = ETF_V2_SORTS[args.order_type]
+    return request_json(build_path("/api/stockSecurity/etfs/v2/foreign", {
+        "sortType": sort_type, "sortDirection": direction, "index": args.index, "size": args.size,
+        "largeCategoryCode": None if args.large_category_code == "all" else args.large_category_code,
+        "middleCategoryCode": None if args.middle_category_code == "all" else args.middle_category_code,
+    }))
+
+
+def fetch_etf_themes_v2(_: argparse.Namespace) -> Any:
+    return request_json("/api/stockSecurity/etfs/v2/foreign/themes")
+
+
+def fetch_popular_etfs(args: argparse.Namespace) -> Any:
+    return request_json(build_path("/api/stockSecurity/rankings/v2/foreign/popular-etf", {
+        "nationType": "USA", "size": args.size, "cursor": args.cursor,
+    }))
+
+
+def fetch_popular_etf_summary(args: argparse.Namespace) -> Any:
+    return request_json(build_path("/api/stockSecurity/aggregate/foreignPopularEtf", {"size": args.size}))
+
+
+def fetch_etf_themes(_: argparse.Namespace) -> Any:
+    return request_json("/api/foreign/market/etf/themes")
+
+
+def fetch_etfs(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/foreign/market/etf/usa",
+            {
+                "orderType": args.order_type,
+                "largeCode": args.large_code,
+                "middleCode": args.middle_code,
+                "startIdx": args.start_idx,
+                "pageSize": args.page_size,
+            },
+        )
+    )
+
+
+def fetch_notable_etfs(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/foreign/market/home/notableETF",
+            {
+                "orderType": args.order_type,
+                "largeCode": args.large_code,
+                "middleCode": args.middle_code,
+                "startIdx": args.start_idx,
+                "pageSize": args.page_size,
+            },
+        )
+    )
+
+
+def fetch_etf_theme_list(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/foreign/market/usa/etf/themeList",
+            {"middleCode": args.middle_code, "count": args.count},
+        )
+    )
+
+
+def fetch_stock_basic(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/securityService/stock/{args.code}/basic")
+
+
+def fetch_stock_consensus(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/securityService/stock/{args.code}/consensus")
+
+
+def fetch_stock_overview(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/securityService/stock/{args.code}/overview")
+
+
+def fetch_finance(args: argparse.Namespace) -> Any:
+    if args.section == "overview":
+        path = "/api/securityService/stock/overview"
+    elif args.section == "summary":
+        path = "/api/securityService/stock/finance/summary"
+    elif args.section == "finance":
+        path = f"/api/securityService/stock/finance/{args.period}"
+    else:
+        path = f"/api/securityService/stock/finance/{args.section}/{args.period}"
+    return request_json(build_path(path, {"reutersCode": args.code}))
+
+
+def fetch_stock_prices(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/securityService/stock/{args.code}/price",
+            {"page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_foreign_detail(args: argparse.Namespace) -> Any:
+    # The current web bundle sends the literal codeType=ETF for this shared
+    # stock/ETF master-detail endpoint, including when the result is a stock.
+    return request_json(build_path(f"/api/foreign/{args.code}/detail", {"codeType": "ETF"}))
+
+
+def fetch_etf_prices(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/securityService/etf/{args.code}/price",
+            {"page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_etf_related(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/foreign/v2/market/etf/usa/{args.code}",
+            {"startIdx": args.start_idx, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_etf_composition(args: argparse.Namespace) -> Any:
+    return request_json(
+        f"/api/stockSecurity/etfs/v2/foreign/{args.code}/composition"
+    )
+
+
+def fetch_chart_meta(args: argparse.Namespace) -> Any:
+    return request_json(
+        f"/api/securityFe/api/fchart/foreign/{args.asset_type}/{args.code}"
+    )
+
+
+def fetch_index_basic(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/securityService/index/{args.code}/basic")
+
+
+def fetch_index_prices(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/securityService/index/{args.code}/price",
+            {"page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_index_constituents(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            f"/api/securityService/index/{args.code}/enrollStocks",
+            {"page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_poll(args: argparse.Namespace) -> Any:
+    codes = ",".join(
+        _canonical_poll_code(code, args.security_type) for code in args.code
+    )
+    return request_json(build_path(f"/api/polling/worldstock/{args.security_type}", {"reutersCodes": codes}))
+
+
+def fetch_exchange_time(args: argparse.Namespace) -> Any:
+    return request_json(f"/api/foreign/operatingTime/exchange/{args.exchange}")
+
+
+def fetch_stock_world_news(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/foreign/worldStock/list",
+            {"reutersCode": args.code, "page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def fetch_stock_local_news(args: argparse.Namespace) -> Any:
+    return request_json(
+        build_path(
+            "/api/domestic/detail/news",
+            {"itemCode": args.code, "page": args.page, "pageSize": args.page_size},
+        )
+    )
+
+
+def add_output(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--output", help="Write output to a file instead of stdout")
+
+
+def add_bounded_paging(parser: argparse.ArgumentParser, *, page_based: bool = False) -> None:
+    if page_based:
+        parser.add_argument("--page", type=bounded_int("page", 1, 1000), default=1)
+    else:
+        parser.add_argument("--start-idx", type=bounded_int("start index", 0, 10000), default=0)
+    parser.add_argument("--page-size", type=bounded_int("page size", 1, 100), default=20)
+    add_output(parser)
+
+
+def add_code(parser: argparse.ArgumentParser, help_text: str) -> None:
+    parser.add_argument("--code", required=True, type=reuters_code, help=help_text)
+    add_output(parser)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    v2 = sub.add_parser("etfs-v2", help="Current US ETF list with index/hasNext paging")
+    v2.add_argument("--order-type", choices=tuple(ETF_V2_SORTS), default="priceTop")
+    v2.add_argument("--index", type=bounded_int("index", 0, 10_000), default=0)
+    v2.add_argument("--size", type=bounded_int("size", 1, 100), default=20)
+    v2.add_argument("--large-category-code", type=theme_code)
+    v2.add_argument("--middle-category-code", type=theme_code)
+    v2.add_argument("--output")
+    v2.set_defaults(func=fetch_etfs_v2)
+    themes_v2 = sub.add_parser("etf-themes-v2", help="Current US ETF large/middle category metadata")
+    themes_v2.add_argument("--output")
+    themes_v2.set_defaults(func=fetch_etf_themes_v2)
+    for name, func in (("popular-etfs", fetch_popular_etfs), ("popular-etf-summary", fetch_popular_etf_summary)):
+        popular = sub.add_parser(name, help="US popular ETF cursor ranking or fixed aggregate summary")
+        popular.add_argument("--size", type=bounded_int("size", 1, 100), default=10)
+        if name == "popular-etfs":
+            popular.add_argument("--cursor", type=validate_page_cursor)
+        popular.add_argument("--output")
+        popular.set_defaults(func=func)
+
+    stocks = sub.add_parser("stocks", help="Foreign country stock ranking/list")
+    stocks.add_argument("--nation", choices=NATIONS, default="usa")
+    stocks.add_argument("--trade-type", choices=TRADE_TYPES, default="ALL")
+    stocks.add_argument("--order-type", choices=STOCK_ORDER_TYPES, default="marketValue")
+    add_bounded_paging(stocks)
+    stocks.set_defaults(func=fetch_stocks)
+
+    sectors = sub.add_parser("sectors", help="Foreign industry/sector list")
+    sectors.add_argument("--nation", choices=NATIONS, default="usa")
+    add_output(sectors)
+    sectors.set_defaults(func=fetch_sectors)
+
+    sector_stocks = sub.add_parser("sector-stocks", help="Stocks in a foreign industry/sector")
+    sector_stocks.add_argument("--nation", choices=NATIONS, default="usa")
+    sector_stocks.add_argument("--industry-code", required=True, type=industry_code)
+    sector_stocks.add_argument("--order-type", choices=STOCK_ORDER_TYPES, default="marketValue")
+    add_bounded_paging(sector_stocks)
+    sector_stocks.set_defaults(func=fetch_sector_stocks)
+
+    sector_detail = sub.add_parser(
+        "sector-detail",
+        help="Current v2 summary for a foreign industry/sector",
+    )
+    sector_detail.add_argument("--nation", choices=NATIONS, default="usa")
+    sector_detail.add_argument("--industry-code", required=True, type=industry_code)
+    add_output(sector_detail)
+    sector_detail.set_defaults(func=fetch_sector_detail)
+
+    etf_themes = sub.add_parser("etf-themes", help="US ETF large/middle theme filters")
+    add_output(etf_themes)
+    etf_themes.set_defaults(func=fetch_etf_themes)
+
+    etfs = sub.add_parser("etfs", help="US ETF ranking/list")
+    etfs.add_argument("--order-type", choices=ETF_ORDER_TYPES, default="marketValue")
+    etfs.add_argument("--large-code", type=theme_code, default="all")
+    etfs.add_argument("--middle-code", type=theme_code, default="all")
+    add_bounded_paging(etfs)
+    etfs.set_defaults(func=fetch_etfs)
+
+    notable = sub.add_parser("notable-etfs", help="Notable US ETF list used on market/home")
+    notable.add_argument("--order-type", choices=NOTABLE_ETF_ORDER_TYPES, default="up")
+    notable.add_argument("--large-code", type=theme_code)
+    notable.add_argument("--middle-code", type=theme_code)
+    add_bounded_paging(notable)
+    notable.set_defaults(func=fetch_notable_etfs)
+
+    theme_list = sub.add_parser("etf-theme-list", help="US ETF list for one middle theme")
+    theme_list.add_argument("--middle-code", required=True, type=theme_code)
+    theme_list.add_argument("--count", type=bounded_int("count", 1, 20), default=3)
+    add_output(theme_list)
+    theme_list.set_defaults(func=fetch_etf_theme_list)
+
+    for name, help_text, func in [
+        ("stock-basic", "Foreign stock basic/current summary", fetch_stock_basic),
+        ("stock-consensus", "Foreign stock analyst consensus", fetch_stock_consensus),
+        ("stock-overview", "Foreign stock company overview", fetch_stock_overview),
+        ("foreign-detail", "Shared foreign stock/ETF master detail", fetch_foreign_detail),
+        ("index-basic", "Foreign index basic/current summary", fetch_index_basic),
+    ]:
+        command = sub.add_parser(name, help=help_text)
+        add_code(command, "Reuters code, for example NVDA.O, VOO, or .IXIC")
+        command.set_defaults(func=func)
+
+    finance = sub.add_parser("finance", help="Foreign stock finance overview, statements, ratios, or summary")
+    finance.add_argument("--code", required=True, type=reuters_code)
+    finance.add_argument(
+        "--section",
+        choices=["overview", "summary", "finance", "ratios", "balance", "income", "cash"],
+        required=True,
+    )
+    finance.add_argument("--period", choices=["annual", "quarter"], default="annual")
+    add_output(finance)
+    finance.set_defaults(func=fetch_finance)
+
+    for name, help_text, func in [
+        ("stock-prices", "Foreign stock daily price rows", fetch_stock_prices),
+        ("etf-prices", "Foreign ETF daily price rows", fetch_etf_prices),
+        ("index-prices", "Foreign index daily price rows", fetch_index_prices),
+        ("index-constituents", "Foreign index constituent stocks", fetch_index_constituents),
+    ]:
+        command = sub.add_parser(name, help=help_text)
+        command.add_argument("--code", required=True, type=reuters_code)
+        add_bounded_paging(command, page_based=True)
+        command.set_defaults(func=func)
+
+    related = sub.add_parser("etf-related", help="US ETF theme peers related to an ETF")
+    related.add_argument("--code", required=True, type=reuters_code)
+    add_bounded_paging(related)
+    related.set_defaults(func=fetch_etf_related)
+
+    composition = sub.add_parser(
+        "etf-composition",
+        help="Foreign ETF exposure and holdings composition",
+    )
+    composition.add_argument("--code", required=True, type=reuters_code)
+    add_output(composition)
+    composition.set_defaults(func=fetch_etf_composition)
+
+    chart_meta = sub.add_parser(
+        "chart-meta",
+        help="Foreign stock, ETF, or index chart metadata",
+    )
+    chart_meta.add_argument("--asset-type", choices=["stock", "index"], required=True)
+    chart_meta.add_argument("--code", required=True, type=reuters_code)
+    add_output(chart_meta)
+    chart_meta.set_defaults(func=fetch_chart_meta)
+
+    poll = sub.add_parser("poll", help="Public current price polling for foreign securities")
+    poll.add_argument("security_type", choices=POLL_TYPES)
+    poll.add_argument(
+        "--code",
+        required=True,
+        action="append",
+        type=poll_code,
+        help="Reuters code; repeat for up to 20 codes",
+    )
+    add_output(poll)
+    poll.set_defaults(func=fetch_poll)
+
+    exchange = sub.add_parser("exchange-time", help="US exchange operating-time metadata")
+    exchange.add_argument("--exchange", choices=EXCHANGES, default="NASDAQ")
+    add_output(exchange)
+    exchange.set_defaults(func=fetch_exchange_time)
+
+    for name, help_text, func in [
+        ("stock-world-news", "Foreign stock global/Reuters news", fetch_stock_world_news),
+        ("stock-local-news", "Korean local news for a foreign stock", fetch_stock_local_news),
+    ]:
+        command = sub.add_parser(name, help=help_text)
+        command.add_argument("--code", required=True, type=reuters_code)
+        add_bounded_paging(command, page_based=True)
+        command.set_defaults(func=func)
+
+    args = parser.parse_args()
+    if args.command == "poll" and len(args.code) > 20:
+        parser.error("poll accepts at most 20 --code values")
+    emit_output(render_json(args.func(args)), args.output)
+
+
+if __name__ == "__main__":
+    main()

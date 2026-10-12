@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    name: Python 3.14
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          check-latest: true
+      - name: Install lint tool
+        run: python -m pip install --disable-pip-version-check "ruff==0.16.6"
+      - name: Compile scripts
+        run: python -m compileall -q scripts
+      - name: Check whitespace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+          else
+            before="${{ github.event.before }}"
+            if [[ "$before" =~ ^0+$ ]] || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              git show --check --pretty=format: --no-ext-diff "${{ github.sha }}"
+            else
+              git diff --check "$before" "${{ github.sha }}"
+            fi
+          fi
+      - name: Check script help
+        run: |
+          for file in scripts/*.py; do
+            python "$file" --help >/dev/null
+          done
+      - name: Run tests
+        run: python -m unittest discover -s tests
+      - name: Lint scripts and tests
+        run: ruff check --isolated --select E4,E7,E9,F scripts tests
+      - name: Smoke-test lightweight skill layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          task_root="$(mktemp -d)"
+          target="$task_root/naverstock-web-api"
+          work="$task_root/user-workspace"
+          mkdir -p "$target" "$work"
+          cp -R SKILL.md LICENSE agents references scripts "$target/"
+          cd "$work"
+          python "$target/scripts/home.py" --help >/dev/null
+          python "$target/scripts/foreign_stock.py" --help >/dev/null
+          python "$target/scripts/search.py" --help >/dev/null
+          python "$target/scripts/research_check.py" --output plan.json
+          test -s plan.json
+          test ! -e "$target/plan.json"
